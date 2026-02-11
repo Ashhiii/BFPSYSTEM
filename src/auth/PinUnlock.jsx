@@ -7,6 +7,8 @@ export default function PinUnlock() {
   const [loading, setLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
 
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const submit = async (e) => {
     e.preventDefault();
     setMsg("");
@@ -15,7 +17,7 @@ export default function PinUnlock() {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/auth/pin", {
+      const res = await fetch(`${API}/auth/pin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
@@ -120,7 +122,6 @@ export default function PinUnlock() {
 
   /* ================= RENDER ================= */
 
-  // 🔥 FIRE ONLY (WHITE SCREEN)
   if (fireLoading) {
     return (
       <div style={fireScreen}>
@@ -141,15 +142,12 @@ export default function PinUnlock() {
     );
   }
 
-  // 🔐 LOGIN SCREEN
   return (
     <div style={bg}>
       <div style={overlay} />
 
       <div style={card}>
-        <div style={{ fontSize: 20, fontWeight: 950 }}>
-          BFP RECORDS SYSTEM
-        </div>
+        <div style={{ fontSize: 20, fontWeight: 950 }}>BFP RECORDS SYSTEM</div>
         <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
           Enter PIN to unlock
         </div>

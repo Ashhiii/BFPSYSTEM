@@ -14,6 +14,8 @@ export default function Records({ refresh, setRefresh }) {
   const [months, setMonths] = useState([]);
   const [mode, setMode] = useState("current"); // current | archive
   const [selectedMonth, setSelectedMonth] = useState("");
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   
   const [selectedRecord, setSelectedRecord] = useState(null);
 
@@ -34,19 +36,19 @@ export default function Records({ refresh, setRefresh }) {
   };
 
   const fetchCurrent = async () => {
-    const res = await fetch("http://localhost:5000/records");
+    const res = await fetch(`${API}/records`);
     const data = await res.json();
     setRecords(data || []);
   };
 
   const fetchMonths = async () => {
-    const res = await fetch("http://localhost:5000/archive/months");
+    const res = await fetch(`${API}/archive/months`);
     const data = await res.json();
     setMonths(data || []);
   };
 
   const fetchArchiveMonth = async (m) => {
-    const res = await fetch(`http://localhost:5000/archive/${m}`);
+    const res = await fetch(`${API}/archive/${m}`);
     const data = await res.json();
     setRecords(data || []);
   };
@@ -96,7 +98,7 @@ export default function Records({ refresh, setRefresh }) {
   const closeMonth = async () => {
     if (!window.confirm("Close month and archive records?")) return;
 
-    const res = await fetch("http://localhost:5000/records/close-month", { method: "POST" });
+    const res = await fetch(`${API}/records/close-month`, { method: "POST" });
     const data = await res.json();
 
     if (data.success) {

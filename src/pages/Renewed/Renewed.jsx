@@ -155,7 +155,7 @@ export default function Renewed({ refresh, setRefresh }) {
 
   const loadRenewed = async () => {
     try {
-      const res = await fetch("http://localhost:5000/manager/items?scope=renewed&month=");
+      const res = await fetch(`${API}/manager/items?scope=renewed&month=`);
       const data = await res.json();
       const raw = Array.isArray(data) ? data : data.items || data.records || [];
       const onlyRenewed = raw.filter((r) => (r.kind || "") === "renewed");

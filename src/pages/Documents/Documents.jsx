@@ -15,18 +15,21 @@ const C = {
 };
 
 export default function Documents({ refresh, setRefresh }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [tab, setTab] = useState("view"); // view | add
   const [docs, setDocs] = useState([]);
   const [search, setSearch] = useState("");
 
   const fetchDocs = async () => {
-    const res = await fetch("http://localhost:5000/documents");
+    const res = await fetch(`${API}/documents`);
     const data = await res.json();
     setDocs(data || []);
   };
 
   useEffect(() => {
     fetchDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
   const filtered = useMemo(() => {
@@ -50,17 +53,6 @@ export default function Documents({ refresh, setRefresh }) {
     fontWeight: 900,
     whiteSpace: "nowrap",
   });
-
-  const refreshBtn = {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: `1px solid ${C.gold}`,
-    background: C.gold,
-    cursor: "pointer",
-    fontWeight: 950,
-    color: "#111827",
-    whiteSpace: "nowrap",
-  };
 
   return (
     <div>
@@ -102,6 +94,7 @@ export default function Documents({ refresh, setRefresh }) {
       {/* ADD DOCUMENT */}
       {tab === "add" && (
         <AddDocument
+          setRefresh={setRefresh}
           onSaved={() => {
             setRefresh((p) => !p);
             setTab("view");
