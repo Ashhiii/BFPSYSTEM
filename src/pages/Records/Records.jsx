@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
-import RecordsTable from "./RecordsTable";
-import RecordDetailsPanel from "./RecordDetailsPanel";
+import RecordsTable from "./RecordsTable.jsx";
+import RecordDetailsPanel from "./RecordDetailsPanel.jsx";
 import AddRecord from "./AddRecord.jsx";
 
-import injectTableStyles from "./injectTableStyles";
+import injectTableStyles from "./injectTableStyles.jsx";
 
 export default function Records({ refresh, setRefresh }) {
   const [tab, setTab] = useState("view"); // view | add
@@ -14,6 +14,7 @@ export default function Records({ refresh, setRefresh }) {
   const [months, setMonths] = useState([]);
   const [mode, setMode] = useState("current"); // current | archive
   const [selectedMonth, setSelectedMonth] = useState("");
+  
   const [selectedRecord, setSelectedRecord] = useState(null);
 
   useEffect(() => injectTableStyles(), []);

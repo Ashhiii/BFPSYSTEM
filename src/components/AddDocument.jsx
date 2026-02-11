@@ -23,11 +23,12 @@ export default function AddDocument({ setRefresh }) {
     e.preventDefault();
 
     try {
-      const res = await fetch("http://localhost:5000/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const res = await fetch("/api/auth/pin", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ pin }),
+});
+
 
       const data = await res.json();
       if (data.success) {
