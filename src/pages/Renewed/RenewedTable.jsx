@@ -1,6 +1,8 @@
 import React from "react";
 
 export default function RenewedTable({ records = [], onRowClick }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const open = (url, e) => {
     e.stopPropagation();
     window.open(url, "_blank");
@@ -139,20 +141,27 @@ export default function RenewedTable({ records = [], onRowClick }) {
                   ...S.row,
                   background: i % 2 === 0 ? "#fff" : "#fafafa",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#fff1f2")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.background =
-                    i % 2 === 0 ? "#fff" : "#fafafa")
+                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
                 }
                 onClick={() => onRowClick?.(r)}
               >
-                <td style={S.td}><div style={clamp}>{r.fsicAppNo || "-"}</div></td>
-                <td style={S.td}><div style={clamp}>{r.ownerName || "-"}</div></td>
-                <td style={S.td}><div style={clamp}>{r.establishmentName || "-"}</div></td>
-                <td style={S.td}><div style={clamp}>{r.businessAddress || "-"}</div></td>
-                <td style={S.td}><div style={clamp}>{r.dateInspected || "-"}</div></td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.fsicAppNo || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.ownerName || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.establishmentName || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.businessAddress || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.dateInspected || "-"}</div>
+                </td>
 
                 <td style={S.actionsTd}>
                   <button
@@ -160,12 +169,7 @@ export default function RenewedTable({ records = [], onRowClick }) {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) =>
-                      open(
-                        `http://localhost:5000/records/${r.id}/certificate/owner/pdf`,
-                        e
-                      )
-                    }
+                    onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
                   >
                     Owner PDF
                   </button>
@@ -175,12 +179,7 @@ export default function RenewedTable({ records = [], onRowClick }) {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) =>
-                      open(
-                        `http://localhost:5000/records/${r.id}/certificate/bfp/pdf`,
-                        e
-                      )
-                    }
+                    onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
                   >
                     BFP PDF
                   </button>

@@ -1,6 +1,8 @@
 import React from "react";
 
 export default function RecordsTable({ records = [], onRowClick }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const open = (url, e) => {
     e.stopPropagation();
     window.open(url, "_blank");
@@ -140,22 +142,33 @@ export default function RecordsTable({ records = [], onRowClick }) {
                   ...S.row,
                   background: i % 2 === 0 ? "#fff" : "#fafafa",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#fff1f2")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.background =
-                    i % 2 === 0 ? "#fff" : "#fafafa")
+                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
                 }
                 onClick={() => onRowClick?.(r)}
               >
-                <td style={S.td}><div style={wrap2}>{r.no || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.fsicAppNo || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.natureOfInspection || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.ownerName || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.establishmentName || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.businessAddress || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.dateInspected || "-"}</div></td>
+                <td style={S.td}>
+                  <div style={wrap2}>{r.no || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={wrap2}>{r.fsicAppNo || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={wrap2}>{r.natureOfInspection || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={wrap2}>{r.ownerName || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={wrap2}>{r.establishmentName || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={wrap2}>{r.businessAddress || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={wrap2}>{r.dateInspected || "-"}</div>
+                </td>
 
                 <td style={S.actionsTd}>
                   <button
@@ -164,10 +177,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onClick={(e) =>
-                      open(
-                        `http://localhost:5000/records/${r.id}/certificate/owner/pdf`,
-                        e
-                      )
+                      open(`${API}/records/${r.id}/certificate/owner/pdf`, e)
                     }
                   >
                     Owner PDF
@@ -179,10 +189,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onClick={(e) =>
-                      open(
-                        `http://localhost:5000/records/${r.id}/certificate/bfp/pdf`,
-                        e
-                      )
+                      open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)
                     }
                   >
                     BFP PDF
