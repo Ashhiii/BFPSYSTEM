@@ -36,6 +36,8 @@ export default function RecordDetailsPanel({
   isArchive,
   onRenewSaved,
 }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [renewedRecord, setRenewedRecord] = useState(null);
@@ -68,11 +70,11 @@ export default function RecordDetailsPanel({
 
     if (!entityKey) return;
 
-    fetch(`http://localhost:5000/records/renewed/${encodeURIComponent(entityKey)}`)
+    fetch(`${API}/records/renewed/${encodeURIComponent(entityKey)}`)
       .then((r) => r.json())
       .then((d) => setRenewedRecord(d?.record || null))
       .catch(() => setRenewedRecord(null));
-  }, [record, entityKey]);
+  }, [record, entityKey, API]);
 
   /* ===================== BFP THEME PANEL STYLES ===================== */
 
@@ -104,9 +106,9 @@ export default function RecordDetailsPanel({
     padding: 12,
   };
 
-  // if parent passes styles.td, keep it, but override colors to match theme
   const baseTd =
-    styles?.td || ({
+    styles?.td ||
+    ({
       padding: 10,
       borderBottom: `1px solid ${C.border}`,
       fontWeight: 850,
@@ -177,7 +179,7 @@ export default function RecordDetailsPanel({
     if (!record) return;
     if (!entityKey) return alert("Missing entityKey");
 
-    const res = await fetch("http://localhost:5000/records/renew", {
+    const res = await fetch(`${API}/records/renew`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -209,7 +211,9 @@ export default function RecordDetailsPanel({
       <div style={panel}>
         <div style={head}>
           <b style={{ color: C.primaryDark }}>Details</b>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>{source}</span>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>
+            {source}
+          </span>
         </div>
         <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>
           Click a row to show details here.
@@ -292,13 +296,22 @@ export default function RecordDetailsPanel({
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
               {FIELDS.map((f) => (
                 <div key={f.key}>
-                  <div style={{ fontSize: 12, fontWeight: 950, color: C.primaryDark, marginBottom: 5 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 950,
+                      color: C.primaryDark,
+                      marginBottom: 5,
+                    }}
+                  >
                     {f.label}
                   </div>
                   <input
                     name={f.key}
                     value={form[f.key] ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, [f.key]: e.target.value }))
+                    }
                     style={inputStyle}
                     autoComplete="off"
                   />
@@ -306,13 +319,22 @@ export default function RecordDetailsPanel({
               ))}
 
               <div>
-                <div style={{ fontSize: 12, fontWeight: 950, color: C.primaryDark, marginBottom: 5 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 950,
+                    color: C.primaryDark,
+                    marginBottom: 5,
+                  }}
+                >
                   Team Leader (Renewed)
                 </div>
                 <input
                   name="teamLeader"
                   value={form.teamLeader ?? ""}
-                  onChange={(e) => setForm((p) => ({ ...p, teamLeader: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, teamLeader: e.target.value }))
+                  }
                   style={inputStyle}
                   autoComplete="off"
                 />
