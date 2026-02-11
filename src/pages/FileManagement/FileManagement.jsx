@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 export default function FileManagement({ refresh, setRefresh }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [tab, setTab] = useState("records");
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
@@ -39,7 +41,7 @@ export default function FileManagement({ refresh, setRefresh }) {
 
   const loadMonths = async () => {
     try {
-      const res = await fetch("http://localhost:5000/archive/months");
+      const res = await fetch(`${API}/archive/months`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : data?.months || [];
       setMonths(list);
@@ -59,7 +61,7 @@ export default function FileManagement({ refresh, setRefresh }) {
         return;
       }
 
-      const url = `http://localhost:5000/manager/items?scope=${encodeURIComponent(
+      const url = `${API}/manager/items?scope=${encodeURIComponent(
         scope
       )}&month=${encodeURIComponent(tab === "archive" ? selectedMonth : "")}`;
 
@@ -75,7 +77,7 @@ export default function FileManagement({ refresh, setRefresh }) {
       // Fallback: old archive endpoint style (optional)
       if (tab === "archive") {
         const res2 = await fetch(
-          `http://localhost:5000/archive/${encodeURIComponent(selectedMonth)}`
+          `${API}/archive/${encodeURIComponent(selectedMonth)}`
         );
         if (res2.ok) {
           const data2 = await res2.json();
@@ -124,12 +126,11 @@ export default function FileManagement({ refresh, setRefresh }) {
     if (!window.confirm("Delete this item?")) return;
 
     let url = "";
-    if (scope === "current") url = `http://localhost:5000/records/${r.id}`;
-    else if (scope === "documents") url = `http://localhost:5000/documents/${r.id}`;
-    else if (scope === "renewed") url = `http://localhost:5000/records/renewed/${r.id}`;
+    if (scope === "current") url = `${API}/records/${r.id}`;
+    else if (scope === "documents") url = `${API}/documents/${r.id}`;
+    else if (scope === "renewed") url = `${API}/records/renewed/${r.id}`;
     else if (scope === "archive") {
-      // ✅ adjust this if your archive delete route differs
-      url = `http://localhost:5000/archive/${encodeURIComponent(selectedMonth)}/${r.id}`;
+      url = `${API}/archive/${encodeURIComponent(selectedMonth)}/${r.id}`;
     }
 
     if (!url) return alert("No delete route for this scope.");
@@ -211,10 +212,24 @@ export default function FileManagement({ refresh, setRefresh }) {
           <div style={{ fontSize: 18, fontWeight: 950, color: C.primaryDark }}>
             File Management
           </div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 6 }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: C.muted,
+              marginTop: 6,
+            }}
+          >
             Deletion only — choose what you want to manage.
           </div>
-          <div style={{ fontSize: 12, fontWeight: 900, color: C.muted, marginTop: 6 }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 900,
+              color: C.muted,
+              marginTop: 6,
+            }}
+          >
             Scope:{" "}
             <span style={{ color: C.primaryDark }}>
               {tab === "records"

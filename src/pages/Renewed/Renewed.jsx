@@ -3,6 +3,8 @@ import RenewedTable from "../Renewed/RenewedTable.jsx";
 import RecordDetailsPanel from "../Records/RecordDetailsPanel.jsx";
 
 export default function Renewed({ refresh, setRefresh }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -43,7 +45,12 @@ export default function Renewed({ refresh, setRefresh }) {
   };
 
   const hTitle = { fontSize: 18, fontWeight: 950, color: C.primaryDark };
-  const hSub = { fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 6 };
+  const hSub = {
+    fontSize: 12,
+    fontWeight: 800,
+    color: C.muted,
+    marginTop: 6,
+  };
 
   const input = {
     padding: "10px 12px",
@@ -106,7 +113,12 @@ export default function Renewed({ refresh, setRefresh }) {
     flexWrap: "wrap",
   };
 
-  const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0 };
+  const scroll = {
+    flex: 1,
+    overflowY: "auto",
+    overflowX: "hidden",
+    minHeight: 0,
+  };
 
   // Pass theme-friendly table cell + buttons into RecordDetailsPanel
   const panelStyles = {
@@ -157,8 +169,11 @@ export default function Renewed({ refresh, setRefresh }) {
     try {
       const res = await fetch(`${API}/manager/items?scope=renewed&month=`);
       const data = await res.json();
+
+      // Backend returns { success:true, items:[...] }
       const raw = Array.isArray(data) ? data : data.items || data.records || [];
       const onlyRenewed = raw.filter((r) => (r.kind || "") === "renewed");
+
       setRecords(onlyRenewed.map(normalizeOne));
     } catch (e) {
       console.error("loadRenewed error:", e);
@@ -168,11 +183,13 @@ export default function Renewed({ refresh, setRefresh }) {
 
   useEffect(() => {
     loadRenewed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return records;
+
     return records.filter((r) => {
       return (
         (r.fsicAppNo || "").toLowerCase().includes(q) ||
@@ -215,7 +232,9 @@ export default function Renewed({ refresh, setRefresh }) {
         <div style={card}>
           <div style={cardHead}>
             <div>Renewed List</div>
-            <div style={{ opacity: 0.85, color: C.muted }}>Results: {filtered.length}</div>
+            <div style={{ opacity: 0.85, color: C.muted }}>
+              Results: {filtered.length}
+            </div>
           </div>
 
           <div style={scroll}>
