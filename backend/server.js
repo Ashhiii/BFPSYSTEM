@@ -735,8 +735,9 @@ app.get("/documents/:id/:docType/pdf", (req, res) => {
 // -----------------------------
 // START
 // -----------------------------
-app.listen(PORT, () => {
-  console.log(`✅ Backend running at http://localhost:${PORT}`);
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Backend running on port ${PORT}`);
   console.log("PIN:", process.env.PIN ? "(set)" : "(default 1234)");
   console.log("SOFFICE_PATH:", process.env.SOFFICE_PATH || "(not set)");
 });
