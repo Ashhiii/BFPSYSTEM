@@ -1,11 +1,15 @@
 import React, { useState } from "react";
 import bgImage from "../assets/background/bg.png";
+import { useNavigate } from "react-router-dom";
+
 
 export default function PinUnlock() {
   const [pin, setPin] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
+  const navigate = useNavigate();
+
 
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -33,7 +37,7 @@ export default function PinUnlock() {
       setFireLoading(true);
 
       setTimeout(() => {
-        window.location.href = "/app/records";
+navigate("/app/records");
       }, 3500);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
