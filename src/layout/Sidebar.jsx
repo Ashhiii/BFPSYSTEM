@@ -16,7 +16,7 @@ export default function Sidebar({
   setCollapsed,
   active,
   navigate,
-  onLock, // ✅ should trigger fire loading sa Shell
+  onLock,
 }) {
   const iconStyle = { fontSize: 20, color: "#fff" };
   const labelStyle = { display: collapsed ? "none" : "inline" };
@@ -39,7 +39,7 @@ export default function Sidebar({
         <div
           style={{
             width: collapsed ? 40 : 46,
-            height: collapsed ? 40 : 46,
+            height: collapsed ? 30 : 46,
             borderRadius: "50%",
             overflow: "hidden",
             background: "rgba(255,255,255,0.08)",
@@ -52,7 +52,7 @@ export default function Sidebar({
           <img
             src={bfpLogo}
             alt="BFP Logo"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{ width: "100%", height: "100%", objectFit: "cover"}}
           />
         </div>
 

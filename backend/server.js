@@ -563,14 +563,16 @@ app.get("/manager/items", (req, res) => {
 });
 
 
-const CORRECT_PIN = "1234";
-
 app.post("/auth/pin", (req, res) => {
-  const pin = String(req.body?.pin || "").trim();
-  if (!pin) return res.status(400).json({ ok: false, message: "Missing PIN" });
-  if (pin === CORRECT_PIN) return res.json({ ok: true });
-  return res.status(401).json({ ok: false, message: "Incorrect PIN" });
+  const { pin } = req.body || {};
+  const OK_PIN = process.env.PIN || "1234";
+
+  if (String(pin) === String(OK_PIN)) {
+    return res.json({ ok: true });
+  }
+  return res.status(401).json({ ok: false });
 });
+
 
 
 // -----------------------------
