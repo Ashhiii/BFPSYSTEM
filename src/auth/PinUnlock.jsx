@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import bgImage from "../assets/background/bg.png";
 
 export default function PinUnlock() {
@@ -8,45 +7,22 @@ export default function PinUnlock() {
   const [loading, setLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
 
-  const navigate = useNavigate();
-
-  // ✅ set this in Vercel env: VITE_API_URL=https://your-backend.com
-  const API = useMemo(() => {
-    // Vite (recommended)
-    const v = import.meta?.env?.VITE_API_URL;
-    return (v || "").replace(/\/$/, ""); // remove trailing slash
-  }, []);
-
   const submit = async (e) => {
     e.preventDefault();
     setMsg("");
-
     if (!pin) return setMsg("Enter PIN.");
-
-    // ✅ helpful message if env var missing
-    if (!API) {
-      setMsg("Server not configured. Missing VITE_API_URL.");
-      return;
-    }
 
     try {
       setLoading(true);
 
-      const res = await fetch(`${API}/auth/pin`, {
+      const res = await fetch("http://localhost:5000/auth/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
       });
 
-      // if backend returns non-json on error, avoid crash
-      let data = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-
-      if (!res.ok || !data?.ok) throw new Error(data?.message || "Invalid PIN");
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error("Invalid PIN");
 
       // ✅ PIN correct
       sessionStorage.setItem("unlocked", "1");
@@ -55,7 +31,7 @@ export default function PinUnlock() {
       setFireLoading(true);
 
       setTimeout(() => {
-        navigate("/app/records"); // ✅ SPA safe
+        window.location.href = "/app/records";
       }, 3500);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
@@ -171,7 +147,9 @@ export default function PinUnlock() {
       <div style={overlay} />
 
       <div style={card}>
-        <div style={{ fontSize: 20, fontWeight: 950 }}>BFP RECORDS SYSTEM</div>
+        <div style={{ fontSize: 20, fontWeight: 950 }}>
+          BFP RECORDS SYSTEM
+        </div>
         <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
           Enter PIN to unlock
         </div>
