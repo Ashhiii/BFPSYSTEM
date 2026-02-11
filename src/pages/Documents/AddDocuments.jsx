@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
 
 export default function AddDocument({ onSaved }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const initial = useMemo(
     () => ({
       fsicAppNo: "",
@@ -14,7 +16,8 @@ export default function AddDocument({ onSaved }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const change = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const change = (e) =>
+    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
   const clearForm = () => {
     if (loading) return;
@@ -43,7 +46,8 @@ export default function AddDocument({ onSaved }) {
 
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/documents", {
+
+      const res = await fetch(`${API}/documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -82,7 +86,12 @@ export default function AddDocument({ onSaved }) {
   };
 
   const title = { fontSize: 16, fontWeight: 950, color: "#0f172a" };
-  const subtitle = { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 };
+  const subtitle = {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#64748b",
+    marginTop: 6,
+  };
 
   const actionsTop = { display: "flex", gap: 8, alignItems: "center" };
 
@@ -106,7 +115,6 @@ export default function AddDocument({ onSaved }) {
 
   const full = { gridColumn: "1 / -1" };
 
-  // FIX: field has its own background so the input doesn't look like it "passes through"
   const field = {
     background: "#f8fafc",
     border: "1px solid #e5e7eb",
@@ -134,7 +142,6 @@ export default function AddDocument({ onSaved }) {
     borderRadius: 999,
   };
 
-  // FIX: input has its own bg + border + focus ring
   const input = {
     width: "100%",
     marginTop: 8,
@@ -149,7 +156,12 @@ export default function AddDocument({ onSaved }) {
     transition: "box-shadow 120ms ease, border-color 120ms ease",
   };
 
-  const hint = { marginTop: 8, fontSize: 12, fontWeight: 700, color: "#94a3b8" };
+  const hint = {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#94a3b8",
+  };
 
   const msgBox = (ok) => ({
     ...full,
@@ -173,10 +185,20 @@ export default function AddDocument({ onSaved }) {
 
         {/* TOP BUTTONS */}
         <div style={actionsTop}>
-          <button type="button" style={btn("ghost")} onClick={clearForm} disabled={loading}>
+          <button
+            type="button"
+            style={btn("ghost")}
+            onClick={clearForm}
+            disabled={loading}
+          >
             Clear
           </button>
-          <button type="submit" form="docForm" style={btn("primary")} disabled={loading}>
+          <button
+            type="submit"
+            form="docForm"
+            style={btn("primary")}
+            disabled={loading}
+          >
             {loading ? "Saving..." : "Save"}
           </button>
         </div>
@@ -217,7 +239,9 @@ export default function AddDocument({ onSaved }) {
             onBlur={focusOff}
             disabled={loading}
           />
-          <div style={hint}>Person/representative responsible for the establishment.</div>
+          <div style={hint}>
+            Person/representative responsible for the establishment.
+          </div>
         </div>
 
         <div style={{ ...field, ...full }}>

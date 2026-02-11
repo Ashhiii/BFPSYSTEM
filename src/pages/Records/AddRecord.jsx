@@ -30,6 +30,8 @@ const INITIAL_FORM = {
 };
 
 export default function AddRecord({ setRefresh }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
 
@@ -45,7 +47,12 @@ export default function AddRecord({ setRefresh }) {
     boxSizing: "border-box",
   };
 
-  const label = { fontSize: 12, fontWeight: 900, color: "#334155", marginBottom: 6 };
+  const label = {
+    fontSize: 12,
+    fontWeight: 900,
+    color: "#334155",
+    marginBottom: 6,
+  };
 
   const btn = {
     padding: "10px 12px",
@@ -70,7 +77,7 @@ export default function AddRecord({ setRefresh }) {
 
     setSaving(true);
     try {
-      const res = await fetch("http://localhost:5000/records", {
+      const res = await fetch(`${API}/records`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -110,16 +117,36 @@ export default function AddRecord({ setRefresh }) {
         boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <div style={{ fontSize: 18, fontWeight: 950, color: "#0f172a" }}>Add Record</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 }}>
+          <div style={{ fontSize: 18, fontWeight: 950, color: "#0f172a" }}>
+            Add Record
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#64748b",
+              marginTop: 6,
+            }}
+          >
             Fill up the fields then save.
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={btn} onClick={() => setForm(INITIAL_FORM)} disabled={saving}>
+          <button
+            style={btn}
+            onClick={() => setForm(INITIAL_FORM)}
+            disabled={saving}
+          >
             Clear
           </button>
           <button style={primary} onClick={submit} disabled={saving}>
@@ -128,14 +155,23 @@ export default function AddRecord({ setRefresh }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div
+        style={{
+          marginTop: 14,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 10,
+        }}
+      >
         {Object.keys(INITIAL_FORM).map((k) => (
           <div key={k}>
             <div style={label}>{k}</div>
             <input
               style={input}
               value={form[k] ?? ""}
-              onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, [k]: e.target.value }))
+              }
               autoComplete="off"
             />
           </div>
