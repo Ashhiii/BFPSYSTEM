@@ -430,10 +430,6 @@ app.post("/records/renew", (req, res) => {
   }
 });
 
-// -----------------------------
-// EXPORT endpoint (for archive month)
-// returns JSON array where each record is replaced by latest renewed (if exists)
-// -----------------------------
 app.get("/records/export", (req, res) => {
   try {
     const month = normalize(req.query.month);
@@ -560,7 +556,6 @@ app.get("/manager/items", (req, res) => {
   }
 });
 
-
 const CORRECT_PIN = "1234";
 
 app.post("/auth/pin", (req, res) => {
@@ -570,10 +565,6 @@ app.post("/auth/pin", (req, res) => {
   return res.status(401).json({ ok: false, message: "Incorrect PIN" });
 });
 
-
-// -----------------------------
-// PDF GENERATION
-// -----------------------------
 const generatePDF = (record, templateFile, filename, res) => {
   const templatePath = path.join(__dirname, "templates", templateFile);
   if (!fs.existsSync(templatePath)) return res.status(404).send("Template not found");

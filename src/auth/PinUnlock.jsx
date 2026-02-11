@@ -15,11 +15,14 @@ export default function PinUnlock() {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/auth/pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-      });
+const API = import.meta.env.VITE_API_URL;
+
+const res = await fetch(`${API}/auth/pin`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ pin }),
+});
+
 
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error("Invalid PIN");
