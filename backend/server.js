@@ -577,10 +577,15 @@ app.post("/auth/pin", (req, res) => {
 // PDF GENERATION
 // -----------------------------
 const findSoffice = () => {
-  // Docker / Linux uses just "soffice"
-  return "soffice";
+  const candidates = [
+    "C:\\\\Program Files\\\\LibreOffice\\\\program\\\\soffice.exe",
+    "C:\\\\Program Files (x86)\\\\LibreOffice\\\\program\\\\soffice.exe",
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
 };
-
 
 const generatePDF = (record, templateFile, filenameBase, res) => {
   const templatePath = path.join(__dirname, "templates", templateFile);
