@@ -25,7 +25,6 @@ const C = {
 };
 
 export default function DocumentsTable({ docs = [], onRowClick }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const open = (url, e) => {
     e?.stopPropagation?.();
     window.open(url, "_blank");
@@ -191,7 +190,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                   onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}
+                    onClick={(e) => open(`http://localhost:5000/documents/${d.id}/io/pdf`, e)}
                   >
                     IO
                   </button>
@@ -201,8 +200,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                   onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}
-
+                    onClick={(e) => open(`http://localhost:5000/documents/${d.id}/reinspection/pdf`, e)}
                   >
                     Reinspection
                   </button>
@@ -212,7 +210,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}
+                    onClick={(e) => open(`http://localhost:5000/documents/${d.id}/nfsi/pdf`, e)}
                   >
                     NFSI
                   </button>
