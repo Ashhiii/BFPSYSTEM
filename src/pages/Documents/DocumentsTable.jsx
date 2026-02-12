@@ -1,5 +1,4 @@
 import React from "react";
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 /* 🔥 BFP COLORS */
 const C = {
@@ -26,6 +25,7 @@ const C = {
 };
 
 export default function DocumentsTable({ docs = [], onRowClick }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const open = (url, e) => {
     e?.stopPropagation?.();
     window.open(url, "_blank");
