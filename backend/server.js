@@ -577,15 +577,10 @@ app.post("/auth/pin", (req, res) => {
 // PDF GENERATION
 // -----------------------------
 const findSoffice = () => {
-  const candidates = [
-    "C:\\\\Program Files\\\\LibreOffice\\\\program\\\\soffice.exe",
-    "C:\\\\Program Files (x86)\\\\LibreOffice\\\\program\\\\soffice.exe",
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
+  // Docker / Linux uses just "soffice"
+  return "soffice";
 };
+
 
 const generatePDF = (record, templateFile, filenameBase, res) => {
   const templatePath = path.join(__dirname, "templates", templateFile);
@@ -725,9 +720,4 @@ app.get("/documents/:id/:docType/pdf", (req, res) => {
 // START
 // -----------------------------
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Backend running on port ${PORT}`);
-  console.log("PIN:", process.env.PIN ? "(set)" : "(default 1234)");
-  console.log("SOFFICE_PATH:", process.env.SOFFICE_PATH || "(not set)");
-});
-
+app.listen(5000, "0.0.0.0", () => console.log("running"));
