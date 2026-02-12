@@ -25,12 +25,12 @@ const C = {
 };
 
 export default function DocumentsTable({ docs = [], onRowClick }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
-  const open = (url, e) => {
-    e?.stopPropagation?.();
-    window.open(url, "_blank");
-  };
+const open = (url, e) => {
+  e?.stopPropagation?.();
+  window.location.href = url; // triggers download same tab
+};
 
   const clamp2 = {
     whiteSpace: "normal",
