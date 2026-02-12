@@ -577,8 +577,20 @@ app.post("/auth/pin", (req, res) => {
 // PDF GENERATION
 // -----------------------------
 const findSoffice = () => {
-  // Docker / Linux uses just "soffice"
-  return "soffice";
+  const envPath = process.env.SOFFICE_PATH;
+  if (envPath && fs.existsSync(envPath)) return envPath;
+
+  const candidates = [
+    "/usr/bin/libreoffice",
+    "/usr/bin/soffice",
+    "/usr/lib/libreoffice/program/soffice",
+  ];
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+
+  return null;
 };
 
 
@@ -638,7 +650,7 @@ const generatePDF = (record, templateFile, filenameBase, res) => {
     fs.writeFileSync(outputDocx, buf);
 
     // ✅ use quotes safely
-    const command = `"${soffice}" --headless --nologo --nolockcheck --norestore --convert-to pdf "${outputDocx}" --outdir "${outDir}"`;
+const command = `${soffice} --headless --nologo --nolockcheck --norestore --convert-to pdf "${outputDocx}" --outdir "${outDir}"`;
 
     exec(command, (err, stdout, stderr) => {
       if (err) {
@@ -720,4 +732,9 @@ app.get("/documents/:id/:docType/pdf", (req, res) => {
 // START
 // -----------------------------
 
-app.listen(5000, "0.0.0.0", () => console.log("running"));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Backend running on port ${PORT}`);
+  console.log("PIN:", process.env.PIN ? "(set)" : "(default 1234)");
+  console.log("SOFFICE_PATH:", process.env.SOFFICE_PATH || "(not set)");
+});
+
