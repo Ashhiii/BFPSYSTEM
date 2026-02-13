@@ -122,11 +122,16 @@ export default function Records({ refresh, setRefresh }) {
     setSelectedRecord(fixed);
   };
 
-const handleRenewSaved = ({ newRecord }) => {
-  setSelectedRecord(newRecord);
-  setRefresh((p) => !p); // reload /records from backend
-};
-
+  const handleRenewSaved = ({ oldId, newRecord }) => {
+    setSelectedRecord(newRecord);
+    setRecords((prev) => {
+      const idx = (prev || []).findIndex((r) => String(r.id) === String(oldId));
+      if (idx === -1) return [newRecord, ...(prev || [])];
+      const copy = [...prev];
+      copy.splice(idx + 1, 0, newRecord);
+      return copy;
+    });
+  };
 
   /* ===================== STYLES (BFP THEME) ===================== */
 
