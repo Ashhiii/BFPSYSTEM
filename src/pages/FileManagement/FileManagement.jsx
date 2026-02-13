@@ -139,9 +139,15 @@ export default function FileManagement({ refresh, setRefresh }) {
       const res = await fetch(url, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok || data?.success === false) {
-        return alert(data?.message || "Delete failed");
-      }
+if (!res.ok || data?.success === false) {
+  return alert(data?.message || "Delete failed");
+}
+
+// ✅ remove instantly in UI
+setRows((prev) => prev.filter((x) => String(x.id) !== String(r.id)));
+
+// ✅ also refresh to re-fetch clean copy
+setRefresh((p) => !p);
 
       setRefresh((p) => !p);
     } catch (e) {
