@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 
 import RecordsTable from "./RecordsTable.jsx";
 import RecordDetailsPanel from "./RecordDetailsPanel.jsx";
-import AddRecord from "./AddRecord.jsx";
+import AddRecord from "../../components/AddRecords.jsx";
 
 import injectTableStyles from "./injectTableStyles.jsx";
 

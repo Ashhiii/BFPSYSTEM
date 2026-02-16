@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import AddDocument from "./AddDocuments.jsx";
+import AddDocument from "../../components/AddDocument.jsx";
 import DocumentsTable from "./DocumentsTable.jsx";
 
 /* 🔥 BFP COLORS */

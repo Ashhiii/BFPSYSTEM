@@ -137,6 +137,8 @@ const open = (url, e) => {
             <th style={{ ...S.th, width: 160 }}>Owner</th>
             <th style={{ ...S.th, width: 180 }}>Establishment</th>
             <th style={{ ...S.th, width: 220 }}>Address</th>
+            <th style={{ ...S.th, width: 220 }}>Chief</th>
+            <th style={{ ...S.th, width: 260 }}>Marshal</th>
             <th style={{ ...S.th, width: 260 }}>Generate</th>
           </tr>
         </thead>
@@ -185,6 +187,18 @@ const open = (url, e) => {
                     {d.businessAddress || "-"}
                   </div>
                 </td>
+
+                  <td style={S.td}>
+                    <div style={clamp2} title={d.chiefName || "-"}>
+                      {d.chiefName || "-"}
+                      </div>
+                      </td>
+
+                 <td style={S.td}>
+                    <div style={clamp2} title={d.marshalName || "-"}>
+                      {d.marshalName || "-"}
+                      </div>
+                      </td>
 
                 <td style={S.actionsTd}>
                   <button
