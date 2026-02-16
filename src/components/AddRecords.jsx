@@ -6,6 +6,8 @@ import React, { useMemo, useState } from "react";
 const INITIAL_FORM = {
   appno: "",
   fsicAppNo: "",
+  chiefName: "",
+  marshalName: "",
   natureOfInspection: "",
   ownerName: "",
   establishmentName: "",
@@ -100,6 +102,23 @@ const FIELDS = [
   { key: "orNumber", label: "OR Number", placeholder: "OR no", help: "", required: false, type: "text", span: 1 },
   { key: "orAmount", label: "OR Amount", placeholder: "0.00", help: "", required: false, type: "number", span: 1 },
   { key: "orDate", label: "OR Date", placeholder: "", help: "", required: false, type: "date", span: 2 },
+  {
+  key: "chiefName",
+  label: "Chief, Fire Safety Enforcement Section",
+  placeholder: "Chief name",
+  required: false,
+  type: "text",
+  span: 1,
+},
+{
+  key: "marshalName",
+  label: "District Fire Marshal",
+  placeholder: "Marshal name",
+  required: false,
+  type: "text",
+  span: 1,
+},
+
 ];
 
 export default function AddRecord({ setRefresh }) {
