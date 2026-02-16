@@ -4,9 +4,7 @@ import React from "react";
 const C = {
   primary: "#b91c1c",
   primaryDark: "#7f1d1d",
-  gold: "#f59e0b",
   softBg: "#fef2f2",
-  bg: "#ffffff",
   border: "#e5e7eb",
   text: "#111827",
   muted: "#6b7280",
@@ -25,12 +23,12 @@ const C = {
 };
 
 export default function DocumentsTable({ docs = [], onRowClick }) {
-const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
-const open = (url, e) => {
-  e?.stopPropagation?.();
-  window.location.href = url; // triggers download same tab
-};
+  const open = (url, e) => {
+    e?.stopPropagation?.();
+    window.location.href = url;
+  };
 
   const clamp2 = {
     whiteSpace: "normal",
@@ -46,7 +44,6 @@ const open = (url, e) => {
 
   const S = {
     wrap: { width: "100%", overflowX: "auto" },
-
     table: {
       width: "100%",
       minWidth: 1100,
@@ -56,7 +53,6 @@ const open = (url, e) => {
       border: `1px solid ${C.border}`,
       borderRadius: 14,
     },
-
     th: {
       position: "sticky",
       top: 0,
@@ -70,7 +66,6 @@ const open = (url, e) => {
       borderBottom: `2px solid ${C.primary}`,
       whiteSpace: "nowrap",
     },
-
     td: {
       padding: "12px 12px",
       fontSize: 13,
@@ -79,15 +74,12 @@ const open = (url, e) => {
       borderBottom: `1px solid ${C.border}`,
       color: C.text,
     },
-
     row: { cursor: "pointer", transition: "background .15s ease" },
-
     actionsTd: {
       padding: "10px 12px",
       borderBottom: `1px solid ${C.border}`,
       whiteSpace: "nowrap",
     },
-
     btn: {
       padding: "8px 12px",
       borderRadius: 999,
@@ -100,25 +92,9 @@ const open = (url, e) => {
       color: C.text,
       transition: "transform .05s ease, background .15s ease, border .15s ease",
     },
-
-    btnIO: {
-      border: `1px solid ${C.ioBorder}`,
-      background: C.ioBg,
-      color: C.ioText,
-    },
-
-    btnReinspect: {
-      border: `1px solid ${C.reBorder}`,
-      background: C.reBg,
-      color: C.reText,
-    },
-
-    btnNFSI: {
-      border: `1px solid ${C.nfsiBorder}`,
-      background: C.nfsiBg,
-      color: C.nfsiText,
-    },
-
+    btnIO: { border: `1px solid ${C.ioBorder}`, background: C.ioBg, color: C.ioText },
+    btnReinspect: { border: `1px solid ${C.reBorder}`, background: C.reBg, color: C.reText },
+    btnNFSI: { border: `1px solid ${C.nfsiBorder}`, background: C.nfsiBg, color: C.nfsiText },
     empty: {
       textAlign: "center",
       padding: 22,
@@ -138,7 +114,7 @@ const open = (url, e) => {
             <th style={{ ...S.th, width: 180 }}>Establishment</th>
             <th style={{ ...S.th, width: 220 }}>Address</th>
             <th style={{ ...S.th, width: 220 }}>Chief</th>
-            <th style={{ ...S.th, width: 260 }}>Marshal</th>
+            <th style={{ ...S.th, width: 220 }}>Marshal</th>
             <th style={{ ...S.th, width: 260 }}>Generate</th>
           </tr>
         </thead>
@@ -146,7 +122,7 @@ const open = (url, e) => {
         <tbody>
           {docs.length === 0 ? (
             <tr>
-              <td colSpan={5} style={S.empty}>
+              <td colSpan={7} style={S.empty}>
                 No documents found
               </td>
             </tr>
@@ -154,10 +130,7 @@ const open = (url, e) => {
             docs.map((d, i) => (
               <tr
                 key={d.id || i}
-                style={{
-                  ...S.row,
-                  background: i % 2 === 0 ? "#fff" : "#fafafa",
-                }}
+                style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
                 onMouseLeave={(e) =>
                   (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
@@ -169,36 +142,31 @@ const open = (url, e) => {
                     {d.fsicAppNo || "-"}
                   </div>
                 </td>
-
                 <td style={S.td}>
                   <div style={clamp2} title={d.ownerName || "-"}>
                     {d.ownerName || "-"}
                   </div>
                 </td>
-
                 <td style={S.td}>
                   <div style={clamp2} title={d.establishmentName || "-"}>
                     {d.establishmentName || "-"}
                   </div>
                 </td>
-
                 <td style={S.td}>
                   <div style={clamp2} title={d.businessAddress || "-"}>
                     {d.businessAddress || "-"}
                   </div>
                 </td>
-
-                  <td style={S.td}>
-                    <div style={clamp2} title={d.chiefName || "-"}>
-                      {d.chiefName || "-"}
-                      </div>
-                      </td>
-
-                 <td style={S.td}>
-                    <div style={clamp2} title={d.marshalName || "-"}>
-                      {d.marshalName || "-"}
-                      </div>
-                      </td>
+                <td style={S.td}>
+                  <div style={clamp2} title={d.chiefName || "-"}>
+                    {d.chiefName || "-"}
+                  </div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp2} title={d.marshalName || "-"}>
+                    {d.marshalName || "-"}
+                  </div>
+                </td>
 
                 <td style={S.actionsTd}>
                   <button

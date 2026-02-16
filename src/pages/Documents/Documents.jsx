@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import AddDocument from "../../components/AddDocument.jsx";
 import DocumentsTable from "./DocumentsTable.jsx";
+import DocumentDetailsPanel from "./DocumentDetailsPanel.jsx";
 
 /* 🔥 BFP COLORS */
 const C = {
@@ -12,14 +13,17 @@ const C = {
   border: "#e5e7eb",
   text: "#111827",
   muted: "#6b7280",
+  green: "#16a34a",
+  danger: "#dc2626",
 };
 
 export default function Documents({ refresh, setRefresh }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const [tab, setTab] = useState("view"); // view | add
   const [docs, setDocs] = useState([]);
   const [search, setSearch] = useState("");
+  const [selectedDoc, setSelectedDoc] = useState(null);
 
   const fetchDocs = async () => {
     const res = await fetch(`${API}/documents`);
@@ -38,7 +42,9 @@ export default function Documents({ refresh, setRefresh }) {
       return (
         (d.ownerName || "").toLowerCase().includes(key) ||
         (d.establishmentName || "").toLowerCase().includes(key) ||
-        (d.fsicAppNo || "").toLowerCase().includes(key)
+        (d.fsicAppNo || "").toLowerCase().includes(key) ||
+        (d.chiefName || "").toLowerCase().includes(key) ||
+        (d.marshalName || "").toLowerCase().includes(key)
       );
     });
   }, [docs, search]);
@@ -53,6 +59,40 @@ export default function Documents({ refresh, setRefresh }) {
     fontWeight: 900,
     whiteSpace: "nowrap",
   });
+
+  // Layout same idea sa Records: table left, panel right
+  const content = {
+    flex: 1,
+    overflow: "hidden",
+    display: "grid",
+    gridTemplateColumns: "1fr 420px",
+    gap: 12,
+  };
+
+  const card = {
+    overflow: "hidden",
+    borderRadius: 16,
+    border: `1px solid ${C.border}`,
+    background: "#fff",
+    boxShadow: "0 10px 25px rgba(0,0,0,.06)",
+    display: "flex",
+    flexDirection: "column",
+  };
+
+  const cardHead = {
+    padding: 10,
+    borderBottom: `1px solid ${C.border}`,
+    color: C.primaryDark,
+    fontWeight: 950,
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+    background: C.softBg,
+  };
+
+  const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden" };
+
 
   return (
     <div>
@@ -77,7 +117,7 @@ export default function Documents({ refresh, setRefresh }) {
             Documents
           </div>
           <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 6 }}>
-            View and generate document PDFs
+            View, edit Chief/Marshal, and generate PDFs
           </div>
         </div>
 
@@ -85,7 +125,13 @@ export default function Documents({ refresh, setRefresh }) {
           <button style={tabBtn(tab === "view")} onClick={() => setTab("view")}>
             View Documents
           </button>
-          <button style={tabBtn(tab === "add")} onClick={() => setTab("add")}>
+          <button
+            style={tabBtn(tab === "add")}
+            onClick={() => {
+              setTab("add");
+              setSelectedDoc(null);
+            }}
+          >
             Add Document
           </button>
         </div>
@@ -94,45 +140,68 @@ export default function Documents({ refresh, setRefresh }) {
       {/* ADD DOCUMENT */}
       {tab === "add" && (
         <AddDocument
-          setRefresh={setRefresh}
           onSaved={() => {
-            setRefresh((p) => !p);
+            setRefresh?.((p) => !p);
             setTab("view");
           }}
-          onCancel={() => setTab("view")}
         />
       )}
 
       {/* VIEW DOCUMENTS */}
       {tab === "view" && (
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 16,
-            border: `1px solid ${C.border}`,
-            boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
-            padding: 14,
-          }}
-        >
-          <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-            <input
-              placeholder="🔍 Search documents..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: 240,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: `1px solid ${C.border}`,
-                outline: "none",
-                fontWeight: 850,
-                color: C.text,
-              }}
-            />
+        <div style={content}>
+          {/* LEFT: TABLE CARD */}
+          <div style={card}>
+            <div style={cardHead}>
+              <div>Documents List</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.muted }}>
+                Results: {filtered.length}
+              </div>
+            </div>
+
+            <div style={{ padding: 12 }}>
+              <input
+                placeholder="🔍 Search documents..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: `1px solid ${C.border}`,
+                  outline: "none",
+                  fontWeight: 850,
+                  color: C.text,
+                }}
+              />
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 8 }}>
+                Click a row → details show on the right
+              </div>
+            </div>
+
+            <div style={scroll}>
+              <DocumentsTable
+                docs={filtered}
+                onRowClick={(d) => setSelectedDoc(d)}
+              />
+            </div>
           </div>
 
-          <DocumentsTable docs={filtered} />
+          {/* RIGHT: SIDE PANEL */}
+          <DocumentDetailsPanel
+            doc={selectedDoc}
+            onUpdated={(updated) => {
+              // update list locally
+              setDocs((prev) => {
+                const copy = [...(prev || [])];
+                const idx = copy.findIndex((x) => String(x.id) === String(updated.id));
+                if (idx !== -1) copy[idx] = updated;
+                return copy;
+              });
+              setSelectedDoc(updated);
+              setRefresh?.((p) => !p);
+            }}
+          />
         </div>
       )}
     </div>

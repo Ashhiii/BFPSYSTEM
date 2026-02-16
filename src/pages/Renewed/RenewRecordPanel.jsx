@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import RenewRecordPanel from "./RenewRecordPanel.jsx"; // ✅ adjust path
 
 const FIELDS = [
   { key: "no", label: "No" },
@@ -35,19 +36,16 @@ export default function RecordDetailsPanel({
   source,
   isArchive,
   onRenewSaved,
-  onUpdated, // ✅ add this prop from parent if you want to refresh list after edit
+  onUpdated, // ✅ optional: para ma refresh list after edit
 }) {
   const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
-  const [editing, setEditing] = useState(false); // ✅ Edit current record
-  const [renewing, setRenewing] = useState(false); // ✅ Renew flow (separate mode)
+  const [mode, setMode] = useState("view"); // view | edit | renew
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
-  const [renewedRecord, setRenewedRecord] = useState(null);
 
   const entityKey = useMemo(() => record?.entityKey || "", [record]);
 
-  /* 🔥 BFP COLORS */
   const C = {
     primary: "#b91c1c",
     primaryDark: "#7f1d1d",
@@ -57,29 +55,19 @@ export default function RecordDetailsPanel({
     border: "#e5e7eb",
     text: "#111827",
     muted: "#6b7280",
-    green: "#16a34a",
     danger: "#dc2626",
   };
 
   useEffect(() => {
-    setEditing(false);
-    setRenewing(false);
+    setMode("view");
     setSaving(false);
-    setRenewedRecord(null);
     if (!record) return;
 
     const init = {};
     FIELDS.forEach((f) => (init[f.key] = record?.[f.key] ?? ""));
     init.teamLeader = record?.teamLeader ?? "";
     setForm(init);
-
-    if (!entityKey) return;
-
-    fetch(`${API}/records/renewed/${encodeURIComponent(entityKey)}`)
-      .then((r) => r.json())
-      .then((d) => setRenewedRecord(d?.record || null))
-      .catch(() => setRenewedRecord(null));
-  }, [record, entityKey, API]);
+  }, [record]);
 
   const panel = {
     overflow: "hidden",
@@ -156,84 +144,36 @@ export default function RecordDetailsPanel({
     return common;
   };
 
-  // ✅ EDIT CURRENT RECORD (needs PUT /records/:id)
-const saveEdit = async () => {
-  if (!record?.id) return alert("Missing record.id (cannot save).");
-
-  try {
-    setSaving(true);
-
-    const payload = {};
-    FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
-    payload.teamLeader = form.teamLeader ?? "";
-
-    const url = `${API}/records/${record.id}`;
-    console.log("SAVE EDIT URL:", url);
-    console.log("PAYLOAD:", payload);
-
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const text = await res.text();
-    console.log("RAW RESPONSE:", res.status, text);
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error(`Backend returned non-JSON. Status ${res.status}`);
-    }
-
-    if (!res.ok || data?.success === false) {
-      throw new Error(data?.message || `Save failed. Status ${res.status}`);
-    }
-
-    setEditing(false);
-    onUpdated?.(data.data);
-  } catch (e) {
-    alert(`❌ SAVE ERROR: ${e.message}`);
-  } finally {
-    setSaving(false);
-  }
-};
-
-
-  // ✅ RENEW (creates renewed record)
-  const saveRenew = async () => {
-    if (!record) return;
-    if (!entityKey) return alert("Missing entityKey");
+  // ✅ EDIT: update existing record (needs PUT endpoint)
+  const saveEdit = async () => {
+    if (!record?.id) return;
 
     try {
       setSaving(true);
 
-      const res = await fetch(`${API}/records/renew`, {
-        method: "POST",
+      const payload = {};
+      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
+      payload.teamLeader = form.teamLeader ?? "";
+
+      // ⚠️ make sure backend has PUT /records/:id
+      const res = await fetch(`${API}/records/${record.id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          entityKey,
-          source,
-          oldRecord: record,
-          updatedRecord: form,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const text = await res.text();
-      let data;
+      let data = {};
       try {
         data = JSON.parse(text);
       } catch {
-        console.log("Non-JSON:", text);
-        throw new Error("Renew failed (non-JSON response).");
+        throw new Error(text || "Update failed");
       }
 
-      if (!res.ok || !data?.success) throw new Error(data?.message || "Renew failed");
+      if (!res.ok || data?.success === false) throw new Error(data?.message || "Update failed");
 
-      setRenewedRecord(data.newRecord);
-      setRenewing(false);
-      onRenewSaved?.({ oldId: record.id, newRecord: data.newRecord });
+      setMode("view");
+      onUpdated?.(data.data);
     } catch (e) {
       alert(`❌ ${e.message}`);
     } finally {
@@ -256,7 +196,6 @@ const saveEdit = async () => {
   }
 
   const title = record.establishmentName || record.fsicAppNo || "Record";
-  const mode = editing ? "edit" : renewing ? "renew" : "view";
 
   return (
     <div style={panel}>
@@ -268,26 +207,19 @@ const saveEdit = async () => {
           </div>
         </div>
 
-        {/* ✅ Buttons like Documents */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {/* ✅ Like Documents: Edit button */}
           {mode === "view" && (
-            <>
-              <button style={btn("primary")} onClick={() => setEditing(true)}>
-                Edit
-              </button>
+            <button style={btn("primary")} onClick={() => setMode("edit")}>
+              Edit
+            </button>
+          )}
 
-              {isArchive && (
-                <button
-                  style={btn("gold")}
-                  onClick={() => {
-                    setRenewing(true);
-                    setEditing(false);
-                  }}
-                >
-                  Renew
-                </button>
-              )}
-            </>
+          {/* ✅ Renew button only if archive */}
+          {isArchive && mode === "view" && (
+            <button style={btn("gold")} onClick={() => setMode("renew")}>
+              Renew
+            </button>
           )}
 
           {mode === "edit" && (
@@ -295,33 +227,29 @@ const saveEdit = async () => {
               <button style={btn("gold")} onClick={saveEdit} disabled={saving}>
                 {saving ? "Saving..." : "Save"}
               </button>
-              <button style={btn("danger")} onClick={() => setEditing(false)} disabled={saving}>
+              <button style={btn("danger")} onClick={() => setMode("view")} disabled={saving}>
                 Cancel
               </button>
             </>
           )}
 
           {mode === "renew" && (
-            <>
-              <button style={btn("gold")} onClick={saveRenew} disabled={saving}>
-                {saving ? "Saving..." : "Save Renew"}
-              </button>
-              <button style={btn("danger")} onClick={() => setRenewing(false)} disabled={saving}>
-                Cancel
-              </button>
-            </>
+            <button style={btn("danger")} onClick={() => setMode("view")} disabled={saving}>
+              Cancel
+            </button>
           )}
         </div>
       </div>
 
       <div style={body}>
+        {/* ✅ VIEW / EDIT table */}
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
             {FIELDS.map((f) => (
               <tr key={f.key}>
                 <td style={labelTd}>{f.label}</td>
                 <td style={valueTd}>
-                  {mode === "edit" || mode === "renew" ? (
+                  {mode === "edit" ? (
                     <input
                       name={f.key}
                       value={form[f.key] ?? ""}
@@ -340,7 +268,7 @@ const saveEdit = async () => {
             <tr>
               <td style={labelTd}>Team Leader</td>
               <td style={valueTd}>
-                {mode === "edit" || mode === "renew" ? (
+                {mode === "edit" ? (
                   <input
                     name="teamLeader"
                     value={form.teamLeader ?? ""}
@@ -357,29 +285,17 @@ const saveEdit = async () => {
           </tbody>
         </table>
 
-        {/* Renew status (view mode only) */}
-        {mode === "view" && (
-          <>
-            {renewedRecord ? (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 10,
-                  border: `1px dashed ${C.primary}`,
-                  borderRadius: 12,
-                  background: C.softBg,
-                  color: C.primaryDark,
-                  fontWeight: 900,
-                }}
-              >
-                ✅ Latest renewed version exists for this record.
-              </div>
-            ) : (
-              <div style={{ marginTop: 12, color: C.muted, fontWeight: 850 }}>
-                No renewed version yet.
-              </div>
-            )}
-          </>
+        {/* ✅ Renew section = separate file/component */}
+        {mode === "renew" && (
+          <RenewRecordPanel
+            record={record}
+            source={source}
+            onCancel={() => setMode("view")}
+            onRenewSaved={(payload) => {
+              setMode("view");
+              onRenewSaved?.(payload);
+            }}
+          />
         )}
       </div>
     </div>

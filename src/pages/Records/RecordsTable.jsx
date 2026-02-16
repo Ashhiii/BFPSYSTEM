@@ -116,7 +116,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
       <table style={S.table}>
         <thead>
           <tr>
-            <th style={{ ...S.th, width: 60 }}>No</th>
+            <th style={{ ...S.th, width: 60 }}>App No</th>
             <th style={{ ...S.th, width: 130 }}>FSIC App No</th>
             <th style={{ ...S.th, width: 170 }}>Nature of Inspection</th>
             <th style={{ ...S.th, width: 180 }}>Owner</th>
