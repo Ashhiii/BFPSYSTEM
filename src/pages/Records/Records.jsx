@@ -440,7 +440,23 @@ export default function Records({ refresh, setRefresh }) {
               source={mode === "archive" ? `Archive: ${selectedMonth}` : "Current"}
               isArchive={mode === "archive"}
               onRenewSaved={handleRenewSaved}
+              onUpdated={(updated) => {
+                // ✅ update table list immediately
+                setRecords((prev) => {
+                  const copy = [...(prev || [])];
+                  const idx = copy.findIndex((r) => String(r.id) === String(updated.id));
+                  if (idx !== -1) copy[idx] = updated;
+                  return copy;
+                });
+
+                // ✅ update right panel immediately
+                setSelectedRecord(updated);
+
+                // optional: trigger refresh fetch if you want
+                // setRefresh?.((p) => !p);
+              }}
             />
+
           </div>
         </>
       )}

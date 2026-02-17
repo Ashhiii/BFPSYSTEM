@@ -27,6 +27,9 @@ const FIELDS = [
   { key: "orNumber", label: "OR No" },
   { key: "orAmount", label: "OR Amount" },
   { key: "orDate", label: "OR Date" },
+    { key: "chiefName", label: "Chief" },
+  { key: "marshalName", label: "Marshal" },
+
 ];
 
 export default function RecordDetailsPanel({
@@ -35,7 +38,7 @@ export default function RecordDetailsPanel({
   source,
   isArchive,
   onRenewSaved,
-  onUpdated, // ✅ add this prop from parent if you want to refresh list after edit
+  onUpdated, 
 }) {
   const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
@@ -337,23 +340,6 @@ const saveEdit = async () => {
               </tr>
             ))}
 
-            <tr>
-              <td style={labelTd}>Team Leader</td>
-              <td style={valueTd}>
-                {mode === "edit" || mode === "renew" ? (
-                  <input
-                    name="teamLeader"
-                    value={form.teamLeader ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, teamLeader: e.target.value }))}
-                    style={inputStyle}
-                    autoComplete="off"
-                    placeholder="Team Leader"
-                  />
-                ) : (
-                  (record?.teamLeader ?? "") || "-"
-                )}
-              </td>
-            </tr>
           </tbody>
         </table>
 
