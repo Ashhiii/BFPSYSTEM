@@ -107,6 +107,7 @@ export default function AddDocument({ onSaved }) {
     border: "1px solid #e5e7eb",
     borderRadius: 14,
     padding: 12,
+    paddingRight: 35,
   };
 
   const labelRow = {

@@ -1,6 +1,45 @@
 import React, { useMemo, useState } from "react";
 
 /**
+ * ✅ Format "YYYY-MM-DD" => "January 2, 2026"
+ */
+const formatDateLong = (yyyy_mm_dd) => {
+  if (!yyyy_mm_dd) return "";
+  const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
+  if (!y || !m || !d) return String(yyyy_mm_dd);
+
+  const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December",
+  ];
+
+  return `${months[m - 1]} ${d}, ${y}`;
+};
+
+/**
+ * ✅ add 1 year to "YYYY-MM-DD" (handles leap year)
+ */
+const addYearsYMD = (yyyy_mm_dd, years = 1) => {
+  if (!yyyy_mm_dd) return "";
+  const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
+  if (!y || !m || !d) return "";
+
+  const dt = new Date(y, m - 1, d);
+  const targetYear = y + years;
+  dt.setFullYear(targetYear);
+
+  // clamp Feb 29 -> Feb 28 if needed
+  if (m === 2 && d === 29 && dt.getMonth() === 2) {
+    return `${targetYear}-02-28`;
+  }
+
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+/**
  * ✅ Backend keys (same as your server expects)
  */
 const INITIAL_FORM = {
@@ -79,7 +118,7 @@ const FIELDS = [
   { key: "nfsiNumber", label: "NFSI Number", placeholder: "NFSI no", required: false, type: "text", span: 1 },
   { key: "nfsiDate", label: "NFSI Date", placeholder: "", required: false, type: "date", span: 1 },
 
-  { key: "fsicValidity", label: "FSIC Validity", placeholder: "Validity", required: false, type: "text", span: 1 },
+  { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
   { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
 
   { key: "inspectors", label: "Inspectors", placeholder: "Inspector names", required: false, type: "text", span: 2 },
@@ -111,7 +150,10 @@ export default function AddRecord({ setRefresh }) {
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
 
-  const requiredKeys = useMemo(() => FIELDS.filter((f) => f.required).map((f) => f.key), []);
+  const requiredKeys = useMemo(
+    () => FIELDS.filter((f) => f.required).map((f) => f.key),
+    []
+  );
 
   const missingRequired = useMemo(() => {
     const miss = {};
@@ -121,6 +163,17 @@ export default function AddRecord({ setRefresh }) {
     }
     return miss;
   }, [form, requiredKeys]);
+
+  // ✅ convert date fields to "January 2, 2026" BEFORE sending to backend
+  const buildPayload = () => {
+    const payload = { ...form };
+    payload.dateInspected = formatDateLong(form.dateInspected);
+    payload.ioDate = formatDateLong(form.ioDate);
+    payload.nfsiDate = formatDateLong(form.nfsiDate);
+    payload.orDate = formatDateLong(form.orDate);
+    // fsicValidity is already auto-set (string), keep as is
+    return payload;
+  };
 
   const styles = {
     wrap: {
@@ -138,7 +191,7 @@ export default function AddRecord({ setRefresh }) {
       alignItems: "center",
     },
     title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
-    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6, textTransform: "uppercase" },
+    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6},
 
     btn: {
       padding: "10px 12px",
@@ -147,7 +200,6 @@ export default function AddRecord({ setRefresh }) {
       background: "#fff",
       cursor: "pointer",
       fontWeight: 950,
-      textTransform: "uppercase",
     },
     primary: {
       padding: "10px 12px",
@@ -157,7 +209,6 @@ export default function AddRecord({ setRefresh }) {
       color: "#fff",
       cursor: "pointer",
       fontWeight: 950,
-      textTransform: "uppercase",
     },
 
     grid: {
@@ -216,9 +267,21 @@ export default function AddRecord({ setRefresh }) {
   const onChange = (e) => {
     const { name, value } = e.target;
 
-    // ✅ uppercase-save only for text keys
-    const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
+    // ✅ if Date Inspected changes: auto compute FSIC Validity (+1 year)
+    if (name === "dateInspected") {
+      const untilYMD = addYearsYMD(value, 1); // +1 year
+      const validityText = untilYMD ? `${formatDateLong(untilYMD)}` : "";
 
+      setForm((p) => ({
+        ...p,
+        dateInspected: value,
+        fsicValidity: validityText,
+      }));
+      return;
+    }
+
+    // ✅ uppercase-save only for text keys (dates stay as YYYY-MM-DD in state)
+    const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
     setForm((p) => ({ ...p, [name]: v }));
   };
 
@@ -232,10 +295,12 @@ export default function AddRecord({ setRefresh }) {
 
     setSaving(true);
     try {
+      const payload = buildPayload(); // ✅ dates become "January 2, 2026"
+
       const res = await fetch(`${API}/records`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       const text = await res.text();
@@ -292,6 +357,8 @@ export default function AddRecord({ setRefresh }) {
         {FIELDS.map((f) => {
           const showError = f.required && touched[f.key] && missingRequired[f.key];
 
+          const isValidity = f.key === "fsicValidity";
+
           return (
             <div
               key={f.key}
@@ -299,6 +366,7 @@ export default function AddRecord({ setRefresh }) {
                 ...styles.card,
                 gridColumn: f.span === 2 ? "1 / -1" : "auto",
                 border: showError ? "1px solid #fecdd3" : styles.card.border,
+                opacity: isValidity ? 0.98 : 1,
               }}
             >
               <div style={styles.cardTop}>
@@ -314,11 +382,14 @@ export default function AddRecord({ setRefresh }) {
                 type={f.type || "text"}
                 placeholder={f.placeholder || ""}
                 autoComplete="off"
+                // ✅ optional: make validity read-only since it's auto
+                readOnly={isValidity}
                 style={{
                   ...styles.input,
                   border: showError ? "1px solid #dc2626" : styles.input.border,
-                  // ✅ keep date readable (optional)
                   textTransform: f.type === "date" ? "none" : "uppercase",
+                  background: isValidity ? "#f8fafc" : styles.input.background,
+                  cursor: isValidity ? "not-allowed" : "text",
                 }}
               />
             </div>
