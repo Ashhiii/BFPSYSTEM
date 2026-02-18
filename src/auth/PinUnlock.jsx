@@ -64,7 +64,6 @@ export default function PinUnlock() {
     overflow: "hidden",
     display: "grid",
     placeItems: "center",
-    padding: 14,
   };
 
   const videoStyle = {
