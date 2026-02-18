@@ -1,9 +1,7 @@
 import React, { useState } from "react";
 import { HiOutlineUpload, HiOutlineDocumentText } from "react-icons/hi";
 
-export default function ImportExcel({ setRefresh }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
+function UploadBox({ title, sub, endpoint, api, onDone }) {
   const [file, setFile] = useState(null);
   const [msg, setMsg] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -35,7 +33,7 @@ export default function ImportExcel({ setRefresh }) {
       const fd = new FormData();
       fd.append("file", file);
 
-      const res = await fetch(`${API}/import/excel`, {
+      const res = await fetch(`${api}${endpoint}`, {
         method: "POST",
         body: fd,
       });
@@ -45,9 +43,9 @@ export default function ImportExcel({ setRefresh }) {
         throw new Error(data?.message || "Import failed.");
       }
 
-      setMsg(`✅ Imported: ${data.imported || 0} record(s).`);
+      setMsg(`✅ Imported: ${data.imported || 0} row(s). Skipped: ${data.skipped || 0}`);
       setFile(null);
-      setRefresh?.((p) => !p);
+      onDone?.();
     } catch (e) {
       setMsg(`❌ ${e.message}`);
     } finally {
@@ -62,9 +60,11 @@ export default function ImportExcel({ setRefresh }) {
       borderRadius: 16,
       padding: 14,
       boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
+      flex: 1,
+      minWidth: 320,
     },
-    title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
-    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6, textTransform: "uppercase" },
+    title: { fontSize: 16, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
+    sub: { fontSize: 12, fontWeight: 800, color: "#64748b", marginTop: 6 },
 
     card: {
       marginTop: 14,
@@ -107,7 +107,7 @@ export default function ImportExcel({ setRefresh }) {
     },
 
     fileName: { fontWeight: 900, color: "#111827" },
-    hint: { fontSize: 12, fontWeight: 700, color: "#64748b" },
+    hint: { fontSize: 12, fontWeight: 800, color: "#64748b" },
 
     msg: (ok) => ({
       padding: "10px 12px",
@@ -116,7 +116,6 @@ export default function ImportExcel({ setRefresh }) {
       background: ok ? "#f0fdf4" : "#fff1f2",
       color: ok ? "#166534" : "#9f1239",
       fontWeight: 900,
-      textTransform: "none",
     }),
   };
 
@@ -125,8 +124,8 @@ export default function ImportExcel({ setRefresh }) {
   return (
     <div style={S.wrap}>
       <div>
-        <div style={S.title}>Import Excel</div>
-        <div style={S.sub}>Upload .xlsx/.xls to add records in bulk.</div>
+        <div style={S.title}>{title}</div>
+        <div style={S.sub}>{sub}</div>
       </div>
 
       <div style={S.card}>
@@ -154,12 +153,36 @@ export default function ImportExcel({ setRefresh }) {
               Selected: <span style={S.fileName}>{file.name}</span>
             </>
           ) : (
-            "Tip: Make sure your Excel columns match your record fields (FSIC App No, Owner, etc.)."
+            "Tip: Use the correct Excel template/columns."
           )}
         </div>
 
         {msg && <div style={S.msg(okMsg)}>{msg}</div>}
       </div>
+    </div>
+  );
+}
+
+export default function ImportExcel({ setRefresh }) {
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+
+  return (
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <UploadBox
+        title="Import to Records"
+        sub="Upload Excel → mo-sulod sa Records"
+        endpoint="/import/records"
+        api={API}
+        onDone={() => setRefresh?.((p) => !p)}
+      />
+
+      <UploadBox
+        title="Import to Documents"
+        sub="Upload Excel → mo-sulod sa Documents"
+        endpoint="/import/documents"
+        api={API}
+        onDone={() => setRefresh?.((p) => !p)}
+      />
     </div>
   );
 }
