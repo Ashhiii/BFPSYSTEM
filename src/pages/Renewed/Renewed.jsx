@@ -44,12 +44,13 @@ export default function Renewed({ refresh, setRefresh }) {
     flexWrap: "wrap",
   };
 
-  const hTitle = { fontSize: 18, fontWeight: 950, color: C.primaryDark };
+  const hTitle = { fontSize: 18, fontWeight: 950, color: C.primaryDark, textTransform: "uppercase" };
   const hSub = {
     fontSize: 12,
     fontWeight: 800,
     color: C.muted,
     marginTop: 6,
+    textTransform: "uppercase",
   };
 
   const input = {
@@ -62,24 +63,7 @@ export default function Renewed({ refresh, setRefresh }) {
     fontWeight: 850,
     flex: 1,
     minWidth: 260,
-  };
-
-  const btn = {
-    padding: "10px 12px",
-    borderRadius: 12,
-    cursor: "pointer",
-    fontWeight: 950,
-    border: `1px solid ${C.border}`,
-    background: "#fff",
-    color: C.text,
-    whiteSpace: "nowrap",
-  };
-
-  const btnGold = {
-    ...btn,
-    border: `1px solid ${C.gold}`,
-    background: C.gold,
-    color: "#111827",
+    textTransform: "uppercase",
   };
 
   const contentWrap = {
@@ -111,6 +95,7 @@ export default function Renewed({ refresh, setRefresh }) {
     justifyContent: "space-between",
     gap: 10,
     flexWrap: "wrap",
+    textTransform: "uppercase",
   };
 
   const scroll = {
@@ -120,7 +105,6 @@ export default function Renewed({ refresh, setRefresh }) {
     minHeight: 0,
   };
 
-  // Pass theme-friendly table cell + buttons into RecordDetailsPanel
   const panelStyles = {
     td: {
       padding: 10,
@@ -137,6 +121,7 @@ export default function Renewed({ refresh, setRefresh }) {
       color: "#fff",
       fontWeight: 950,
       cursor: "pointer",
+      textTransform: "uppercase",
     },
     dangerBtn: {
       padding: "10px 12px",
@@ -146,6 +131,7 @@ export default function Renewed({ refresh, setRefresh }) {
       color: C.danger,
       fontWeight: 950,
       cursor: "pointer",
+      textTransform: "uppercase",
     },
   };
 
@@ -170,7 +156,6 @@ export default function Renewed({ refresh, setRefresh }) {
       const res = await fetch(`${API}/manager/items?scope=renewed&month=`);
       const data = await res.json();
 
-      // Backend returns { success:true, items:[...] }
       const raw = Array.isArray(data) ? data : data.items || data.records || [];
       const onlyRenewed = raw.filter((r) => (r.kind || "") === "renewed");
 
@@ -221,7 +206,7 @@ export default function Renewed({ refresh, setRefresh }) {
         }}
       >
         <input
-          placeholder="🔍 Search renewed records..."
+          placeholder="🔍 SEARCH RENEWED RECORDS..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={input}
@@ -233,7 +218,7 @@ export default function Renewed({ refresh, setRefresh }) {
           <div style={cardHead}>
             <div>Renewed List</div>
             <div style={{ opacity: 0.85, color: C.muted }}>
-              Results: {filtered.length}
+              RESULTS: {filtered.length}
             </div>
           </div>
 
@@ -245,9 +230,24 @@ export default function Renewed({ refresh, setRefresh }) {
         <RecordDetailsPanel
           styles={panelStyles}
           record={selected}
-          source="Renewed"
+          source="RENEWED"
           isArchive={true}
           onRenewSaved={() => setRefresh((p) => !p)}
+          onUpdated={(updated) => {
+            // ✅ update Renewed table immediately
+            setRecords((prev) => {
+              const copy = [...(prev || [])];
+              const idx = copy.findIndex((r) => String(r.id) === String(updated.id));
+              if (idx !== -1) copy[idx] = updated;
+              return copy;
+            });
+
+            // ✅ update right panel immediately
+            setSelected(updated);
+
+            // optional refresh
+            // setRefresh?.((p) => !p);
+          }}
         />
       </div>
     </div>

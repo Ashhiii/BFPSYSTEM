@@ -27,19 +27,41 @@ export default function AddDocument({ onSaved }) {
     []
   );
 
+  // ✅ uppercase-save only for these keys (text only)
+  const UPPER_KEYS = useMemo(
+    () =>
+      new Set([
+        "fsicAppNo",
+        "ownerName",
+        "establishmentName",
+        "businessAddress",
+        "contactNumber",
+        "ioNumber",
+        "nfsiNumber",
+        "inspectors",
+        "teamLeader",
+        "chiefName",
+        "marshalName",
+      ]),
+    []
+  );
+
   const [form, setForm] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const change = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const change = (e) => {
+    const { name, value } = e.target;
+    const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value; // ✅ save as CAPS for text keys
+    setForm((p) => ({ ...p, [name]: v }));
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setMsg("");
 
-    // ✅ required (imo gusto): FSIC + Owner
     if (!form.fsicAppNo.trim() || !form.ownerName.trim()) {
-      setMsg("❌ Please fill in FSIC App No and Owner.");
+      setMsg("❌ PLEASE FILL IN FSIC APP NO AND OWNER.");
       return;
     }
 
@@ -51,13 +73,13 @@ export default function AddDocument({ onSaved }) {
         body: JSON.stringify(form),
       });
 
-      if (!res.ok) throw new Error((await res.text()) || "Failed to add document");
+      if (!res.ok) throw new Error((await res.text()) || "FAILED TO ADD DOCUMENT");
 
       setForm(initial);
-      setMsg("✅ Document added successfully");
+      setMsg("✅ DOCUMENT ADDED SUCCESSFULLY");
       onSaved?.();
     } catch (err) {
-      setMsg(`❌ ${err.message}`);
+      setMsg(`❌ ${String(err.message || err).toUpperCase()}`);
     } finally {
       setLoading(false);
     }
@@ -94,7 +116,7 @@ export default function AddDocument({ onSaved }) {
     gap: 10,
   };
 
-  const label = { fontSize: 12, fontWeight: 950, color: "#334155" };
+  const label = { fontSize: 12, fontWeight: 950, color: "#334155", textTransform: "uppercase" };
 
   const req = {
     fontSize: 11,
@@ -104,6 +126,7 @@ export default function AddDocument({ onSaved }) {
     border: "1px solid #fecaca",
     padding: "4px 8px",
     borderRadius: 999,
+    textTransform: "uppercase",
   };
 
   const input = {
@@ -117,9 +140,10 @@ export default function AddDocument({ onSaved }) {
     fontWeight: 700,
     color: "#0f172a",
     background: "#fff",
+    textTransform: "uppercase", // ✅ display CAPS
   };
 
-  const hint = { marginTop: 8, fontSize: 12, fontWeight: 700, color: "#94a3b8" };
+  const hint = { marginTop: 8, fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" };
 
   const btn = (primary = false) => ({
     padding: "9px 14px",
@@ -130,14 +154,17 @@ export default function AddDocument({ onSaved }) {
     fontWeight: 950,
     cursor: loading ? "not-allowed" : "pointer",
     opacity: loading ? 0.75 : 1,
+    textTransform: "uppercase",
   });
 
   return (
     <div style={card}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 950, color: "#0f172a" }}>Add Document</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 }}>
+          <div style={{ fontSize: 16, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" }}>
+            Add Document
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6, textTransform: "uppercase" }}>
             Fill in details (FSIC + Owner required).
           </div>
         </div>
@@ -190,63 +217,63 @@ export default function AddDocument({ onSaved }) {
           <div style={labelRow}>
             <div style={label}>Contact Number</div>
           </div>
-          <input name="contactNumber" value={form.contactNumber} onChange={change} style={input} placeholder="09xxxxxxxxx" />
+          <input name="contactNumber" value={form.contactNumber} onChange={change} style={input} placeholder="09XXXXXXXXX" />
         </div>
 
         <div style={field}>
           <div style={labelRow}>
             <div style={label}>IO Number</div>
           </div>
-          <input name="ioNumber" value={form.ioNumber} onChange={change} style={input} placeholder="IO no" />
+          <input name="ioNumber" value={form.ioNumber} onChange={change} style={input} placeholder="IO NO" />
         </div>
 
         <div style={field}>
           <div style={labelRow}>
             <div style={label}>IO Date</div>
           </div>
-          <input name="ioDate" value={form.ioDate} onChange={change} style={input} type="date" />
+          <input name="ioDate" value={form.ioDate} onChange={change} style={{ ...input, textTransform: "none" }} type="date" />
         </div>
 
         <div style={field}>
           <div style={labelRow}>
             <div style={label}>NFSI Number</div>
           </div>
-          <input name="nfsiNumber" value={form.nfsiNumber} onChange={change} style={input} placeholder="NFSI no" />
+          <input name="nfsiNumber" value={form.nfsiNumber} onChange={change} style={input} placeholder="NFSI NO" />
         </div>
 
         <div style={field}>
           <div style={labelRow}>
             <div style={label}>NFSI Date</div>
           </div>
-          <input name="nfsiDate" value={form.nfsiDate} onChange={change} style={input} type="date" />
+          <input name="nfsiDate" value={form.nfsiDate} onChange={change} style={{ ...input, textTransform: "none" }} type="date" />
         </div>
 
         <div style={{ ...field, ...full }}>
           <div style={labelRow}>
             <div style={label}>Inspectors</div>
           </div>
-          <input name="inspectors" value={form.inspectors} onChange={change} style={input} placeholder="Inspector names" />
+          <input name="inspectors" value={form.inspectors} onChange={change} style={input} placeholder="INSPECTOR NAMES" />
         </div>
 
         <div style={{ ...field, ...full }}>
           <div style={labelRow}>
             <div style={label}>Team Leader</div>
           </div>
-          <input name="teamLeader" value={form.teamLeader} onChange={change} style={input} placeholder="Team Leader" />
+          <input name="teamLeader" value={form.teamLeader} onChange={change} style={input} placeholder="TEAM LEADER" />
         </div>
 
         <div style={field}>
           <div style={labelRow}>
-            <div style={label}>CHIEF</div>
+            <div style={label}>Chief</div>
           </div>
-          <input name="chiefName" value={form.chiefName} onChange={change} style={input} placeholder="Chief name" />
+          <input name="chiefName" value={form.chiefName} onChange={change} style={input} placeholder="CHIEF NAME" />
         </div>
 
         <div style={field}>
           <div style={labelRow}>
-            <div style={label}>MARSHAL</div>
+            <div style={label}>Marshal</div>
           </div>
-          <input name="marshalName" value={form.marshalName} onChange={change} style={input} placeholder="Marshal name" />
+          <input name="marshalName" value={form.marshalName} onChange={change} style={input} placeholder="MARSHAL NAME" />
         </div>
 
         {msg && (
@@ -260,6 +287,7 @@ export default function AddDocument({ onSaved }) {
               color: msg.includes("✅") ? "#166534" : "#991b1b",
               fontSize: 12,
               fontWeight: 900,
+              textTransform: "uppercase",
             }}
           >
             {msg}

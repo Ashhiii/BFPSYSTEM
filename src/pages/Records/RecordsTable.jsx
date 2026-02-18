@@ -13,6 +13,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
     overflow: "hidden",
     textOverflow: "ellipsis",
     maxWidth: "100%",
+    textTransform: "uppercase",
   };
 
   /* 🔥 BFP COLORS */
@@ -55,6 +56,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
       padding: "12px 12px",
       borderBottom: `2px solid ${C.primary}`,
       whiteSpace: "nowrap",
+      textTransform: "uppercase",
     },
 
     td: {
@@ -64,6 +66,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
       verticalAlign: "top",
       borderBottom: `1px solid ${C.border}`,
       color: C.text,
+      textTransform: "uppercase",
     },
 
     row: {
@@ -75,6 +78,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
       padding: "10px 12px",
       borderBottom: `1px solid ${C.border}`,
       whiteSpace: "nowrap",
+      textTransform: "none",
     },
 
     btn: {
@@ -108,6 +112,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
       color: C.muted,
       background: "#fff",
       fontWeight: 800,
+      textTransform: "uppercase",
     },
   };
 
@@ -176,9 +181,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) =>
-                      open(`${API}/records/${r.id}/certificate/owner/pdf`, e)
-                    }
+                    onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
                   >
                     Owner PDF
                   </button>
@@ -188,9 +191,7 @@ export default function RecordsTable({ records = [], onRowClick }) {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) =>
-                      open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)
-                    }
+                    onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
                   >
                     BFP PDF
                   </button>

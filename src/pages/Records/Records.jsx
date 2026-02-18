@@ -16,14 +16,13 @@ export default function Records({ refresh, setRefresh }) {
   const [selectedMonth, setSelectedMonth] = useState("");
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-  
   const [selectedRecord, setSelectedRecord] = useState(null);
 
   useEffect(() => injectTableStyles(), []);
 
   /* 🔥 BFP COLORS */
   const C = {
-    primary: "#b91c1c", // fire red
+    primary: "#b91c1c",
     primaryDark: "#7f1d1d",
     gold: "#f59e0b",
     softBg: "#fef2f2",
@@ -82,19 +81,6 @@ export default function Records({ refresh, setRefresh }) {
     XLSX.writeFile(workbook, "BFP_Records.xlsx");
   };
 
-  const exportCSV = () => {
-    const worksheet = XLSX.utils.json_to_sheet(filtered);
-    const csv = XLSX.utils.sheet_to_csv(worksheet);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "BFP_Records.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const closeMonth = async () => {
     if (!window.confirm("Close month and archive records?")) return;
 
@@ -117,7 +103,8 @@ export default function Records({ refresh, setRefresh }) {
     if (!record) return;
     const fixed = {
       ...record,
-      entityKey: record.entityKey || (record.fsicAppNo ? `fsic:${record.fsicAppNo}` : ""),
+      entityKey:
+        record.entityKey || (record.fsicAppNo ? `fsic:${record.fsicAppNo}` : ""),
     };
     setSelectedRecord(fixed);
   };
@@ -252,13 +239,6 @@ export default function Records({ refresh, setRefresh }) {
     color: "#fff",
   };
 
-  const btnGhost = {
-    ...btn,
-    background: "#fff",
-    border: `1px solid ${C.border}`,
-    color: C.text,
-  };
-
   const content = {
     flex: 1,
     overflow: "hidden",
@@ -291,7 +271,6 @@ export default function Records({ refresh, setRefresh }) {
 
   const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden" };
 
-  // NOTE: This is passed to RecordDetailsPanel; adjust there if needed
   const panelStyles = {
     td: {
       padding: 10,
@@ -300,33 +279,16 @@ export default function Records({ refresh, setRefresh }) {
       fontSize: 13,
       color: C.text,
     },
-    primaryBtn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: `1px solid ${C.primary}`,
-      background: C.primary,
-      color: "#fff",
-      fontWeight: 950,
-      cursor: "pointer",
-    },
-    dangerBtn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: `1px solid ${C.danger}`,
-      background: "#fef2f2",
-      color: C.danger,
-      fontWeight: 950,
-      cursor: "pointer",
-    },
   };
 
   return (
     <div style={page}>
-      {/* HEADER */}
       <div style={header}>
         <div>
           <div style={hTitle}>Fire Inspection Records</div>
-          <div style={hSub}>View records, archive by month, export, add and manage records</div>
+          <div style={hSub}>
+            View records, archive by month, export, add and manage records
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -339,7 +301,6 @@ export default function Records({ refresh, setRefresh }) {
         </div>
       </div>
 
-      {/* ADD TAB */}
       {tab === "add" && (
         <div style={card}>
           <div style={{ padding: 12, overflow: "auto" }}>
@@ -353,14 +314,15 @@ export default function Records({ refresh, setRefresh }) {
         </div>
       )}
 
-      {/* VIEW TAB */}
       {tab === "view" && (
         <>
           <div style={topbar}>
             <div style={topbarInner}>
               <div style={{ minWidth: 220 }}>
                 <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>
-                  {mode === "archive" ? `Archive Records (${selectedMonth || "-"})` : "Current Records"}
+                  {mode === "archive"
+                    ? `Archive Records (${selectedMonth || "-"})`
+                    : "Current Records"}
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 4 }}>
                   Click a row → details show on the right
@@ -368,8 +330,12 @@ export default function Records({ refresh, setRefresh }) {
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={btnGold} onClick={exportExcel}>Export Excel</button>
-                <button style={btnRed} onClick={closeMonth}>Close Month</button>
+                <button style={btnGold} onClick={exportExcel}>
+                  Export Excel
+                </button>
+                <button style={btnRed} onClick={closeMonth}>
+                  Close Month
+                </button>
               </div>
 
               <div style={{ width: "100%", display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
@@ -394,9 +360,7 @@ export default function Records({ refresh, setRefresh }) {
                       await fetchArchiveMonth(m);
                     }}
                   >
-                    <option value="">
-                      📁 View Month Archive
-                    </option>
+                    <option value="">📁 View Month Archive</option>
                     {months.map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -419,7 +383,6 @@ export default function Records({ refresh, setRefresh }) {
               </div>
             </div>
 
-            {/* small accent bar */}
             <div style={{ height: 4, background: C.primary }} />
           </div>
 
@@ -441,7 +404,7 @@ export default function Records({ refresh, setRefresh }) {
               isArchive={mode === "archive"}
               onRenewSaved={handleRenewSaved}
               onUpdated={(updated) => {
-                // ✅ update table list immediately
+                // ✅ update table immediately
                 setRecords((prev) => {
                   const copy = [...(prev || [])];
                   const idx = copy.findIndex((r) => String(r.id) === String(updated.id));
@@ -449,14 +412,10 @@ export default function Records({ refresh, setRefresh }) {
                   return copy;
                 });
 
-                // ✅ update right panel immediately
+                // ✅ update details immediately
                 setSelectedRecord(updated);
-
-                // optional: trigger refresh fetch if you want
-                // setRefresh?.((p) => !p);
               }}
             />
-
           </div>
         </>
       )}

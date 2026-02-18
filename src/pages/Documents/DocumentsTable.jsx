@@ -40,6 +40,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
     WebkitBoxOrient: "vertical",
     overflow: "hidden",
     maxWidth: "100%",
+    textTransform: "uppercase",
   };
 
   const S = {
@@ -65,6 +66,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
       padding: "12px 12px",
       borderBottom: `2px solid ${C.primary}`,
       whiteSpace: "nowrap",
+      textTransform: "uppercase",
     },
     td: {
       padding: "12px 12px",
@@ -73,12 +75,14 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
       verticalAlign: "top",
       borderBottom: `1px solid ${C.border}`,
       color: C.text,
+      textTransform: "uppercase",
     },
     row: { cursor: "pointer", transition: "background .15s ease" },
     actionsTd: {
       padding: "10px 12px",
       borderBottom: `1px solid ${C.border}`,
       whiteSpace: "nowrap",
+      textTransform: "none",
     },
     btn: {
       padding: "8px 12px",
@@ -91,6 +95,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
       background: "#fff",
       color: C.text,
       transition: "transform .05s ease, background .15s ease, border .15s ease",
+      textTransform: "uppercase",
     },
     btnIO: { border: `1px solid ${C.ioBorder}`, background: C.ioBg, color: C.ioText },
     btnReinspect: { border: `1px solid ${C.reBorder}`, background: C.reBg, color: C.reText },
@@ -101,6 +106,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
       color: C.muted,
       background: "#fff",
       fontWeight: 800,
+      textTransform: "uppercase",
     },
   };
 

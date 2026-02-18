@@ -27,10 +27,36 @@ const FIELDS = [
   { key: "orNumber", label: "OR No" },
   { key: "orAmount", label: "OR Amount" },
   { key: "orDate", label: "OR Date" },
-    { key: "chiefName", label: "Chief" },
+  { key: "chiefName", label: "Chief" },
   { key: "marshalName", label: "Marshal" },
-
 ];
+
+// ✅ uppercase-save only for these keys
+const UPPER_KEYS = new Set([
+  "no",
+  "fsicAppNo",
+  "natureOfInspection",
+  "ownerName",
+  "establishmentName",
+  "businessAddress",
+  "contactNumber",
+  "ioNumber",
+  "nfsiNumber",
+  "fsicValidity",
+  "defects",
+  "inspectors",
+  "occupancyType",
+  "buildingDesc",
+  "floorArea",
+  "buildingHeight",
+  "storeyCount",
+  "highRise",
+  "fsmr",
+  "remarks",
+  "orNumber",
+  "chiefName",
+  "marshalName",
+]);
 
 export default function RecordDetailsPanel({
   styles,
@@ -38,12 +64,15 @@ export default function RecordDetailsPanel({
   source,
   isArchive,
   onRenewSaved,
-  onUpdated, 
+  onUpdated,
 }) {
-  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+    /\/+$/,
+    ""
+  );
 
-  const [editing, setEditing] = useState(false); // ✅ Edit current record
-  const [renewing, setRenewing] = useState(false); // ✅ Renew flow (separate mode)
+  const [editing, setEditing] = useState(false);
+  const [renewing, setRenewing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
   const [renewedRecord, setRenewedRecord] = useState(null);
@@ -108,6 +137,8 @@ export default function RecordDetailsPanel({
 
   const body = { flex: 1, overflowY: "auto", padding: 12 };
 
+  const caps = { textTransform: "uppercase" };
+
   const baseTd =
     styles?.td ||
     ({
@@ -120,13 +151,14 @@ export default function RecordDetailsPanel({
 
   const labelTd = {
     ...baseTd,
+    ...caps,
     fontWeight: 950,
     width: 160,
     color: C.primaryDark,
     background: "#fff",
   };
 
-  const valueTd = { ...baseTd, color: C.text, background: "#fff" };
+  const valueTd = { ...baseTd, ...caps, color: C.text, background: "#fff" };
 
   const inputStyle = {
     width: "100%",
@@ -139,6 +171,7 @@ export default function RecordDetailsPanel({
     background: "#fff",
     boxSizing: "border-box",
     fontWeight: 850,
+    textTransform: "uppercase",
   };
 
   const btn = (variant) => {
@@ -146,63 +179,79 @@ export default function RecordDetailsPanel({
       padding: "10px 12px",
       borderRadius: 12,
       fontWeight: 950,
-      cursor: "pointer",
+      cursor: saving ? "not-allowed" : "pointer",
       whiteSpace: "nowrap",
       opacity: saving ? 0.7 : 1,
     };
     if (variant === "primary")
-      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
+      return {
+        ...common,
+        border: `1px solid ${C.primary}`,
+        background: C.primary,
+        color: "#fff",
+      };
     if (variant === "gold")
-      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
+      return {
+        ...common,
+        border: `1px solid ${C.gold}`,
+        background: C.gold,
+        color: "#111827",
+      };
     if (variant === "danger")
-      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
+      return {
+        ...common,
+        border: `1px solid ${C.danger}`,
+        background: C.softBg,
+        color: C.danger,
+      };
     return common;
   };
 
+  const onFieldChange = (key, value) => {
+    const v = UPPER_KEYS.has(key) ? String(value ?? "").toUpperCase() : value;
+    setForm((p) => ({ ...p, [key]: v }));
+  };
+
   // ✅ EDIT CURRENT RECORD (needs PUT /records/:id)
-const saveEdit = async () => {
-  if (!record?.id) return alert("Missing record.id (cannot save).");
+  const saveEdit = async () => {
+    if (!record?.id) return alert("Missing record.id (cannot save).");
 
-  try {
-    setSaving(true);
-
-    const payload = {};
-    FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
-    payload.teamLeader = form.teamLeader ?? "";
-
-    const url = `${API}/records/${record.id}`;
-    console.log("SAVE EDIT URL:", url);
-    console.log("PAYLOAD:", payload);
-
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const text = await res.text();
-    console.log("RAW RESPONSE:", res.status, text);
-
-    let data;
     try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error(`Backend returned non-JSON. Status ${res.status}`);
+      setSaving(true);
+
+      const payload = {};
+      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
+      payload.teamLeader = form.teamLeader ?? "";
+
+      const url = `${API}/records/${record.id}`;
+
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await res.text();
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Backend returned non-JSON. Status ${res.status}`);
+      }
+
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.message || `Save failed. Status ${res.status}`);
+      }
+
+      setEditing(false);
+      onUpdated?.(data.data); // ✅ updates table immediately (Records.jsx handles it)
+    } catch (e) {
+      alert(`❌ SAVE ERROR: ${e.message}`);
+    } finally {
+      setSaving(false);
     }
-
-    if (!res.ok || data?.success === false) {
-      throw new Error(data?.message || `Save failed. Status ${res.status}`);
-    }
-
-    setEditing(false);
-    onUpdated?.(data.data);
-  } catch (e) {
-    alert(`❌ SAVE ERROR: ${e.message}`);
-  } finally {
-    setSaving(false);
-  }
-};
-
+  };
 
   // ✅ RENEW (creates renewed record)
   const saveRenew = async () => {
@@ -228,11 +277,11 @@ const saveEdit = async () => {
       try {
         data = JSON.parse(text);
       } catch {
-        console.log("Non-JSON:", text);
         throw new Error("Renew failed (non-JSON response).");
       }
 
-      if (!res.ok || !data?.success) throw new Error(data?.message || "Renew failed");
+      if (!res.ok || !data?.success)
+        throw new Error(data?.message || "Renew failed");
 
       setRenewedRecord(data.newRecord);
       setRenewing(false);
@@ -248,10 +297,12 @@ const saveEdit = async () => {
     return (
       <div style={panel}>
         <div style={head}>
-          <b style={{ color: C.primaryDark }}>Details</b>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>{source}</span>
+          <b style={{ color: C.primaryDark, ...caps }}>Details</b>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800, ...caps }}>
+            {source}
+          </span>
         </div>
-        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>
+        <div style={{ padding: 14, color: C.muted, fontWeight: 800, ...caps }}>
           Click a row to show details here.
         </div>
       </div>
@@ -265,8 +316,18 @@ const saveEdit = async () => {
     <div style={panel}>
       <div style={head}>
         <div>
-          <div style={{ fontWeight: 950, color: C.primaryDark }}>{title}</div>
-          <div style={{ fontSize: 12, color: C.muted, fontWeight: 800, marginTop: 4 }}>
+          <div style={{ fontWeight: 950, color: C.primaryDark, ...caps }}>
+            {title}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: C.muted,
+              fontWeight: 800,
+              marginTop: 4,
+              ...caps,
+            }}
+          >
             {source} {entityKey ? `• ${entityKey}` : ""}
           </div>
         </div>
@@ -275,10 +336,14 @@ const saveEdit = async () => {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {mode === "view" && (
             <>
-              <button style={btn("primary")} onClick={() => setEditing(true)}>
-                Edit
-              </button>
+              {/* ✅ Edit only for CURRENT (not archive) */}
+              {!isArchive && (
+                <button style={btn("primary")} onClick={() => setEditing(true)}>
+                  Edit
+                </button>
+              )}
 
+              {/* ✅ Renew only for ARCHIVE */}
               {isArchive && (
                 <button
                   style={btn("gold")}
@@ -298,7 +363,11 @@ const saveEdit = async () => {
               <button style={btn("gold")} onClick={saveEdit} disabled={saving}>
                 {saving ? "Saving..." : "Save"}
               </button>
-              <button style={btn("danger")} onClick={() => setEditing(false)} disabled={saving}>
+              <button
+                style={btn("danger")}
+                onClick={() => setEditing(false)}
+                disabled={saving}
+              >
                 Cancel
               </button>
             </>
@@ -309,7 +378,11 @@ const saveEdit = async () => {
               <button style={btn("gold")} onClick={saveRenew} disabled={saving}>
                 {saving ? "Saving..." : "Save Renew"}
               </button>
-              <button style={btn("danger")} onClick={() => setRenewing(false)} disabled={saving}>
+              <button
+                style={btn("danger")}
+                onClick={() => setRenewing(false)}
+                disabled={saving}
+              >
                 Cancel
               </button>
             </>
@@ -328,7 +401,7 @@ const saveEdit = async () => {
                     <input
                       name={f.key}
                       value={form[f.key] ?? ""}
-                      onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                      onChange={(e) => onFieldChange(f.key, e.target.value)}
                       style={inputStyle}
                       autoComplete="off"
                       placeholder={f.label}
@@ -339,7 +412,6 @@ const saveEdit = async () => {
                 </td>
               </tr>
             ))}
-
           </tbody>
         </table>
 
@@ -356,12 +428,13 @@ const saveEdit = async () => {
                   background: C.softBg,
                   color: C.primaryDark,
                   fontWeight: 900,
+                  ...caps,
                 }}
               >
                 ✅ Latest renewed version exists for this record.
               </div>
             ) : (
-              <div style={{ marginTop: 12, color: C.muted, fontWeight: 850 }}>
+              <div style={{ marginTop: 12, color: C.muted, fontWeight: 850, ...caps }}>
                 No renewed version yet.
               </div>
             )}

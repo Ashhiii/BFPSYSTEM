@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import RenewRecordPanel from "./RenewRecordPanel.jsx"; // ✅ adjust path
+import RenewRecordPanel from "./RenewRecordPanel.jsx"; // ✅ adjust path if needed
 
 const FIELDS = [
   { key: "no", label: "No" },
@@ -30,13 +30,41 @@ const FIELDS = [
   { key: "orDate", label: "OR Date" },
 ];
 
+const UPPER_KEYS = new Set([
+  "no",
+  "fsicAppNo",
+  "natureOfInspection",
+  "ownerName",
+  "establishmentName",
+  "businessAddress",
+  "contactNumber",
+  "ioNumber",
+  "nfsiNumber",
+  "fsicValidity",
+  "defects",
+  "inspectors",
+  "occupancyType",
+  "buildingDesc",
+  "floorArea",
+  "buildingHeight",
+  "storeyCount",
+  "highRise",
+  "fsmr",
+  "remarks",
+  "orNumber",
+  "orAmount",
+  "teamLeader",
+]);
+
+const DATE_KEYS = new Set(["dateInspected", "ioDate", "nfsiDate", "orDate"]);
+
 export default function RecordDetailsPanel({
   styles,
   record,
   source,
   isArchive,
   onRenewSaved,
-  onUpdated, // ✅ optional: para ma refresh list after edit
+  onUpdated,
 }) {
   const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
@@ -57,6 +85,8 @@ export default function RecordDetailsPanel({
     muted: "#6b7280",
     danger: "#dc2626",
   };
+
+  const caps = { textTransform: "uppercase" };
 
   useEffect(() => {
     setMode("view");
@@ -105,15 +135,16 @@ export default function RecordDetailsPanel({
 
   const labelTd = {
     ...baseTd,
+    ...caps,
     fontWeight: 950,
     width: 160,
     color: C.primaryDark,
     background: "#fff",
   };
 
-  const valueTd = { ...baseTd, color: C.text, background: "#fff" };
+  const valueTd = { ...baseTd, ...caps, color: C.text, background: "#fff" };
 
-  const inputStyle = {
+  const inputStyle = (k) => ({
     width: "100%",
     padding: "9px 10px",
     borderRadius: 12,
@@ -124,16 +155,18 @@ export default function RecordDetailsPanel({
     background: "#fff",
     boxSizing: "border-box",
     fontWeight: 850,
-  };
+    textTransform: DATE_KEYS.has(k) ? "none" : "uppercase",
+  });
 
   const btn = (variant) => {
     const common = {
       padding: "10px 12px",
       borderRadius: 12,
       fontWeight: 950,
-      cursor: "pointer",
+      cursor: saving ? "not-allowed" : "pointer",
       whiteSpace: "nowrap",
       opacity: saving ? 0.7 : 1,
+      textTransform: "uppercase",
     };
     if (variant === "primary")
       return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
@@ -144,7 +177,11 @@ export default function RecordDetailsPanel({
     return common;
   };
 
-  // ✅ EDIT: update existing record (needs PUT endpoint)
+  const setField = (k, v) => {
+    const next = UPPER_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
+    setForm((p) => ({ ...p, [k]: next }));
+  };
+
   const saveEdit = async () => {
     if (!record?.id) return;
 
@@ -155,7 +192,6 @@ export default function RecordDetailsPanel({
       FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
       payload.teamLeader = form.teamLeader ?? "";
 
-      // ⚠️ make sure backend has PUT /records/:id
       const res = await fetch(`${API}/records/${record.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -167,15 +203,15 @@ export default function RecordDetailsPanel({
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error(text || "Update failed");
+        throw new Error(text || "UPDATE FAILED");
       }
 
-      if (!res.ok || data?.success === false) throw new Error(data?.message || "Update failed");
+      if (!res.ok || data?.success === false) throw new Error(data?.message || "UPDATE FAILED");
 
       setMode("view");
       onUpdated?.(data.data);
     } catch (e) {
-      alert(`❌ ${e.message}`);
+      alert(`❌ ${String(e.message || e).toUpperCase()}`);
     } finally {
       setSaving(false);
     }
@@ -185,10 +221,10 @@ export default function RecordDetailsPanel({
     return (
       <div style={panel}>
         <div style={head}>
-          <b style={{ color: C.primaryDark }}>Details</b>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>{source}</span>
+          <b style={{ color: C.primaryDark, ...caps }}>Details</b>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800, ...caps }}>{source}</span>
         </div>
-        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>
+        <div style={{ padding: 14, color: C.muted, fontWeight: 800, ...caps }}>
           Click a row to show details here.
         </div>
       </div>
@@ -201,21 +237,19 @@ export default function RecordDetailsPanel({
     <div style={panel}>
       <div style={head}>
         <div>
-          <div style={{ fontWeight: 950, color: C.primaryDark }}>{title}</div>
-          <div style={{ fontSize: 12, color: C.muted, fontWeight: 800, marginTop: 4 }}>
+          <div style={{ fontWeight: 950, color: C.primaryDark, ...caps }}>{title}</div>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 800, marginTop: 4, ...caps }}>
             {source} {entityKey ? `• ${entityKey}` : ""}
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {/* ✅ Like Documents: Edit button */}
           {mode === "view" && (
             <button style={btn("primary")} onClick={() => setMode("edit")}>
               Edit
             </button>
           )}
 
-          {/* ✅ Renew button only if archive */}
           {isArchive && mode === "view" && (
             <button style={btn("gold")} onClick={() => setMode("renew")}>
               Renew
@@ -242,21 +276,21 @@ export default function RecordDetailsPanel({
       </div>
 
       <div style={body}>
-        {/* ✅ VIEW / EDIT table */}
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
             {FIELDS.map((f) => (
               <tr key={f.key}>
                 <td style={labelTd}>{f.label}</td>
-                <td style={valueTd}>
+                <td style={{ ...valueTd, textTransform: DATE_KEYS.has(f.key) ? "none" : "uppercase" }}>
                   {mode === "edit" ? (
                     <input
                       name={f.key}
                       value={form[f.key] ?? ""}
-                      onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                      style={inputStyle}
+                      onChange={(e) => setField(f.key, e.target.value)}
+                      style={inputStyle(f.key)}
                       autoComplete="off"
                       placeholder={f.label}
+                      type={DATE_KEYS.has(f.key) ? "date" : "text"}
                     />
                   ) : (
                     (record?.[f.key] ?? "") || "-"
@@ -272,10 +306,10 @@ export default function RecordDetailsPanel({
                   <input
                     name="teamLeader"
                     value={form.teamLeader ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, teamLeader: e.target.value }))}
-                    style={inputStyle}
+                    onChange={(e) => setField("teamLeader", e.target.value)}
+                    style={inputStyle("teamLeader")}
                     autoComplete="off"
-                    placeholder="Team Leader"
+                    placeholder="TEAM LEADER"
                   />
                 ) : (
                   (record?.teamLeader ?? "") || "-"
@@ -285,7 +319,6 @@ export default function RecordDetailsPanel({
           </tbody>
         </table>
 
-        {/* ✅ Renew section = separate file/component */}
         {mode === "renew" && (
           <RenewRecordPanel
             record={record}

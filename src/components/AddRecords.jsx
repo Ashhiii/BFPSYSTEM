@@ -34,91 +34,74 @@ const INITIAL_FORM = {
   orDate: "",
 };
 
-/**
- * ✅ Field UI config (label/placeholder/help/required/layout)
- * - span: 1 (half) or 2 (full width)
- */
+const UPPER_KEYS = new Set([
+  "appno",
+  "fsicAppNo",
+  "chiefName",
+  "marshalName",
+  "natureOfInspection",
+  "ownerName",
+  "establishmentName",
+  "businessAddress",
+  "contactNumber",
+  "ioNumber",
+  "nfsiNumber",
+  "fsicValidity",
+  "defects",
+  "inspectors",
+  "occupancyType",
+  "buildingDesc",
+  "floorArea",
+  "buildingHeight",
+  "storeyCount",
+  "highRise",
+  "fsmr",
+  "remarks",
+  "orNumber",
+]);
+
 const FIELDS = [
-  {
-    key: "fsicAppNo",
-    label: "FSIC App No",
-    placeholder: "2026-00123",
-    help: "Use the official FSIC application number.",
-    required: true,
-    type: "text",
-    span: 1,
-  },
-  {
-    key: "ownerName",
-    label: "Owner",
-    placeholder: "Owner name",
-    help: "Person/representative responsible for the establishment.",
-    required: true,
-    type: "text",
-    span: 1,
-  },
-  {
-    key: "establishmentName",
-    label: "Establishment",
-    placeholder: "Establishment name",
-    help: "Business name / building / place inspected.",
-    required: false, // if you want required, set true
-    type: "text",
-    span: 2,
-  },
+  { key: "fsicAppNo", label: "FSIC App No", placeholder: "2026-00123", required: true, type: "text", span: 1 },
+  { key: "ownerName", label: "Owner", placeholder: "Owner name", required: true, type: "text", span: 1 },
+  { key: "establishmentName", label: "Establishment", placeholder: "Establishment name", required: false, type: "text", span: 2 },
 
-  // ---- the rest (same UI style) ----
-  { key: "appno", label: "Application No.", placeholder: "App no", help: "", required: false, type: "text", span: 1 },
-  { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "e.g. Annual / New / Re-inspection", help: "", required: false, type: "text", span: 1 },
+  { key: "appno", label: "Application No.", placeholder: "App no", required: false, type: "text", span: 1 },
+  { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "Annual / New / Re-inspection", required: false, type: "text", span: 1 },
 
-  { key: "businessAddress", label: "Business Address", placeholder: "Full address", help: "", required: false, type: "text", span: 2 },
+  { key: "businessAddress", label: "Business Address", placeholder: "Full address", required: false, type: "text", span: 2 },
 
-  { key: "contactNumber", label: "Contact Number", placeholder: "09xxxxxxxxx", help: "", required: false, type: "tel", span: 1 },
-  { key: "dateInspected", label: "Date Inspected", placeholder: "", help: "", required: false, type: "date", span: 1 },
+  { key: "contactNumber", label: "Contact Number", placeholder: "09xxxxxxxxx", required: false, type: "tel", span: 1 },
+  { key: "dateInspected", label: "Date Inspected", placeholder: "", required: false, type: "date", span: 1 },
 
-  { key: "ioNumber", label: "IO Number", placeholder: "IO no", help: "Inspection Order number.", required: false, type: "text", span: 1 },
-  { key: "ioDate", label: "IO Date", placeholder: "", help: "", required: false, type: "date", span: 1 },
+  { key: "ioNumber", label: "IO Number", placeholder: "IO no", required: false, type: "text", span: 1 },
+  { key: "ioDate", label: "IO Date", placeholder: "", required: false, type: "date", span: 1 },
 
-  { key: "nfsiNumber", label: "NFSI Number", placeholder: "NFSI no", help: "", required: false, type: "text", span: 1 },
-  { key: "nfsiDate", label: "NFSI Date", placeholder: "", help: "", required: false, type: "date", span: 1 },
+  { key: "nfsiNumber", label: "NFSI Number", placeholder: "NFSI no", required: false, type: "text", span: 1 },
+  { key: "nfsiDate", label: "NFSI Date", placeholder: "", required: false, type: "date", span: 1 },
 
-  { key: "fsicValidity", label: "FSIC Validity", placeholder: "Validity", help: "", required: false, type: "text", span: 1 },
-  { key: "defects", label: "Defects / Violations", placeholder: "List defects", help: "", required: false, type: "text", span: 1 },
+  { key: "fsicValidity", label: "FSIC Validity", placeholder: "Validity", required: false, type: "text", span: 1 },
+  { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
 
-  { key: "inspectors", label: "Inspectors", placeholder: "Inspector names", help: "", required: false, type: "text", span: 2 },
+  { key: "inspectors", label: "Inspectors", placeholder: "Inspector names", required: false, type: "text", span: 2 },
 
-  { key: "occupancyType", label: "Occupancy Type", placeholder: "Occupancy", help: "", required: false, type: "text", span: 1 },
-  { key: "buildingDesc", label: "Building Description", placeholder: "Description", help: "", required: false, type: "text", span: 1 },
+  { key: "occupancyType", label: "Occupancy Type", placeholder: "Occupancy", required: false, type: "text", span: 1 },
+  { key: "buildingDesc", label: "Building Description", placeholder: "Description", required: false, type: "text", span: 1 },
 
-  { key: "floorArea", label: "Floor Area", placeholder: "e.g. 120 sqm", help: "", required: false, type: "text", span: 1 },
-  { key: "buildingHeight", label: "Building Height", placeholder: "e.g. 10 m", help: "", required: false, type: "text", span: 1 },
+  { key: "floorArea", label: "Floor Area", placeholder: "120 SQM", required: false, type: "text", span: 1 },
+  { key: "buildingHeight", label: "Building Height", placeholder: "10 M", required: false, type: "text", span: 1 },
 
-  { key: "storeyCount", label: "Storey Count", placeholder: "e.g. 2", help: "", required: false, type: "number", span: 1 },
-  { key: "highRise", label: "High Rise", placeholder: "YES / NO", help: "", required: false, type: "text", span: 1 },
+  { key: "storeyCount", label: "Storey Count", placeholder: "2", required: false, type: "number", span: 1 },
+  { key: "highRise", label: "High Rise", placeholder: "YES / NO", required: false, type: "text", span: 1 },
 
-  { key: "fsmr", label: "FSMR", placeholder: "FSMR", help: "", required: false, type: "text", span: 1 },
-  { key: "remarks", label: "Remarks", placeholder: "Remarks", help: "", required: false, type: "text", span: 1 },
+  { key: "fsmr", label: "FSMR", placeholder: "FSMR", required: false, type: "text", span: 1 },
+  { key: "remarks", label: "Remarks", placeholder: "Remarks", required: false, type: "text", span: 1 },
 
-  { key: "orNumber", label: "OR Number", placeholder: "OR no", help: "", required: false, type: "text", span: 1 },
-  { key: "orAmount", label: "OR Amount", placeholder: "0.00", help: "", required: false, type: "number", span: 1 },
-  { key: "orDate", label: "OR Date", placeholder: "", help: "", required: false, type: "date", span: 2 },
-  {
-  key: "chiefName",
-  label: "Chief, Fire Safety Enforcement Section",
-  placeholder: "Chief name",
-  required: false,
-  type: "text",
-  span: 1,
-},
-{
-  key: "marshalName",
-  label: "District Fire Marshal",
-  placeholder: "Marshal name",
-  required: false,
-  type: "text",
-  span: 1,
-},
+  { key: "orNumber", label: "OR Number", placeholder: "OR no", required: false, type: "text", span: 1 },
+  { key: "orAmount", label: "OR Amount", placeholder: "0.00", required: false, type: "number", span: 1 },
+  { key: "orDate", label: "OR Date", placeholder: "", required: false, type: "date", span: 2 },
 
+  { key: "chiefName", label: "Chief, Fire Safety Enforcement Section", placeholder: "Chief name", required: false, type: "text", span: 1 },
+  { key: "marshalName", label: "District Fire Marshal", placeholder: "Marshal name", required: false, type: "text", span: 1 },
 ];
 
 export default function AddRecord({ setRefresh }) {
@@ -128,10 +111,7 @@ export default function AddRecord({ setRefresh }) {
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
 
-  const requiredKeys = useMemo(
-    () => FIELDS.filter((f) => f.required).map((f) => f.key),
-    []
-  );
+  const requiredKeys = useMemo(() => FIELDS.filter((f) => f.required).map((f) => f.key), []);
 
   const missingRequired = useMemo(() => {
     const miss = {};
@@ -157,8 +137,8 @@ export default function AddRecord({ setRefresh }) {
       flexWrap: "wrap",
       alignItems: "center",
     },
-    title: { fontSize: 18, fontWeight: 950, color: "#0f172a" },
-    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 },
+    title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
+    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6, textTransform: "uppercase" },
 
     btn: {
       padding: "10px 12px",
@@ -167,6 +147,7 @@ export default function AddRecord({ setRefresh }) {
       background: "#fff",
       cursor: "pointer",
       fontWeight: 950,
+      textTransform: "uppercase",
     },
     primary: {
       padding: "10px 12px",
@@ -176,6 +157,7 @@ export default function AddRecord({ setRefresh }) {
       color: "#fff",
       cursor: "pointer",
       fontWeight: 950,
+      textTransform: "uppercase",
     },
 
     grid: {
@@ -198,7 +180,12 @@ export default function AddRecord({ setRefresh }) {
       gap: 10,
       marginBottom: 10,
     },
-    cardLabel: { fontSize: 13, fontWeight: 900, color: "#0f172a" },
+    cardLabel: {
+      fontSize: 13,
+      fontWeight: 900,
+      color: "#0f172a",
+      textTransform: "uppercase",
+    },
 
     reqPill: {
       fontSize: 11,
@@ -209,6 +196,7 @@ export default function AddRecord({ setRefresh }) {
       padding: "4px 10px",
       borderRadius: 999,
       lineHeight: 1,
+      textTransform: "uppercase",
     },
 
     input: {
@@ -221,19 +209,22 @@ export default function AddRecord({ setRefresh }) {
       fontWeight: 800,
       background: "#fff",
       boxSizing: "border-box",
+      textTransform: "uppercase",
     },
-    help: { marginTop: 8, fontSize: 11.5, color: "#64748b", fontWeight: 700 },
   };
 
   const onChange = (e) => {
     const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+
+    // ✅ uppercase-save only for text keys
+    const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
+
+    setForm((p) => ({ ...p, [name]: v }));
   };
 
   const onBlur = (k) => setTouched((p) => ({ ...p, [k]: true }));
 
   const submit = async () => {
-    // ✅ required: fsicAppNo + ownerName
     if (!form.fsicAppNo?.trim() || !form.ownerName?.trim()) {
       setTouched((p) => ({ ...p, fsicAppNo: true, ownerName: true }));
       return alert("Required: FSIC App No and Owner");
@@ -273,7 +264,6 @@ export default function AddRecord({ setRefresh }) {
 
   return (
     <div style={styles.wrap}>
-      {/* Header */}
       <div style={styles.headerRow}>
         <div>
           <div style={styles.title}>Add Record</div>
@@ -298,7 +288,6 @@ export default function AddRecord({ setRefresh }) {
         </div>
       </div>
 
-      {/* Cards */}
       <div style={styles.grid}>
         {FIELDS.map((f) => {
           const showError = f.required && touched[f.key] && missingRequired[f.key];
@@ -318,7 +307,7 @@ export default function AddRecord({ setRefresh }) {
               </div>
 
               <input
-                name={f.key} // ✅ backend key
+                name={f.key}
                 value={form[f.key] ?? ""}
                 onChange={onChange}
                 onBlur={() => onBlur(f.key)}
@@ -328,10 +317,10 @@ export default function AddRecord({ setRefresh }) {
                 style={{
                   ...styles.input,
                   border: showError ? "1px solid #dc2626" : styles.input.border,
+                  // ✅ keep date readable (optional)
+                  textTransform: f.type === "date" ? "none" : "uppercase",
                 }}
               />
-
-              {!!f.help && <div style={styles.help}>{f.help}</div>}
             </div>
           );
         })}
