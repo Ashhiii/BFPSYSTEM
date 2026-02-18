@@ -5,11 +5,13 @@ import {
   HiOutlineTrash,
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
+    HiOutlineUpload, // ✅ NEW
 } from "react-icons/hi";
 
 import bfpLogo from "../assets/logo/bfp-logo.png";
 import { sidebarWrap, navBtn, arrowBtn, C } from "./shellStyles";
 import LockButton from "./LockButton"; // ✅ new
+
 
 export default function Sidebar({
   collapsed,
@@ -87,6 +89,11 @@ export default function Sidebar({
         <span style={labelStyle}>Data Deletion</span>
       </div>
 
+            <div style={navBtn(active.importexcel)} onClick={() => navigate("/app/import")}>
+  <HiOutlineUpload style={iconStyle} />
+  <span style={labelStyle}>Import Excel</span>
+</div>
+
       {/* ✅ LOCK BUTTON SEPARATE */}
       <LockButton collapsed={collapsed} onClick={onLock} />
 
@@ -94,6 +101,8 @@ export default function Sidebar({
       <div style={arrowBtn} onClick={() => setCollapsed(!collapsed)}>
         {collapsed ? <HiOutlineChevronRight /> : <HiOutlineChevronLeft />}
       </div>
+
+
     </aside>
   );
 }

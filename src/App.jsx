@@ -12,6 +12,9 @@ import FileManagement from "./pages/FileManagement/FileManagement";
 import Sidebar from "./layout/Sidebar.jsx";
 import { layout, main } from "./layout/shellStyles.js";
 
+import ImportExcel from "./pages/ImportExcel/ImportExcel.jsx";
+
+
 function Shell() {
   const navigate = useNavigate();
   const [refresh, setRefresh] = useState(false);
@@ -27,6 +30,7 @@ function Shell() {
     documents: path.includes("/app/documents"),
     renewed: path.includes("/app/renewed"),
     filemgmt: path.includes("/app/filemgmt"),
+      importexcel: path.includes("/app/import"), // ✅ NEW
   };
 
   // ✅ LOCK WITH FIRE OVERLAY (NO WHITE BG)
@@ -56,6 +60,7 @@ function Shell() {
           <Route path="documents" element={<Documents refresh={refresh} setRefresh={setRefresh} />} />
           <Route path="renewed" element={<Renewed refresh={refresh} setRefresh={setRefresh} />} />
           <Route path="filemgmt" element={<FileManagement refresh={refresh} setRefresh={setRefresh} />} />
+          <Route path="import" element={<ImportExcel refresh={refresh} setRefresh={setRefresh} />} />
           <Route path="*" element={<Navigate to="records" replace />} />
         </Routes>
       </main>
