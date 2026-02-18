@@ -59,11 +59,12 @@ export default function PinUnlock() {
   /* ================= VIDEO BG ================= */
 
   const bg = {
-    minHeight: "100vh",
+    height: "95vh",
     position: "relative",
     overflow: "hidden",
     display: "grid",
     placeItems: "center",
+    padding: 14,
   };
 
   const videoStyle = {
