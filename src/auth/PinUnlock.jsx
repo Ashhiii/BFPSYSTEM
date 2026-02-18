@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import bgVideo from "../assets/background/bg.mp4";
-import logo from "../assets/logo/bfp-logo.png"; // ✅ change to your logo path
+import React, { useEffect, useState } from "react";
+import bgVideo from "../assets/background/bg1.mp4";
+import logo from "../assets/logo/bfp-logo.png";
 import { useNavigate } from "react-router-dom";
 
 export default function PinUnlock() {
@@ -9,18 +9,16 @@ export default function PinUnlock() {
   const [loading, setLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [active, setActive] = useState(false); // ✅ controls logo “saka” animation
+  const [active, setActive] = useState(false);
   const navigate = useNavigate();
 
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
-    // ✅ entrance animation
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
 
-  // logo goes up when typing / focused / has pin
   useEffect(() => {
     setActive(Boolean(pin));
   }, [pin]);
@@ -43,11 +41,13 @@ export default function PinUnlock() {
       if (!res.ok || !data?.ok) throw new Error("Invalid PIN");
 
       sessionStorage.setItem("unlocked", "1");
+
+      // ✅ transparent overlay loading (same screen)
       setFireLoading(true);
 
       setTimeout(() => {
         navigate("/app/records");
-      }, 2500);
+      }, 5500);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
       setPin("");
@@ -99,7 +99,7 @@ export default function PinUnlock() {
     width: "100%",
     borderRadius: 22,
     padding: 22,
-    paddingTop: 90, // ✅ space for logo overlap
+    paddingTop: 90,
     background: "rgba(255,255,255,0.14)",
     backdropFilter: "blur(14px)",
     WebkitBackdropFilter: "blur(14px)",
@@ -107,62 +107,46 @@ export default function PinUnlock() {
     boxShadow: "0 25px 60px rgba(0,0,0,0.38)",
     color: "#fff",
     textAlign: "center",
-
-    // ✅ entrance transition
     transform: mounted ? "translateY(0px)" : "translateY(18px)",
     opacity: mounted ? 1 : 0,
     transition: "transform .55s ease, opacity .55s ease",
   };
 
-const logoWrap = {
-  position: "absolute",
-  top: 0,
-  bottom: 10,
-  left: "50%",
-  transform: active
-    ? "translate(-50%, -70px) scale(0.92)"
-    : "translate(-50%, -50px) scale(1)",
-  transition: "transform .45s cubic-bezier(.2,.9,.2,1)",
-  zIndex: 3,
-  width: 130,      // 🔥 from 96 → 130
-  height: 130,
-  borderRadius: 28,
-  display: "grid",
-  placeItems: "center",
-};
-
-const logoImg = {
-  width: "200%",      // 🔥 bigger image
-  height: 120,
-  objectFit: "contain",
-  filter: "drop-shadow(0 10px 18px rgba(0,0,0,.25))",
-};
-
-
-  const title = {
-    fontSize: 18,
-    fontWeight: 950,
-    letterSpacing: 1,
-  };
-
-  const sub = {
-    fontSize: 12,
-    opacity: 0.88,
-    marginTop: 6,
-    fontWeight: 800,
-  };
-
-  const inputWrap = {
-    marginTop: 18,
+  const logoWrap = {
+    position: "absolute",
+    top: 0,
+    left: "50%",
+    transform: active
+      ? "translate(-50%, -70px) scale(0.92)"
+      : "translate(-50%, -50px) scale(1)",
+    transition: "transform .45s cubic-bezier(.2,.9,.2,1)",
+    zIndex: 3,
+    width: 130,
+    height: 130,
+    borderRadius: 28,
     display: "grid",
-    gap: 10,
+    placeItems: "center",
   };
+
+  const logoImg = {
+    width: "200%",
+    height: 120,
+    objectFit: "contain",
+    filter: "drop-shadow(0 10px 18px rgba(0,0,0,.25))",
+  };
+
+  const title = { fontSize: 18, fontWeight: 950, letterSpacing: 1 };
+  const sub = { fontSize: 12, opacity: 0.88, marginTop: 6, fontWeight: 800 };
+
+  const inputWrap = { marginTop: 18, display: "grid", gap: 10 };
 
   const input = {
     width: "95%",
     padding: "12px 14px",
     borderRadius: 14,
-    border: msg ? "1px solid rgba(254,202,202,.75)" : "1px solid rgba(255,255,255,0.28)",
+    border: msg
+      ? "1px solid rgba(254,202,202,.75)"
+      : "1px solid rgba(255,255,255,0.28)",
     background: "rgba(255,255,255,0.18)",
     color: "#fff",
     outline: "none",
@@ -195,60 +179,74 @@ const logoImg = {
     minHeight: 16,
   };
 
-  const hintRow = {
-    marginTop: 10,
-    fontSize: 11,
-    opacity: 0.82,
-    fontWeight: 800,
-  };
+  const hintRow = { marginTop: 10, fontSize: 11, opacity: 0.82, fontWeight: 800 };
 
-  /* ================= FIRE LOADING ================= */
+  /* ================= TRANSPARENT LOADING OVERLAY ================= */
 
-  const fireScreen = {
-    minHeight: "100vh",
-    background: "#ffffff",
+  const loadingOverlay = {
+    position: "absolute",
+    inset: 0,
+    zIndex: 6,
     display: "grid",
     placeItems: "center",
+    background: "rgba(0,0,0,0.35)", // ✅ transparent
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    animation: "fadeIn .18s ease",
+  };
+
+  const loadingCard = {
+    width: "min(360px, 92vw)",
+    borderRadius: 18,
+    padding: 18,
+    background: "rgba(255,255,255,0.14)",
+    border: "1px solid rgba(255,255,255,0.22)",
+    boxShadow: "0 25px 60px rgba(0,0,0,0.45)",
+    color: "#fff",
     textAlign: "center",
   };
 
-  const fire = {
-    fontSize: 72,
-    animation: "firePulse 0.6s infinite alternate",
+  const spinner = {
+    width: 46,
+    height: 46,
+    borderRadius: 999,
+    border: "4px solid rgba(255,255,255,0.25)",
+    borderTop: "4px solid rgba(255,255,255,0.95)",
+    margin: "0 auto",
+    animation: "spin .9s linear infinite",
   };
-
-  if (fireLoading) {
-    return (
-      <div style={fireScreen}>
-        <div>
-          <div style={fire}>🔥</div>
-          <div style={{ marginTop: 14, fontWeight: 900, color: "#991b1b" }}>
-            Securing system...
-          </div>
-        </div>
-
-        <style>{`
-          @keyframes firePulse {
-            from { transform: scale(1); opacity: 0.7; }
-            to { transform: scale(1.25); opacity: 1; }
-          }
-        `}</style>
-      </div>
-    );
-  }
 
   return (
     <div style={bg}>
       <video style={videoStyle} src={bgVideo} autoPlay loop muted playsInline />
       <div style={overlay} />
 
+      {/* ✅ overlay loading on top of same login */}
+      {fireLoading && (
+        <div style={loadingOverlay}>
+          <div style={loadingCard}>
+            <div style={{ fontSize: 44 }}>🔥</div>
+            <div style={{ marginTop: 8, fontWeight: 950 }}>Securing system...</div>
+            <div style={{ marginTop: 14 }}>
+              <div style={spinner} />
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.9, fontWeight: 800 }}>
+              Please wait…
+            </div>
+          </div>
+
+          <style>{`
+            @keyframes spin { to { transform: rotate(360deg); } }
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          `}</style>
+        </div>
+      )}
+
       <div style={wrap}>
-        {/* ✅ LOGO that moves up */}
         <div style={logoWrap}>
           <img src={logo} alt="BFP Logo" style={logoImg} />
         </div>
 
-        {/* ✅ LOGIN CARD */}
         <div style={card}>
           <div style={title}>BFP RECORDS SYSTEM</div>
           <div style={sub}>Enter PIN to unlock</div>
@@ -267,7 +265,7 @@ const logoImg = {
               placeholder="••••"
               style={input}
               autoFocus
-              disabled={loading}
+              disabled={loading || fireLoading}
               onFocus={(e) => {
                 setActive(true);
                 e.currentTarget.style.transform = "translateY(-1px)";
@@ -282,13 +280,11 @@ const logoImg = {
 
             <div style={msgStyle}>{msg || ""}</div>
 
-            <button type="submit" style={btn} disabled={loading}>
-              {loading ? "Checking..." : "Unlock"}
+            <button type="submit" style={btn} disabled={loading || fireLoading}>
+              {loading ? "Checking..." : fireLoading ? "Entering..." : "Unlock"}
             </button>
 
-            <div style={hintRow}>
-              Tip: numbers only • max 6 digits
-            </div>
+            <div style={hintRow}>Tip: numbers only • max 6 digits</div>
           </form>
         </div>
       </div>
