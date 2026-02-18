@@ -13,7 +13,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
     overflow: "hidden",
     textOverflow: "ellipsis",
     maxWidth: "100%",
-    textTransform: "uppercase",
   };
 
   /* 🔥 BFP COLORS */
@@ -57,7 +56,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       padding: "12px 12px",
       borderBottom: `2px solid ${C.primary}`,
       whiteSpace: "nowrap",
-      textTransform: "uppercase",
     },
 
     td: {
@@ -67,7 +65,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       verticalAlign: "top",
       borderBottom: `1px solid ${C.border}`,
       color: C.text,
-      textTransform: "uppercase",
     },
 
     row: {
@@ -79,7 +76,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       padding: "10px 12px",
       borderBottom: `1px solid ${C.border}`,
       whiteSpace: "nowrap",
-      textTransform: "none",
     },
 
     btn: {
@@ -93,7 +89,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       background: "#fff",
       color: C.text,
       transition: "transform .05s ease, background .15s ease, border .15s ease",
-      textTransform: "uppercase",
     },
 
     btnOwner: {
@@ -114,7 +109,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       color: C.muted,
       background: "#fff",
       fontWeight: 800,
-      textTransform: "uppercase",
     },
   };
 
@@ -165,8 +159,8 @@ export default function RenewedTable({ records = [], onRowClick }) {
                 <td style={S.td}>
                   <div style={clamp}>{r.businessAddress || "-"}</div>
                 </td>
-                <td style={{ ...S.td, textTransform: "none" }}>
-                  <div style={{ ...clamp, textTransform: "none" }}>{r.dateInspected || "-"}</div>
+                <td style={S.td}>
+                  <div style={clamp}>{r.dateInspected || "-"}</div>
                 </td>
 
                 <td style={S.actionsTd}>

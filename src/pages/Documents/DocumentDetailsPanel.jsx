@@ -16,7 +16,8 @@ const FIELDS = [
   { key: "marshalName", label: "Marshal" },
 ];
 
-const UPPER_KEYS = new Set([
+// ✅ inputs ra i-CAPS (ayaw apila dates)
+const CAPS_KEYS = new Set([
   "fsicAppNo",
   "ownerName",
   "establishmentName",
@@ -29,6 +30,8 @@ const UPPER_KEYS = new Set([
   "chiefName",
   "marshalName",
 ]);
+
+const DATE_KEYS = new Set(["ioDate", "nfsiDate"]);
 
 export default function DocumentDetailsPanel({ doc, onUpdated }) {
   const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
@@ -49,8 +52,6 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     muted: "#6b7280",
     danger: "#dc2626",
   };
-
-  const caps = { textTransform: "uppercase" };
 
   useEffect(() => {
     setEditing(false);
@@ -100,16 +101,16 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
 
   const labelTd = {
     ...baseTd,
-    ...caps,
     fontWeight: 950,
     width: 160,
     color: C.primaryDark,
     background: "#fff",
   };
 
-  const valueTd = { ...baseTd, ...caps, color: C.text, background: "#fff" };
+  const valueTd = { ...baseTd, color: C.text, background: "#fff" };
 
-  const inputStyle = {
+  // ✅ input style (caps only if key is in CAPS_KEYS)
+  const inputStyle = (k) => ({
     width: "100%",
     padding: "9px 10px",
     borderRadius: 12,
@@ -120,7 +121,13 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     background: "#fff",
     boxSizing: "border-box",
     fontWeight: 850,
-    textTransform: "uppercase",
+    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
+  });
+
+  // ✅ store CAPS in state for inputs only
+  const setField = (k, v) => {
+    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
+    setForm((p) => ({ ...p, [k]: next }));
   };
 
   const btn = (variant) => {
@@ -128,10 +135,9 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       padding: "10px 12px",
       borderRadius: 12,
       fontWeight: 950,
-      cursor: saving ? "not-allowed" : "pointer",
+      cursor: "pointer",
       whiteSpace: "nowrap",
       opacity: saving ? 0.7 : 1,
-      textTransform: "uppercase",
     };
     if (variant === "primary")
       return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
@@ -142,17 +148,13 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     return common;
   };
 
-  const onFieldChange = (key, value) => {
-    const v = UPPER_KEYS.has(key) ? String(value ?? "").toUpperCase() : value;
-    setForm((p) => ({ ...p, [key]: v }));
-  };
-
   const save = async () => {
     if (!doc?.id) return;
 
     try {
       setSaving(true);
 
+      // ✅ send ALL fields
       const payload = {};
       FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
 
@@ -167,17 +169,17 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error(text || "UPDATE FAILED");
+        throw new Error(text || "Update failed");
       }
 
       if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || "UPDATE FAILED");
+        throw new Error(data?.message || "Update failed");
       }
 
       setEditing(false);
       onUpdated?.(data.data);
     } catch (e) {
-      alert(`❌ ${String(e.message || e).toUpperCase()}`);
+      alert(`❌ ${e.message}`);
     } finally {
       setSaving(false);
     }
@@ -187,10 +189,10 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     return (
       <div style={panel}>
         <div style={head}>
-          <b style={{ color: C.primaryDark, ...caps }}>Details</b>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800, ...caps }}>Documents</span>
+          <b style={{ color: C.primaryDark }}>Details</b>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>Documents</span>
         </div>
-        <div style={{ padding: 14, color: C.muted, fontWeight: 800, ...caps }}>
+        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>
           Click a row to show details here.
         </div>
       </div>
@@ -201,8 +203,8 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     <div style={panel}>
       <div style={head}>
         <div>
-          <div style={{ fontWeight: 950, color: C.primaryDark, ...caps }}>{title}</div>
-          <div style={{ fontSize: 12, color: C.muted, fontWeight: 800, marginTop: 4, ...caps }}>
+          <div style={{ fontWeight: 950, color: C.primaryDark }}>{title}</div>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 800, marginTop: 4 }}>
             Doc ID: {doc.id}
           </div>
         </div>
@@ -231,19 +233,18 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
             {FIELDS.map((f) => (
               <tr key={f.key}>
                 <td style={labelTd}>{f.label}</td>
+
+                {/* ✅ table values NOT forced caps, inputs ra */}
                 <td style={valueTd}>
                   {editing ? (
                     <input
                       name={f.key}
                       value={form[f.key] ?? ""}
-                      onChange={(e) => onFieldChange(f.key, e.target.value)}
-                      style={{
-                        ...inputStyle,
-                        textTransform: f.key === "ioDate" || f.key === "nfsiDate" ? "none" : "uppercase",
-                      }}
+                      onChange={(e) => setField(f.key, e.target.value)}
+                      style={inputStyle(f.key)}
                       autoComplete="off"
                       placeholder={f.label}
-                      type={f.key === "ioDate" || f.key === "nfsiDate" ? "date" : "text"}
+                      type={DATE_KEYS.has(f.key) ? "date" : "text"}
                     />
                   ) : (
                     (doc?.[f.key] ?? "") || "-"
@@ -255,7 +256,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
         </table>
 
         {!editing ? (
-          <div style={{ marginTop: 12, color: C.muted, fontWeight: 850, ...caps }}>
+          <div style={{ marginTop: 12, color: C.muted, fontWeight: 850 }}>
             Tip: After editing, generate PDF again.
           </div>
         ) : null}

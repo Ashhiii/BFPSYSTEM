@@ -31,8 +31,8 @@ const FIELDS = [
   { key: "marshalName", label: "Marshal" },
 ];
 
-// ✅ uppercase-save only for these keys
-const UPPER_KEYS = new Set([
+// ✅ INPUTS RA I-CAPS (ayaw apila dates)
+const CAPS_KEYS = new Set([
   "no",
   "fsicAppNo",
   "natureOfInspection",
@@ -54,9 +54,12 @@ const UPPER_KEYS = new Set([
   "fsmr",
   "remarks",
   "orNumber",
+  "orAmount",
   "chiefName",
   "marshalName",
 ]);
+
+const DATE_KEYS = new Set(["dateInspected", "ioDate", "nfsiDate", "orDate"]);
 
 export default function RecordDetailsPanel({
   styles,
@@ -66,10 +69,7 @@ export default function RecordDetailsPanel({
   onRenewSaved,
   onUpdated,
 }) {
-  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-    /\/+$/,
-    ""
-  );
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const [editing, setEditing] = useState(false);
   const [renewing, setRenewing] = useState(false);
@@ -79,7 +79,6 @@ export default function RecordDetailsPanel({
 
   const entityKey = useMemo(() => record?.entityKey || "", [record]);
 
-  /* 🔥 BFP COLORS */
   const C = {
     primary: "#b91c1c",
     primaryDark: "#7f1d1d",
@@ -137,8 +136,6 @@ export default function RecordDetailsPanel({
 
   const body = { flex: 1, overflowY: "auto", padding: 12 };
 
-  const caps = { textTransform: "uppercase" };
-
   const baseTd =
     styles?.td ||
     ({
@@ -151,16 +148,16 @@ export default function RecordDetailsPanel({
 
   const labelTd = {
     ...baseTd,
-    ...caps,
     fontWeight: 950,
     width: 160,
     color: C.primaryDark,
     background: "#fff",
   };
 
-  const valueTd = { ...baseTd, ...caps, color: C.text, background: "#fff" };
+  const valueTd = { ...baseTd, color: C.text, background: "#fff" };
 
-  const inputStyle = {
+  // ✅ input style: uppercase only for inputs
+  const inputStyle = (k) => ({
     width: "100%",
     padding: "9px 10px",
     borderRadius: 12,
@@ -171,7 +168,13 @@ export default function RecordDetailsPanel({
     background: "#fff",
     boxSizing: "border-box",
     fontWeight: 850,
-    textTransform: "uppercase",
+    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
+  });
+
+  // ✅ keep caps in state so saved value is caps
+  const setField = (k, v) => {
+    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
+    setForm((p) => ({ ...p, [k]: next }));
   };
 
   const btn = (variant) => {
@@ -179,40 +182,19 @@ export default function RecordDetailsPanel({
       padding: "10px 12px",
       borderRadius: 12,
       fontWeight: 950,
-      cursor: saving ? "not-allowed" : "pointer",
+      cursor: "pointer",
       whiteSpace: "nowrap",
       opacity: saving ? 0.7 : 1,
     };
     if (variant === "primary")
-      return {
-        ...common,
-        border: `1px solid ${C.primary}`,
-        background: C.primary,
-        color: "#fff",
-      };
+      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
     if (variant === "gold")
-      return {
-        ...common,
-        border: `1px solid ${C.gold}`,
-        background: C.gold,
-        color: "#111827",
-      };
+      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
     if (variant === "danger")
-      return {
-        ...common,
-        border: `1px solid ${C.danger}`,
-        background: C.softBg,
-        color: C.danger,
-      };
+      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
     return common;
   };
 
-  const onFieldChange = (key, value) => {
-    const v = UPPER_KEYS.has(key) ? String(value ?? "").toUpperCase() : value;
-    setForm((p) => ({ ...p, [key]: v }));
-  };
-
-  // ✅ EDIT CURRENT RECORD (needs PUT /records/:id)
   const saveEdit = async () => {
     if (!record?.id) return alert("Missing record.id (cannot save).");
 
@@ -245,7 +227,7 @@ export default function RecordDetailsPanel({
       }
 
       setEditing(false);
-      onUpdated?.(data.data); // ✅ updates table immediately (Records.jsx handles it)
+      onUpdated?.(data.data);
     } catch (e) {
       alert(`❌ SAVE ERROR: ${e.message}`);
     } finally {
@@ -253,7 +235,6 @@ export default function RecordDetailsPanel({
     }
   };
 
-  // ✅ RENEW (creates renewed record)
   const saveRenew = async () => {
     if (!record) return;
     if (!entityKey) return alert("Missing entityKey");
@@ -280,8 +261,7 @@ export default function RecordDetailsPanel({
         throw new Error("Renew failed (non-JSON response).");
       }
 
-      if (!res.ok || !data?.success)
-        throw new Error(data?.message || "Renew failed");
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Renew failed");
 
       setRenewedRecord(data.newRecord);
       setRenewing(false);
@@ -297,12 +277,10 @@ export default function RecordDetailsPanel({
     return (
       <div style={panel}>
         <div style={head}>
-          <b style={{ color: C.primaryDark, ...caps }}>Details</b>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800, ...caps }}>
-            {source}
-          </span>
+          <b style={{ color: C.primaryDark }}>Details</b>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>{source}</span>
         </div>
-        <div style={{ padding: 14, color: C.muted, fontWeight: 800, ...caps }}>
+        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>
           Click a row to show details here.
         </div>
       </div>
@@ -316,34 +294,19 @@ export default function RecordDetailsPanel({
     <div style={panel}>
       <div style={head}>
         <div>
-          <div style={{ fontWeight: 950, color: C.primaryDark, ...caps }}>
-            {title}
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: C.muted,
-              fontWeight: 800,
-              marginTop: 4,
-              ...caps,
-            }}
-          >
+          <div style={{ fontWeight: 950, color: C.primaryDark }}>{title}</div>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 800, marginTop: 4 }}>
             {source} {entityKey ? `• ${entityKey}` : ""}
           </div>
         </div>
 
-        {/* ✅ Buttons like Documents */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {mode === "view" && (
             <>
-              {/* ✅ Edit only for CURRENT (not archive) */}
-              {!isArchive && (
-                <button style={btn("primary")} onClick={() => setEditing(true)}>
-                  Edit
-                </button>
-              )}
+              <button style={btn("primary")} onClick={() => setEditing(true)}>
+                Edit
+              </button>
 
-              {/* ✅ Renew only for ARCHIVE */}
               {isArchive && (
                 <button
                   style={btn("gold")}
@@ -363,11 +326,7 @@ export default function RecordDetailsPanel({
               <button style={btn("gold")} onClick={saveEdit} disabled={saving}>
                 {saving ? "Saving..." : "Save"}
               </button>
-              <button
-                style={btn("danger")}
-                onClick={() => setEditing(false)}
-                disabled={saving}
-              >
+              <button style={btn("danger")} onClick={() => setEditing(false)} disabled={saving}>
                 Cancel
               </button>
             </>
@@ -378,11 +337,7 @@ export default function RecordDetailsPanel({
               <button style={btn("gold")} onClick={saveRenew} disabled={saving}>
                 {saving ? "Saving..." : "Save Renew"}
               </button>
-              <button
-                style={btn("danger")}
-                onClick={() => setRenewing(false)}
-                disabled={saving}
-              >
+              <button style={btn("danger")} onClick={() => setRenewing(false)} disabled={saving}>
                 Cancel
               </button>
             </>
@@ -396,15 +351,18 @@ export default function RecordDetailsPanel({
             {FIELDS.map((f) => (
               <tr key={f.key}>
                 <td style={labelTd}>{f.label}</td>
+
+                {/* ✅ inputs ra ang caps (edit/renew mode) */}
                 <td style={valueTd}>
                   {mode === "edit" || mode === "renew" ? (
                     <input
                       name={f.key}
                       value={form[f.key] ?? ""}
-                      onChange={(e) => onFieldChange(f.key, e.target.value)}
-                      style={inputStyle}
+                      onChange={(e) => setField(f.key, e.target.value)}
+                      style={inputStyle(f.key)}
                       autoComplete="off"
                       placeholder={f.label}
+                      type={DATE_KEYS.has(f.key) ? "date" : "text"}
                     />
                   ) : (
                     (record?.[f.key] ?? "") || "-"
@@ -415,7 +373,6 @@ export default function RecordDetailsPanel({
           </tbody>
         </table>
 
-        {/* Renew status (view mode only) */}
         {mode === "view" && (
           <>
             {renewedRecord ? (
@@ -428,13 +385,12 @@ export default function RecordDetailsPanel({
                   background: C.softBg,
                   color: C.primaryDark,
                   fontWeight: 900,
-                  ...caps,
                 }}
               >
                 ✅ Latest renewed version exists for this record.
               </div>
             ) : (
-              <div style={{ marginTop: 12, color: C.muted, fontWeight: 850, ...caps }}>
+              <div style={{ marginTop: 12, color: C.muted, fontWeight: 850 }}>
                 No renewed version yet.
               </div>
             )}

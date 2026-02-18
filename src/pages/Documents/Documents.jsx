@@ -58,9 +58,9 @@ export default function Documents({ refresh, setRefresh }) {
     cursor: "pointer",
     fontWeight: 900,
     whiteSpace: "nowrap",
-    textTransform: "uppercase",
   });
 
+  // Layout same idea sa Records: table left, panel right
   const content = {
     flex: 1,
     overflow: "hidden",
@@ -89,10 +89,10 @@ export default function Documents({ refresh, setRefresh }) {
     gap: 10,
     flexWrap: "wrap",
     background: C.softBg,
-    textTransform: "uppercase",
   };
 
   const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden" };
+
 
   return (
     <div>
@@ -113,10 +113,10 @@ export default function Documents({ refresh, setRefresh }) {
         }}
       >
         <div>
-          <div style={{ fontSize: 18, fontWeight: 950, color: C.primaryDark, textTransform: "uppercase" }}>
+          <div style={{ fontSize: 18, fontWeight: 950, color: C.primaryDark }}>
             Documents
           </div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 6, textTransform: "uppercase" }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 6 }}>
             View, edit Chief/Marshal, and generate PDFs
           </div>
         </div>
@@ -150,6 +150,7 @@ export default function Documents({ refresh, setRefresh }) {
       {/* VIEW DOCUMENTS */}
       {tab === "view" && (
         <div style={content}>
+          {/* LEFT: TABLE CARD */}
           <div style={card}>
             <div style={cardHead}>
               <div>Documents List</div>
@@ -160,7 +161,7 @@ export default function Documents({ refresh, setRefresh }) {
 
             <div style={{ padding: 12 }}>
               <input
-                placeholder="🔍 SEARCH DOCUMENTS..."
+                placeholder="🔍 Search documents..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{
@@ -171,22 +172,26 @@ export default function Documents({ refresh, setRefresh }) {
                   outline: "none",
                   fontWeight: 850,
                   color: C.text,
-                  textTransform: "uppercase",
                 }}
               />
-              <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 8, textTransform: "uppercase" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 8 }}>
                 Click a row → details show on the right
               </div>
             </div>
 
             <div style={scroll}>
-              <DocumentsTable docs={filtered} onRowClick={(d) => setSelectedDoc(d)} />
+              <DocumentsTable
+                docs={filtered}
+                onRowClick={(d) => setSelectedDoc(d)}
+              />
             </div>
           </div>
 
+          {/* RIGHT: SIDE PANEL */}
           <DocumentDetailsPanel
             doc={selectedDoc}
             onUpdated={(updated) => {
+              // update list locally
               setDocs((prev) => {
                 const copy = [...(prev || [])];
                 const idx = copy.findIndex((x) => String(x.id) === String(updated.id));
@@ -194,9 +199,7 @@ export default function Documents({ refresh, setRefresh }) {
                 return copy;
               });
               setSelectedDoc(updated);
-
-              // optional refresh fetch
-              // setRefresh?.((p) => !p);
+              setRefresh?.((p) => !p);
             }}
           />
         </div>
