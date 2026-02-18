@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import bgImage from "../assets/background/bg.png";
+import bgVideo from "../assets/background/bg.mp4"; // ✅ change path/name sa imo video
 import { useNavigate } from "react-router-dom";
-
 
 export default function PinUnlock() {
   const [pin, setPin] = useState("");
@@ -9,7 +8,6 @@ export default function PinUnlock() {
   const [loading, setLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
   const navigate = useNavigate();
-
 
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -30,14 +28,11 @@ export default function PinUnlock() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error("Invalid PIN");
 
-      // ✅ PIN correct
       sessionStorage.setItem("unlocked", "1");
-
-      // 🔥 SWITCH TO FIRE LOADING SCREEN
       setFireLoading(true);
 
       setTimeout(() => {
-navigate("/app/records");
+        navigate("/app/records");
       }, 3500);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
@@ -47,22 +42,30 @@ navigate("/app/records");
     }
   };
 
-  /* ================= LOGIN SCREEN ================= */
+  /* ================= VIDEO BG ================= */
 
   const bg = {
     minHeight: "100vh",
-    backgroundImage: `url(${bgImage})`,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
+    position: "relative",
+    overflow: "hidden",
     display: "grid",
     placeItems: "center",
-    position: "relative",
+  };
+
+  const videoStyle = {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    zIndex: 0,
   };
 
   const overlay = {
     position: "absolute",
     inset: 0,
     background: "rgba(0,0,0,0.55)",
+    zIndex: 1,
   };
 
   const card = {
@@ -124,8 +127,6 @@ navigate("/app/records");
     animation: "firePulse 0.6s infinite alternate",
   };
 
-  /* ================= RENDER ================= */
-
   if (fireLoading) {
     return (
       <div style={fireScreen}>
@@ -148,8 +149,20 @@ navigate("/app/records");
 
   return (
     <div style={bg}>
+      {/* ✅ VIDEO BACKGROUND */}
+      <video
+        style={videoStyle}
+        src={bgVideo}
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+
+      {/* ✅ DARK OVERLAY */}
       <div style={overlay} />
 
+      {/* ✅ CONTENT */}
       <div style={card}>
         <div style={{ fontSize: 20, fontWeight: 950 }}>BFP RECORDS SYSTEM</div>
         <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
