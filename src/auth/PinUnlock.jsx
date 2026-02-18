@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import bgVideo from "../assets/background/bg.mp4"; // ✅ change path/name sa imo video
+import React, { useEffect, useMemo, useState } from "react";
+import bgVideo from "../assets/background/bg.mp4";
+import logo from "../assets/logo/bfp-logo.png"; // ✅ change to your logo path
 import { useNavigate } from "react-router-dom";
 
 export default function PinUnlock() {
@@ -7,9 +8,22 @@ export default function PinUnlock() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [fireLoading, setFireLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [active, setActive] = useState(false); // ✅ controls logo “saka” animation
   const navigate = useNavigate();
 
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  useEffect(() => {
+    // ✅ entrance animation
+    const t = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  // logo goes up when typing / focused / has pin
+  useEffect(() => {
+    setActive(Boolean(pin));
+  }, [pin]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -33,7 +47,7 @@ export default function PinUnlock() {
 
       setTimeout(() => {
         navigate("/app/records");
-      }, 3500);
+      }, 2500);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
       setPin("");
@@ -50,6 +64,7 @@ export default function PinUnlock() {
     overflow: "hidden",
     display: "grid",
     placeItems: "center",
+    padding: 14,
   };
 
   const videoStyle = {
@@ -59,60 +74,135 @@ export default function PinUnlock() {
     height: "100%",
     objectFit: "cover",
     zIndex: 0,
+    filter: "saturate(1.05) contrast(1.05)",
   };
 
   const overlay = {
     position: "absolute",
     inset: 0,
-    background: "rgba(0,0,0,0.55)",
+    background:
+      "radial-gradient(circle at 30% 20%, rgba(0,0,0,.35), rgba(0,0,0,.65))",
     zIndex: 1,
   };
 
-  const card = {
+  /* ================= CARD + ANIMATIONS ================= */
+
+  const wrap = {
     position: "relative",
     zIndex: 2,
-    width: "min(420px, 92%)",
+    width: "min(440px, 92vw)",
+    display: "grid",
+    placeItems: "center",
+  };
+
+  const card = {
+    width: "100%",
+    borderRadius: 22,
     padding: 22,
-    paddingRight: 50,
-    borderRadius: 18,
-    background: "rgba(255,255,255,0.15)",
+    paddingTop: 90, // ✅ space for logo overlap
+    background: "rgba(255,255,255,0.14)",
     backdropFilter: "blur(14px)",
     WebkitBackdropFilter: "blur(14px)",
-    border: "1px solid rgba(255,255,255,0.25)",
-    boxShadow: "0 25px 50px rgba(0,0,0,0.35)",
+    border: "1px solid rgba(255,255,255,0.22)",
+    boxShadow: "0 25px 60px rgba(0,0,0,0.38)",
     color: "#fff",
     textAlign: "center",
+
+    // ✅ entrance transition
+    transform: mounted ? "translateY(0px)" : "translateY(18px)",
+    opacity: mounted ? 1 : 0,
+    transition: "transform .55s ease, opacity .55s ease",
+  };
+
+const logoWrap = {
+  position: "absolute",
+  top: 0,
+  bottom: 10,
+  left: "50%",
+  transform: active
+    ? "translate(-50%, -70px) scale(0.92)"
+    : "translate(-50%, -50px) scale(1)",
+  transition: "transform .45s cubic-bezier(.2,.9,.2,1)",
+  zIndex: 3,
+  width: 130,      // 🔥 from 96 → 130
+  height: 130,
+  borderRadius: 28,
+  display: "grid",
+  placeItems: "center",
+};
+
+const logoImg = {
+  width: "200%",      // 🔥 bigger image
+  height: 120,
+  objectFit: "contain",
+  filter: "drop-shadow(0 10px 18px rgba(0,0,0,.25))",
+};
+
+
+  const title = {
+    fontSize: 18,
+    fontWeight: 950,
+    letterSpacing: 1,
+  };
+
+  const sub = {
+    fontSize: 12,
+    opacity: 0.88,
+    marginTop: 6,
+    fontWeight: 800,
+  };
+
+  const inputWrap = {
+    marginTop: 18,
+    display: "grid",
+    gap: 10,
   };
 
   const input = {
-    width: "100%",
-    marginTop: 16,
+    width: "95%",
     padding: "12px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.35)",
+    borderRadius: 14,
+    border: msg ? "1px solid rgba(254,202,202,.75)" : "1px solid rgba(255,255,255,0.28)",
     background: "rgba(255,255,255,0.18)",
     color: "#fff",
     outline: "none",
     fontSize: 16,
-    fontWeight: 900,
-    letterSpacing: 8,
+    fontWeight: 950,
+    letterSpacing: 10,
     textAlign: "center",
+    transition: "transform .12s ease, border .2s ease, box-shadow .2s ease",
   };
 
   const btn = {
     width: "100%",
-    marginTop: 14,
     padding: "12px 14px",
-    borderRadius: 12,
-    border: "none",
-    background: "#b91c1c",
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.18)",
+    background: "linear-gradient(180deg, #b91c1c, #7f1d1d)",
     color: "#fff",
     fontWeight: 950,
     cursor: loading ? "not-allowed" : "pointer",
-    opacity: loading ? 0.7 : 1,
+    opacity: loading ? 0.75 : 1,
+    transform: loading ? "scale(.99)" : "scale(1)",
+    transition: "transform .12s ease, opacity .2s ease",
+    boxShadow: "0 18px 40px rgba(185,28,28,.28)",
   };
 
-  /* ================= FIRE LOADING SCREEN ================= */
+  const msgStyle = {
+    fontSize: 12,
+    color: "#fecaca",
+    fontWeight: 900,
+    minHeight: 16,
+  };
+
+  const hintRow = {
+    marginTop: 10,
+    fontSize: 11,
+    opacity: 0.82,
+    fontWeight: 800,
+  };
+
+  /* ================= FIRE LOADING ================= */
 
   const fireScreen = {
     minHeight: "100vh",
@@ -149,55 +239,58 @@ export default function PinUnlock() {
 
   return (
     <div style={bg}>
-      {/* ✅ VIDEO BACKGROUND */}
-      <video
-        style={videoStyle}
-        src={bgVideo}
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
-
-      {/* ✅ DARK OVERLAY */}
+      <video style={videoStyle} src={bgVideo} autoPlay loop muted playsInline />
       <div style={overlay} />
 
-      {/* ✅ CONTENT */}
-      <div style={card}>
-        <div style={{ fontSize: 20, fontWeight: 950 }}>BFP RECORDS SYSTEM</div>
-        <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
-          Enter PIN to unlock
+      <div style={wrap}>
+        {/* ✅ LOGO that moves up */}
+        <div style={logoWrap}>
+          <img src={logo} alt="BFP Logo" style={logoImg} />
         </div>
 
-        <form onSubmit={submit}>
-          <input
-            type="password"
-            maxLength={6}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-            placeholder="••••"
-            style={input}
-            autoFocus
-            disabled={loading}
-          />
+        {/* ✅ LOGIN CARD */}
+        <div style={card}>
+          <div style={title}>BFP RECORDS SYSTEM</div>
+          <div style={sub}>Enter PIN to unlock</div>
 
-          {msg && (
-            <div
-              style={{
-                marginTop: 10,
-                fontSize: 12,
-                color: "#fecaca",
-                fontWeight: 900,
+          <form
+            onSubmit={submit}
+            onFocus={() => setActive(true)}
+            onBlur={() => setActive(Boolean(pin))}
+            style={inputWrap}
+          >
+            <input
+              type="password"
+              maxLength={6}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              placeholder="••••"
+              style={input}
+              autoFocus
+              disabled={loading}
+              onFocus={(e) => {
+                setActive(true);
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 16px 40px rgba(0,0,0,.25)";
               }}
-            >
-              {msg}
-            </div>
-          )}
+              onBlur={(e) => {
+                setActive(Boolean(pin));
+                e.currentTarget.style.transform = "translateY(0px)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
 
-          <button type="submit" style={btn} disabled={loading}>
-            {loading ? "Checking..." : "Unlock"}
-          </button>
-        </form>
+            <div style={msgStyle}>{msg || ""}</div>
+
+            <button type="submit" style={btn} disabled={loading}>
+              {loading ? "Checking..." : "Unlock"}
+            </button>
+
+            <div style={hintRow}>
+              Tip: numbers only • max 6 digits
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
