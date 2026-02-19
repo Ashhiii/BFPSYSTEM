@@ -1,4 +1,3 @@
-// DocumentsTable.jsx
 import React from "react";
 
 const C = {
@@ -25,42 +24,10 @@ const C = {
 export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
-const generatePDF = async (endpoint, payload, e) => {
-  e?.stopPropagation?.();
-  try {
-    const res = await fetch(`${API}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-
-    // ✅ show backend error clearly
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text}`);
-    }
-
-    // ✅ ensure we actually got a PDF
-    if (!contentType.includes("application/pdf")) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Not a PDF. content-type=${contentType} — ${text}`);
-    }
-
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "document.pdf";
-    link.click();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error(err);
-    alert(err.message || "PDF generation failed");
-  }
-};
-
+  const open = (url, e) => {
+    e?.stopPropagation?.();
+    window.open(url, "_blank");
+  };
 
   const clamp2 = {
     whiteSpace: "nowrap",
@@ -118,7 +85,6 @@ const generatePDF = async (endpoint, payload, e) => {
       border: `1px solid ${C.border}`,
       background: "#fff",
       color: C.text,
-      transition: "transform .05s ease, background .15s ease, border .15s ease",
     },
     btnIO: { border: `1px solid ${C.ioBorder}`, background: C.ioBg, color: C.ioText },
     btnReinspect: { border: `1px solid ${C.reBorder}`, background: C.reBg, color: C.reText },
@@ -152,7 +118,9 @@ const generatePDF = async (endpoint, payload, e) => {
                 key={d.id || i}
                 style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
+                }
                 onClick={() => onRowClick?.(d)}
               >
                 <td style={S.td}><div style={clamp2}>{d.fsicAppNo || "-"}</div></td>
@@ -165,19 +133,19 @@ const generatePDF = async (endpoint, payload, e) => {
                 <td style={S.actionsTd}>
                   <button
                     style={{ ...S.btn, ...S.btnIO }}
-                    onClick={(e) => generatePDF("/generate/io", d, e)}
+                    onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}
                   >
                     IO
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnReinspect }}
-                    onClick={(e) => generatePDF("/generate/reinspection", d, e)}
+                    onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}
                   >
                     Reinspection
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnNFSI }}
-                    onClick={(e) => generatePDF("/generate/nfsi", d, e)}
+                    onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}
                   >
                     NFSI
                   </button>

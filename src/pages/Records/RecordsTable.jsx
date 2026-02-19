@@ -1,45 +1,12 @@
-// RecordsTable.jsx
 import React from "react";
 
 export default function RecordsTable({ records = [], onRowClick, apiBase }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
-  // Unified function to generate PDF using POST
-const generatePDF = async (endpoint, payload, e) => {
-  e?.stopPropagation?.();
-  try {
-    const res = await fetch(`${API}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-
-    // ✅ show backend error clearly
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text}`);
-    }
-
-    // ✅ ensure we actually got a PDF
-    if (!contentType.includes("application/pdf")) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Not a PDF. content-type=${contentType} — ${text}`);
-    }
-
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "document.pdf";
-    link.click();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error(err);
-    alert(err.message || "PDF generation failed");
-  }
-};
+  const open = (url, e) => {
+    e.stopPropagation();
+    window.open(url, "_blank");
+  };
 
   const wrap2 = {
     whiteSpace: "nowrap",
@@ -155,13 +122,13 @@ const generatePDF = async (endpoint, payload, e) => {
                 <td style={S.actionsTd}>
                   <button
                     style={{ ...S.btn, ...S.btnOwner }}
-                    onClick={(e) => generatePDF("/generate/fsic", r, e)}
+                    onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
                   >
                     Owner PDF
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnBfp }}
-                    onClick={(e) => generatePDF("/generate/io", r, e)}
+                    onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
                   >
                     BFP PDF
                   </button>
