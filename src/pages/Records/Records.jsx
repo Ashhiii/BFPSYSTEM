@@ -111,78 +111,67 @@ export default function Records({ refresh, setRefresh }) {
   // =========================
   // CLOSE MONTH (ARCHIVE) ✅ FIXED (writeBatch)
   // =========================
-  const closeMonth = async () => {
-    try {
-      if (!window.confirm("Close month and archive records?")) return;
 
-      const month = monthKeyNow();
+const closeMonth = async () => {
+  try {
+    if (!window.confirm("Close month and archive records?")) return;
 
-      // get all current
-      const currentSnap = await getDocs(collection(db, "records"));
-      const archivedCount = currentSnap.size;
+    const month = monthKeyNow();
 
-      if (archivedCount === 0) {
-        alert("No records to archive.");
-        return;
-      }
+    const currentSnap = await getDocs(collection(db, "records"));
+    const archivedCount = currentSnap.size;
 
-      // NOTE: Firestore batch limit is 500 operations.
-      // Each record uses 2 ops (set archive + delete current).
-      // So safe up to ~249 records. If you may exceed, tell me for chunked version.
-      const opsNeeded = archivedCount * 2 + 1; // +1 for month doc
-      if (opsNeeded > 500) {
-        alert(
-          `Too many records for one batch (${archivedCount}). Need chunked batching.`
-        );
-        return;
-      }
+    if (!archivedCount) {
+      alert("No records to archive.");
+      return;
+    }
 
+    // ensure month doc exists
+    await setDoc(
+      doc(db, "archives", month),
+      { month, closedAt: new Date().toISOString() },
+      { merge: true }
+    );
+
+    // Firestore batch limit = 500 ops
+    const docsArr = currentSnap.docs;
+    let index = 0;
+
+    while (index < docsArr.length) {
       const batch = writeBatch(db);
+      const slice = docsArr.slice(index, index + 200); // safe chunk
 
-      // ensure month doc exists (for dropdown)
-      batch.set(
-        doc(db, "archives", month),
-        {
-          month,
-          closedAt: new Date().toISOString(),
-          count: archivedCount,
-        },
-        { merge: true }
-      );
-
-      // move docs
-      currentSnap.docs.forEach((d) => {
+      slice.forEach((d) => {
         const data = d.data();
 
         // copy to archive subcollection
         batch.set(doc(db, "archives", month, "records", d.id), {
           ...data,
           archivedAt: new Date().toISOString(),
-          sourceMonth: month,
         });
 
-        // delete current
+        // delete from current
         batch.delete(doc(db, "records", d.id));
       });
 
       await batch.commit();
-
-      alert(`✅ Archived ${archivedCount} records for ${month}`);
-
-      // reset UI
-      setMode("current");
-      setSelectedMonth("");
-      setSelectedRecord(null);
-
-      await fetchMonths();
-      await fetchCurrent();
-    } catch (e) {
-      console.error("closeMonth failed:", e);
-      alert(
-        "❌ Close Month failed. Most common reason: Firestore rules block write/delete."
-      );
+      index += 200;
     }
-  };
+
+    alert(`Archived ${archivedCount} records for ${month}`);
+
+    setMode("current");
+    setSelectedMonth("");
+    setSelectedRecord(null);
+
+    await fetchMonths();
+    await fetchCurrent();
+  } catch (e) {
+    console.error("Close Month error:", e);
+    alert("❌ Close Month failed. Check Firestore rules/login or batch limits.");
+  }
+};
+
 
   const onSelectRow = (record) => {
     if (!record) return;
