@@ -133,19 +133,19 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 <td style={S.actionsTd}>
                   <button
                     style={{ ...S.btn, ...S.btnIO }}
-                    onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}
+onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}
                   >
                     IO
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnReinspect }}
-                    onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}
+onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}
                   >
                     Reinspection
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnNFSI }}
-                    onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}
+onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}
                   >
                     NFSI
                   </button>

@@ -122,13 +122,13 @@ export default function RecordsTable({ records = [], onRowClick, apiBase }) {
                 <td style={S.actionsTd}>
                   <button
                     style={{ ...S.btn, ...S.btnOwner }}
-                    onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
+onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
                   >
                     Owner PDF
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnBfp }}
-                    onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
+onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
                   >
                     BFP PDF
                   </button>
