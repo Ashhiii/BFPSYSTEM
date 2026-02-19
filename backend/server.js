@@ -23,7 +23,7 @@ const PORT = Number(process.env.PORT) || 5000;
 // ✅ Firebase Admin
 // -------------------------
 // Option A (recommended on Render): use env var FIREBASE_SERVICE_ACCOUNT_JSON
-// Put the full json string in env (Render > Environment)
+// Put the full json string in env (Render > Environment))
 if (!admin.apps.length) {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) {
