@@ -2,32 +2,44 @@
 import React from "react";
 
 export default function RecordsTable({ records = [], onRowClick, apiBase }) {
-  const API = (apiBase || "https://bfpbackend-1.onrender.com").replace(/\/+$/, "");
+  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
   // Unified function to generate PDF using POST
-  const generatePDF = async (endpoint, record, e) => {
-    e.stopPropagation();
-    try {
-      const res = await fetch(`${API}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(record),
-      });
+const generatePDF = async (endpoint, payload, e) => {
+  e?.stopPropagation?.();
+  try {
+    const res = await fetch(`${API}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      if (!res.ok) throw new Error("Failed to generate PDF");
+    const contentType = res.headers.get("content-type") || "";
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "document.pdf";
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert("PDF generation failed");
+    // ✅ show backend error clearly
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text}`);
     }
-  };
+
+    // ✅ ensure we actually got a PDF
+    if (!contentType.includes("application/pdf")) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Not a PDF. content-type=${contentType} — ${text}`);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "document.pdf";
+    link.click();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(err);
+    alert(err.message || "PDF generation failed");
+  }
+};
 
   const wrap2 = {
     whiteSpace: "nowrap",
