@@ -14,6 +14,9 @@ import { layout, main } from "./layout/shellStyles.js";
 
 import ImportExcel from "./pages/ImportExcel/ImportExcel.jsx";
 
+import logo from "./assets/logo/bfp-logo.png";
+
+
 
 function Shell() {
   const navigate = useNavigate();
@@ -41,7 +44,7 @@ function Shell() {
     setTimeout(() => {
       sessionStorage.removeItem("unlocked");
       navigate("/", { replace: true });
-    }, 1500);
+    }, 5500);
   };
 
   return (
@@ -80,9 +83,18 @@ function Shell() {
           }}
         >
           <div style={{ textAlign: "center", color: "#fff" }}>
-            <div style={{ fontSize: 70, animation: "firePulse .6s infinite alternate" }}>
-              🔥
-            </div>
+            <img
+              src={logo}
+              alt="BFP Logo Loading"
+              style={{
+                width: 120,
+                height: 120,
+                objectFit: "contain",
+                animation: "pulseLogo 1.8s ease-in-out infinite",
+                filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))"
+              }}
+            />
+
             <div style={{ marginTop: 10, fontWeight: 950 }}>Locking system...</div>
           </div>
 
