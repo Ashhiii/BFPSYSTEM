@@ -33,7 +33,6 @@ const FIELDS = [
 
 // ✅ INPUTS RA I-CAPS (ayaw apila dates)
 const CAPS_KEYS = new Set([
-  "no",
   "fsicAppNo",
   "natureOfInspection",
   "ownerName",
