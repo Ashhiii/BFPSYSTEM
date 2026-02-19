@@ -1,11 +1,32 @@
+// RecordsTable.jsx
 import React from "react";
 
 export default function RecordsTable({ records = [], onRowClick, apiBase }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
-  const open = (url, e) => {
+  // Unified function to generate PDF using POST
+  const generatePDF = async (endpoint, record, e) => {
     e.stopPropagation();
-    window.open(url, "_blank");
+    try {
+      const res = await fetch(`${API}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(record),
+      });
+
+      if (!res.ok) throw new Error("Failed to generate PDF");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "document.pdf";
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("PDF generation failed");
+    }
   };
 
   const wrap2 = {
@@ -122,13 +143,13 @@ export default function RecordsTable({ records = [], onRowClick, apiBase }) {
                 <td style={S.actionsTd}>
                   <button
                     style={{ ...S.btn, ...S.btnOwner }}
-                    onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
+                    onClick={(e) => generatePDF("/generate/fsic", r, e)}
                   >
                     Owner PDF
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnBfp }}
-                    onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
+                    onClick={(e) => generatePDF("/generate/io", r, e)}
                   >
                     BFP PDF
                   </button>

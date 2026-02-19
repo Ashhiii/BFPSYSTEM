@@ -1,3 +1,4 @@
+// DocumentsTable.jsx
 import React from "react";
 
 const C = {
@@ -24,9 +25,28 @@ const C = {
 export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
-  const open = (url, e) => {
+  const generatePDF = async (endpoint, doc, e) => {
     e?.stopPropagation?.();
-    window.open(url, "_blank");
+    try {
+      const res = await fetch(`${API}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(doc),
+      });
+
+      if (!res.ok) throw new Error("Failed to generate PDF");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "document.pdf";
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("PDF generation failed");
+    }
   };
 
   const clamp2 = {
@@ -111,9 +131,7 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
         <tbody>
           {docs.length === 0 ? (
             <tr>
-              <td colSpan={7} style={S.empty}>
-                No documents found
-              </td>
+              <td colSpan={7} style={S.empty}>No documents found</td>
             </tr>
           ) : (
             docs.map((d, i) => (
@@ -121,9 +139,7 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 key={d.id || i}
                 style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
-                }
+                onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
                 onClick={() => onRowClick?.(d)}
               >
                 <td style={S.td}><div style={clamp2}>{d.fsicAppNo || "-"}</div></td>
@@ -134,13 +150,22 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 <td style={S.td}><div style={clamp2}>{d.marshalName || "-"}</div></td>
 
                 <td style={S.actionsTd}>
-                  <button style={{ ...S.btn, ...S.btnIO }} onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}>
+                  <button
+                    style={{ ...S.btn, ...S.btnIO }}
+                    onClick={(e) => generatePDF("/generate/io", d, e)}
+                  >
                     IO
                   </button>
-                  <button style={{ ...S.btn, ...S.btnReinspect }} onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}>
+                  <button
+                    style={{ ...S.btn, ...S.btnReinspect }}
+                    onClick={(e) => generatePDF("/generate/reinspection", d, e)}
+                  >
                     Reinspection
                   </button>
-                  <button style={{ ...S.btn, ...S.btnNFSI }} onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}>
+                  <button
+                    style={{ ...S.btn, ...S.btnNFSI }}
+                    onClick={(e) => generatePDF("/generate/nfsi", d, e)}
+                  >
                     NFSI
                   </button>
                 </td>
