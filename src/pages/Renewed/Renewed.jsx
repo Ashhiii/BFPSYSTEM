@@ -114,17 +114,38 @@ export default function Renewed({ refresh, setRefresh }) {
     };
   };
 
-  const loadRenewed = async () => {
-    try {
-      const qy = query(collection(db, "renewed"), orderBy("changedAt", "desc"));
-      const snap = await getDocs(qy);
-      const list = snap.docs.map(normalizeSnap);
-      setRecords(list);
-    } catch (e) {
-      console.error("loadRenewed error:", e);
-      setRecords([]);
-    }
-  };
+const loadRenewed = async () => {
+  try {
+    // ✅ read from renewals (doc id = entityKey)
+    const snap = await getDocs(collection(db, "renewals"));
+
+    const list = snap.docs
+      .map((d) => {
+        const data = d.data() || {};
+        const rec = data.record || null;
+        if (!rec) return null;
+
+        return {
+          id: d.id, // entityKey
+          ...rec,
+          entityKey: rec.entityKey || d.id,
+          teamLeader: rec.teamLeader || "",
+          // for sorting display (optional)
+          _sort:
+            data.updatedAt?.toMillis?.() ||
+            (rec.renewedAt ? Date.parse(rec.renewedAt) : 0),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b._sort || 0) - (a._sort || 0));
+
+    setRecords(list);
+  } catch (e) {
+    console.error("loadRenewed error:", e);
+    setRecords([]);
+  }
+};
+
 
   useEffect(() => {
     loadRenewed();

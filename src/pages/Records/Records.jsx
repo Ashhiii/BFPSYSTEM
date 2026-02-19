@@ -227,6 +227,7 @@ export default function Records({ refresh, setRefresh }) {
       copy.splice(idx + 1, 0, newRecord);
       return copy;
     });
+     setRefresh?.((p) => !p);
   };
 
   // =========================
