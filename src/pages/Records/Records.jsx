@@ -111,64 +111,46 @@ export default function Records({ refresh, setRefresh }) {
   // =========================
   // CLOSE MONTH (ARCHIVE) ✅ FIXED (writeBatch)
   // =========================
-
 const closeMonth = async () => {
   try {
     if (!window.confirm("Close month and archive records?")) return;
 
     const month = monthKeyNow();
-
     const currentSnap = await getDocs(collection(db, "records"));
-    const archivedCount = currentSnap.size;
 
-    if (!archivedCount) {
-      alert("No records to archive.");
-      return;
-    }
+    if (currentSnap.empty) return alert("No records to archive.");
 
-    // ensure month doc exists
-    await setDoc(
-      doc(db, "archives", month),
-      { month, closedAt: new Date().toISOString() },
-      { merge: true }
-    );
+    await setDoc(doc(db, "archives", month), {
+      month,
+      closedAt: new Date().toISOString(),
+    }, { merge: true });
 
-    // Firestore batch limit = 500 ops
     const docsArr = currentSnap.docs;
-    let index = 0;
+    let i = 0;
 
-    while (index < docsArr.length) {
+    while (i < docsArr.length) {
       const batch = writeBatch(db);
-      const slice = docsArr.slice(index, index + 200); // safe chunk
+      const slice = docsArr.slice(i, i + 200);
 
       slice.forEach((d) => {
         const data = d.data();
-
-        // copy to archive subcollection
         batch.set(doc(db, "archives", month, "records", d.id), {
           ...data,
           archivedAt: new Date().toISOString(),
         });
-
-        // delete from current
         batch.delete(doc(db, "records", d.id));
       });
 
       await batch.commit();
-      index += 200;
+      i += 200;
     }
 
-    alert(`Archived ${archivedCount} records for ${month}`);
-
-    setMode("current");
-    setSelectedMonth("");
-    setSelectedRecord(null);
-
+    alert(`Archived ${docsArr.length} records for ${month}`);
     await fetchMonths();
     await fetchCurrent();
   } catch (e) {
-    console.error("Close Month error:", e);
-    alert("❌ Close Month failed. Check Firestore rules/login or batch limits.");
+    console.error(e);
+    alert("❌ Close Month failed. Check that PIN login succeeded and rules are published.");
   }
 };
 
