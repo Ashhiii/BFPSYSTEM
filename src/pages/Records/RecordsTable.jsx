@@ -2,7 +2,7 @@
 import React from "react";
 
 export default function RecordsTable({ records = [], onRowClick, apiBase }) {
-  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
+  const API = (apiBase || "https://bfpbackend-1.onrender.com").replace(/\/+$/, "");
 
   // Unified function to generate PDF using POST
   const generatePDF = async (endpoint, record, e) => {

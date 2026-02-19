@@ -23,7 +23,7 @@ const C = {
 };
 
 export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
-  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
+  const API = (apiBase || "https://bfpbackend-1.onrender.com").replace(/\/+$/, "");
 
   const generatePDF = async (endpoint, doc, e) => {
     e?.stopPropagation?.();
