@@ -4,7 +4,8 @@ import logo from "../assets/logo/bfp-logo.png";
 import { useNavigate } from "react-router-dom";
 
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
+import { signInWithCustomToken } from "firebase/auth";
 
 export default function PinUnlock() {
   const [pin, setPin] = useState("");
@@ -14,6 +15,8 @@ export default function PinUnlock() {
   const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(false);
   const navigate = useNavigate();
+
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -34,28 +37,42 @@ export default function PinUnlock() {
     try {
       setLoading(true);
 
-      // ✅ EXACTLY matches your Firestore location:
-      // pinunlock (collection) -> config (doc) -> pin (field)
+      // 1) Read PIN from Firestore (read is allowed in your rules)
       const snap = await getDoc(doc(db, "pinunlock", "config"));
       const savedPin = snap.exists() ? String(snap.data()?.pin || "").trim() : "";
-
       if (!savedPin) throw new Error("PIN not configured");
+      if (cleanPin !== savedPin) throw new Error("Invalid PIN");
 
-      const ok = cleanPin === savedPin;
-      if (!ok) throw new Error("Invalid PIN");
+      // 2) Get custom token from backend (this is the important part)
+      const r = await fetch(`${API}/auth/pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: cleanPin }),
+      });
 
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data?.ok || !data?.token) {
+        throw new Error(data?.message || "Auth token failed");
+      }
+
+      // 3) Login to Firebase Auth using the custom token
+      await signInWithCustomToken(auth, data.token);
+
+      // 4) Now your Firestore writes will work (request.auth != null)
       sessionStorage.setItem("unlocked", "1");
       setFireLoading(true);
 
       setTimeout(() => navigate("/app/records"), 2200);
     } catch (err) {
-      setMsg("❌ Incorrect PIN");
+      console.error(err);
+      setMsg("❌ Incorrect PIN / Not authorized");
       setPin("");
     } finally {
       setLoading(false);
     }
   };
 
+  // ---- styles (same as your code) ----
   const bg = {
     height: "95vh",
     position: "relative",
@@ -130,7 +147,6 @@ export default function PinUnlock() {
 
   const title = { fontSize: 18, fontWeight: 950, letterSpacing: 1 };
   const sub = { fontSize: 12, opacity: 0.88, marginTop: 6, fontWeight: 800 };
-
   const inputWrap = { marginTop: 18, display: "grid", gap: 10 };
 
   const input = {
@@ -205,7 +221,12 @@ export default function PinUnlock() {
             <img
               src={logo}
               alt="BFP Logo Loading"
-              style={{ width: 90, height: 90, objectFit: "contain", filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))" }}
+              style={{
+                width: 90,
+                height: 90,
+                objectFit: "contain",
+                filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))",
+              }}
             />
             <div style={{ marginTop: 8, fontWeight: 950 }}>Securing system...</div>
             <div style={{ marginTop: 14 }}>
