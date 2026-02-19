@@ -1,26 +1,45 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
+import { db } from "../../firebase";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  setDoc,
+  deleteDoc,
+  query,
+  orderBy,
+} from "firebase/firestore";
+
 import RecordsTable from "./RecordsTable.jsx";
 import RecordDetailsPanel from "./RecordDetailsPanel.jsx";
 import AddRecord from "../../components/AddRecords.jsx";
-
 import injectTableStyles from "./injectTableStyles.jsx";
 
+const monthKeyNow = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+};
+
 export default function Records({ refresh, setRefresh }) {
-  const [tab, setTab] = useState("view"); // view | add
+  const [tab, setTab] = useState("view");
   const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
   const [months, setMonths] = useState([]);
   const [mode, setMode] = useState("current"); // current | archive
   const [selectedMonth, setSelectedMonth] = useState("");
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
   const [selectedRecord, setSelectedRecord] = useState(null);
+
+  // ✅ keep Render API only for PDF opening
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => injectTableStyles(), []);
 
-  /* 🔥 BFP COLORS */
   const C = {
     primary: "#b91c1c",
     primaryDark: "#7f1d1d",
@@ -34,30 +53,36 @@ export default function Records({ refresh, setRefresh }) {
     danger: "#dc2626",
   };
 
+  // =========================
+  // FIRESTORE LOADERS
+  // =========================
+
   const fetchCurrent = async () => {
-    const res = await fetch(`${API}/records`);
-    const data = await res.json();
-    setRecords(data || []);
+    const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
+    const snap = await getDocs(qy);
+    const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    setRecords(list);
   };
 
   const fetchMonths = async () => {
-    const res = await fetch(`${API}/archive/months`);
-    const data = await res.json();
-    setMonths(data || []);
+    const qy = query(collection(db, "archives"), orderBy("month", "desc"));
+    const snap = await getDocs(qy);
+    setMonths(snap.docs.map((d) => d.id));
   };
 
   const fetchArchiveMonth = async (m) => {
-    const res = await fetch(`${API}/archive/${m}`);
-    const data = await res.json();
-    setRecords(data || []);
+    const snap = await getDocs(collection(db, "archives", m, "records"));
+    const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    setRecords(list);
   };
 
   useEffect(() => {
-    fetchCurrent();
+    fetchCurrent().catch(() => setRecords([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
   useEffect(() => {
-    fetchMonths();
+    fetchMonths().catch(() => setMonths([]));
   }, []);
 
   const filtered = useMemo(() => {
@@ -81,30 +106,57 @@ export default function Records({ refresh, setRefresh }) {
     XLSX.writeFile(workbook, "BFP_Records.xlsx");
   };
 
+  // =========================
+  // CLOSE MONTH (ARCHIVE)
+  // =========================
   const closeMonth = async () => {
     if (!window.confirm("Close month and archive records?")) return;
 
-    const res = await fetch(`${API}/records/close-month`, { method: "POST" });
-    const data = await res.json();
+    const month = monthKeyNow();
 
-    if (data.success) {
-      alert(`Archived ${data.archivedCount} records for ${data.month}`);
-      setMode("current");
-      setSelectedMonth("");
-      setSelectedRecord(null);
-      await fetchMonths();
-      await fetchCurrent();
-    } else {
-      alert(data.message || "Failed");
+    // get all current
+    const currentSnap = await getDocs(collection(db, "records"));
+    const archivedCount = currentSnap.size;
+
+    // ensure month doc exists
+    await setDoc(
+      doc(db, "archives", month),
+      { month, closedAt: new Date().toISOString() },
+      { merge: true }
+    );
+
+    // move docs
+    const ops = [];
+    for (const d of currentSnap.docs) {
+      const data = d.data();
+
+      // copy to archive
+      ops.push(
+        setDoc(doc(db, "archives", month, "records", d.id), {
+          ...data,
+          archivedAt: new Date().toISOString(),
+        })
+      );
+
+      // delete current
+      ops.push(deleteDoc(doc(db, "records", d.id)));
     }
+
+    await Promise.all(ops);
+
+    alert(`Archived ${archivedCount} records for ${month}`);
+    setMode("current");
+    setSelectedMonth("");
+    setSelectedRecord(null);
+    await fetchMonths();
+    await fetchCurrent();
   };
 
   const onSelectRow = (record) => {
     if (!record) return;
     const fixed = {
       ...record,
-      entityKey:
-        record.entityKey || (record.fsicAppNo ? `fsic:${record.fsicAppNo}` : ""),
+      entityKey: record.entityKey || (record.fsicAppNo ? `fsic:${record.fsicAppNo}` : ""),
     };
     setSelectedRecord(fixed);
   };
@@ -120,7 +172,9 @@ export default function Records({ refresh, setRefresh }) {
     });
   };
 
-  /* ===================== STYLES (BFP THEME) ===================== */
+  // =========================
+  // UI STYLES
+  // =========================
 
   const page = {
     height: "calc(100vh - 70px)",
@@ -218,26 +272,9 @@ export default function Records({ refresh, setRefresh }) {
     whiteSpace: "nowrap",
   };
 
-  const btnGold = {
-    ...btn,
-    border: `1px solid ${C.gold}`,
-    background: C.gold,
-    color: "#111827",
-  };
-
-  const btnGreen = {
-    ...btn,
-    border: `1px solid ${C.green}`,
-    background: "#f0fdf4",
-    color: "#166534",
-  };
-
-  const btnRed = {
-    ...btn,
-    border: `1px solid ${C.primary}`,
-    background: C.primary,
-    color: "#fff",
-  };
+  const btnGold = { ...btn, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
+  const btnGreen = { ...btn, border: `1px solid ${C.green}`, background: "#f0fdf4", color: "#166534" };
+  const btnRed = { ...btn, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
 
   const content = {
     flex: 1,
@@ -272,13 +309,7 @@ export default function Records({ refresh, setRefresh }) {
   const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden" };
 
   const panelStyles = {
-    td: {
-      padding: 10,
-      borderBottom: `1px solid ${C.border}`,
-      fontWeight: 850,
-      fontSize: 13,
-      color: C.text,
-    },
+    td: { padding: 10, borderBottom: `1px solid ${C.border}`, fontWeight: 850, fontSize: 13, color: C.text },
   };
 
   return (
@@ -286,9 +317,7 @@ export default function Records({ refresh, setRefresh }) {
       <div style={header}>
         <div>
           <div style={hTitle}>Fire Inspection Records</div>
-          <div style={hSub}>
-            View records, archive by month, export, add and manage records
-          </div>
+          <div style={hSub}>View records, archive by month, export, add and manage records</div>
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -320,9 +349,7 @@ export default function Records({ refresh, setRefresh }) {
             <div style={topbarInner}>
               <div style={{ minWidth: 220 }}>
                 <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>
-                  {mode === "archive"
-                    ? `Archive Records (${selectedMonth || "-"})`
-                    : "Current Records"}
+                  {mode === "archive" ? `Archive Records (${selectedMonth || "-"})` : "Current Records"}
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 4 }}>
                   Click a row → details show on the right
@@ -330,12 +357,8 @@ export default function Records({ refresh, setRefresh }) {
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={btnGold} onClick={exportExcel}>
-                  Export Excel
-                </button>
-                <button style={btnRed} onClick={closeMonth}>
-                  Close Month
-                </button>
+                <button style={btnGold} onClick={exportExcel}>Export Excel</button>
+                <button style={btnRed} onClick={closeMonth}>Close Month</button>
               </div>
 
               <div style={{ width: "100%", display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
@@ -354,7 +377,6 @@ export default function Records({ refresh, setRefresh }) {
                       const m = e.target.value;
                       setSelectedMonth(m);
                       if (!m) return;
-
                       setMode("archive");
                       setSelectedRecord(null);
                       await fetchArchiveMonth(m);
@@ -362,9 +384,7 @@ export default function Records({ refresh, setRefresh }) {
                   >
                     <option value="">📁 View Month Archive</option>
                     {months.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
+                      <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
 
@@ -393,7 +413,7 @@ export default function Records({ refresh, setRefresh }) {
                 <div style={{ opacity: 0.85, color: C.muted }}>Results: {filtered.length}</div>
               </div>
               <div style={scroll}>
-                <RecordsTable records={filtered} onRowClick={onSelectRow} />
+                <RecordsTable records={filtered} onRowClick={onSelectRow} apiBase={API} />
               </div>
             </div>
 
@@ -404,15 +424,12 @@ export default function Records({ refresh, setRefresh }) {
               isArchive={mode === "archive"}
               onRenewSaved={handleRenewSaved}
               onUpdated={(updated) => {
-                // ✅ update table immediately
                 setRecords((prev) => {
                   const copy = [...(prev || [])];
                   const idx = copy.findIndex((r) => String(r.id) === String(updated.id));
                   if (idx !== -1) copy[idx] = updated;
                   return copy;
                 });
-
-                // ✅ update details immediately
                 setSelectedRecord(updated);
               }}
             />

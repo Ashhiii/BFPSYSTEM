@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { db } from "../../firebase";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 const FIELDS = [
   { key: "no", label: "No" },
@@ -31,31 +33,11 @@ const FIELDS = [
   { key: "marshalName", label: "Marshal" },
 ];
 
-// ✅ INPUTS RA I-CAPS (ayaw apila dates)
 const CAPS_KEYS = new Set([
-  "fsicAppNo",
-  "natureOfInspection",
-  "ownerName",
-  "establishmentName",
-  "businessAddress",
-  "contactNumber",
-  "ioNumber",
-  "nfsiNumber",
-  "fsicValidity",
-  "defects",
-  "inspectors",
-  "occupancyType",
-  "buildingDesc",
-  "floorArea",
-  "buildingHeight",
-  "storeyCount",
-  "highRise",
-  "fsmr",
-  "remarks",
-  "orNumber",
-  "orAmount",
-  "chiefName",
-  "marshalName",
+  "fsicAppNo","natureOfInspection","ownerName","establishmentName","businessAddress","contactNumber",
+  "ioNumber","nfsiNumber","fsicValidity","defects","inspectors","occupancyType","buildingDesc",
+  "floorArea","buildingHeight","storeyCount","highRise","fsmr","remarks","orNumber","orAmount",
+  "chiefName","marshalName",
 ]);
 
 const DATE_KEYS = new Set(["dateInspected", "ioDate", "nfsiDate", "orDate"]);
@@ -68,8 +50,6 @@ export default function RecordDetailsPanel({
   onRenewSaved,
   onUpdated,
 }) {
-  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
-
   const [editing, setEditing] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -103,13 +83,113 @@ export default function RecordDetailsPanel({
     init.teamLeader = record?.teamLeader ?? "";
     setForm(init);
 
+    // ✅ load latest renewed (renewals/{entityKey})
     if (!entityKey) return;
-
-    fetch(`${API}/records/renewed/${encodeURIComponent(entityKey)}`)
-      .then((r) => r.json())
-      .then((d) => setRenewedRecord(d?.record || null))
+    getDoc(doc(db, "renewals", entityKey))
+      .then((snap) => setRenewedRecord(snap.exists() ? snap.data()?.record || null : null))
       .catch(() => setRenewedRecord(null));
-  }, [record, entityKey, API]);
+  }, [record, entityKey]);
+
+  const inputStyle = (k) => ({
+    width: "100%",
+    padding: "9px 10px",
+    borderRadius: 12,
+    border: `1px solid ${C.border}`,
+    outline: "none",
+    fontSize: 13,
+    color: C.text,
+    background: "#fff",
+    boxSizing: "border-box",
+    fontWeight: 850,
+    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
+  });
+
+  const setField = (k, v) => {
+    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
+    setForm((p) => ({ ...p, [k]: next }));
+  };
+
+  const btn = (variant) => {
+    const common = {
+      padding: "10px 12px",
+      borderRadius: 12,
+      fontWeight: 950,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+      opacity: saving ? 0.7 : 1,
+    };
+    if (variant === "primary")
+      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
+    if (variant === "gold")
+      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
+    if (variant === "danger")
+      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
+    return common;
+  };
+
+  // ✅ Save edit
+  const saveEdit = async () => {
+    if (!record?.id) return alert("Missing record.id (cannot save).");
+
+    try {
+      setSaving(true);
+
+      const payload = {};
+      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
+      payload.teamLeader = form.teamLeader ?? "";
+      payload.updatedAt = serverTimestamp();
+
+      const targetCol = isArchive
+        ? doc(db, "archives", String(source || "").replace("Archive: ", ""), "records", record.id)
+        : doc(db, "records", record.id);
+
+      // if source string is not clean, just fallback to archive month from record.month if you store it
+      // For safety, when archive mode, prefer passing month separately; but we'll keep it simple:
+      await setDoc(targetCol, payload, { merge: true });
+
+      // return merged object for UI
+      const merged = { ...record, ...payload };
+      setEditing(false);
+      onUpdated?.({ ...merged, id: record.id });
+    } catch (e) {
+      alert(`❌ SAVE ERROR: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ✅ Save renew (writes renewals/{entityKey})
+  const saveRenew = async () => {
+    if (!record) return;
+    if (!entityKey) return alert("Missing entityKey");
+
+    try {
+      setSaving(true);
+
+      const newRecord = {
+        ...record,
+        ...form,
+        entityKey,
+        source: source || "unknown",
+        renewedFromId: record?.id || "",
+        renewedAt: new Date().toISOString(),
+      };
+
+      await setDoc(
+        doc(db, "renewals", entityKey),
+        { record: newRecord, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+
+      setRenewedRecord(newRecord);
+      setRenewing(false);
+      onRenewSaved?.({ oldId: record.id, newRecord });
+    } catch (e) {
+      alert(`❌ ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const panel = {
     overflow: "hidden",
@@ -145,132 +225,8 @@ export default function RecordDetailsPanel({
       verticalAlign: "top",
     });
 
-  const labelTd = {
-    ...baseTd,
-    fontWeight: 950,
-    width: 160,
-    color: C.primaryDark,
-    background: "#fff",
-  };
-
+  const labelTd = { ...baseTd, fontWeight: 950, width: 160, color: C.primaryDark, background: "#fff" };
   const valueTd = { ...baseTd, color: C.text, background: "#fff" };
-
-  // ✅ input style: uppercase only for inputs
-  const inputStyle = (k) => ({
-    width: "100%",
-    padding: "9px 10px",
-    borderRadius: 12,
-    border: `1px solid ${C.border}`,
-    outline: "none",
-    fontSize: 13,
-    color: C.text,
-    background: "#fff",
-    boxSizing: "border-box",
-    fontWeight: 850,
-    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
-  });
-
-  // ✅ keep caps in state so saved value is caps
-  const setField = (k, v) => {
-    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
-    setForm((p) => ({ ...p, [k]: next }));
-  };
-
-  const btn = (variant) => {
-    const common = {
-      padding: "10px 12px",
-      borderRadius: 12,
-      fontWeight: 950,
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-      opacity: saving ? 0.7 : 1,
-    };
-    if (variant === "primary")
-      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
-    if (variant === "gold")
-      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
-    if (variant === "danger")
-      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
-    return common;
-  };
-
-  const saveEdit = async () => {
-    if (!record?.id) return alert("Missing record.id (cannot save).");
-
-    try {
-      setSaving(true);
-
-      const payload = {};
-      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
-      payload.teamLeader = form.teamLeader ?? "";
-
-      const url = `${API}/records/${record.id}`;
-
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(`Backend returned non-JSON. Status ${res.status}`);
-      }
-
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || `Save failed. Status ${res.status}`);
-      }
-
-      setEditing(false);
-      onUpdated?.(data.data);
-    } catch (e) {
-      alert(`❌ SAVE ERROR: ${e.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const saveRenew = async () => {
-    if (!record) return;
-    if (!entityKey) return alert("Missing entityKey");
-
-    try {
-      setSaving(true);
-
-      const res = await fetch(`${API}/records/renew`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          entityKey,
-          source,
-          oldRecord: record,
-          updatedRecord: form,
-        }),
-      });
-
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error("Renew failed (non-JSON response).");
-      }
-
-      if (!res.ok || !data?.success) throw new Error(data?.message || "Renew failed");
-
-      setRenewedRecord(data.newRecord);
-      setRenewing(false);
-      onRenewSaved?.({ oldId: record.id, newRecord: data.newRecord });
-    } catch (e) {
-      alert(`❌ ${e.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (!record) {
     return (
@@ -302,17 +258,12 @@ export default function RecordDetailsPanel({
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {mode === "view" && (
             <>
-              <button style={btn("primary")} onClick={() => setEditing(true)}>
-                Edit
-              </button>
+              <button style={btn("primary")} onClick={() => setEditing(true)}>Edit</button>
 
               {isArchive && (
                 <button
                   style={btn("gold")}
-                  onClick={() => {
-                    setRenewing(true);
-                    setEditing(false);
-                  }}
+                  onClick={() => { setRenewing(true); setEditing(false); }}
                 >
                   Renew
                 </button>
@@ -350,8 +301,6 @@ export default function RecordDetailsPanel({
             {FIELDS.map((f) => (
               <tr key={f.key}>
                 <td style={labelTd}>{f.label}</td>
-
-                {/* ✅ inputs ra ang caps (edit/renew mode) */}
                 <td style={valueTd}>
                   {mode === "edit" || mode === "renew" ? (
                     <input

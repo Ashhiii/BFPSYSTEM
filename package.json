@@ -19,6 +19,7 @@
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "file-saver": "^2.0.5",
+    "firebase": "^12.9.0",
     "fs": "^0.0.1-security",
     "lucide-react": "^0.563.0",
     "mammoth": "^1.11.0",

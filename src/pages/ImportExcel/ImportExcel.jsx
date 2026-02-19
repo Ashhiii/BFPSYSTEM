@@ -8,7 +8,18 @@ import {
   HiOutlineExclamationCircle,
 } from "react-icons/hi";
 
-function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
+import * as XLSX from "xlsx";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  writeBatch,
+  doc as fsDoc,
+} from "firebase/firestore";
+
+import { db } from "../../firebase";
+
+function UploadBox({ title, sub, onDone, variant = "records" }) {
   const inputRef = useRef(null);
 
   const [file, setFile] = useState(null);
@@ -34,9 +45,7 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
       rose: "#e11d48",
     };
 
-    if (variant === "documents") {
-      return { ...base, accent: base.blue, accentDark: "#1d4ed8" };
-    }
+    if (variant === "documents") return { ...base, accent: base.blue, accentDark: "#1d4ed8" };
     return { ...base, accent: base.red, accentDark: base.redDark };
   }, [variant]);
 
@@ -70,43 +79,10 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const upload = async () => {
-    if (!file) return setMsg("❌ Choose an Excel file first.");
-    setUploading(true);
-    setMsg("");
-
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-
-      const res = await fetch(`${api}${endpoint}`, {
-        method: "POST",
-        body: fd,
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || "Import failed.");
-      }
-
-      setMsg(
-        `✅ Imported: ${data.imported || 0} row(s). Skipped: ${data.skipped || 0}`
-      );
-      setFile(null);
-      if (inputRef.current) inputRef.current.value = "";
-      onDone?.();
-    } catch (e) {
-      setMsg(`❌ ${e.message}`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const onDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDrag(false);
-
     const f = e.dataTransfer?.files?.[0];
     setPickedFile(f);
   };
@@ -121,6 +97,119 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
     e.preventDefault();
     e.stopPropagation();
     setDrag(false);
+  };
+
+  // ✅ Map excel row headers -> firestore fields
+  const normalizeRow = (r) => {
+    const get = (...keys) => {
+      for (const k of keys) {
+        const v = r?.[k];
+        if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+      }
+      return "";
+    };
+
+    return {
+      fsicAppNo: get("fsicAppNo", "FSIC App No", "FSIC"),
+      ownerName: get("ownerName", "Owner"),
+      establishmentName: get("establishmentName", "Establishment"),
+      businessAddress: get("businessAddress", "Address"),
+      contactNumber: get("contactNumber", "Contact"),
+      natureOfInspection: get("natureOfInspection", "Inspection"),
+      dateInspected: get("dateInspected", "Date Inspected"),
+      ioNumber: get("ioNumber", "IO No", "IO Number"),
+      ioDate: get("ioDate", "IO Date"),
+      nfsiNumber: get("nfsiNumber", "NFSI No", "NFSI Number"),
+      nfsiDate: get("nfsiDate", "NFSI Date"),
+      inspectors: get("inspectors", "Inspectors"),
+      teamLeader: get("teamLeader", "Team Leader"),
+      chiefName: get("chiefName", "Chief"),
+      marshalName: get("marshalName", "Marshal"),
+      occupancyType: get("occupancyType", "Occupancy"),
+      buildingDesc: get("buildingDesc", "Building Desc"),
+      floorArea: get("floorArea", "Floor Area"),
+      buildingHeight: get("buildingHeight", "Height"),
+      storeyCount: get("storeyCount", "Storey"),
+      highRise: get("highRise", "High Rise"),
+      fsmr: get("fsmr", "FSMR"),
+      remarks: get("remarks", "Remarks"),
+      orNumber: get("orNumber", "OR No"),
+      orAmount: get("orAmount", "OR Amount"),
+      orDate: get("orDate", "OR Date"),
+    };
+  };
+
+  const upload = async () => {
+    if (!file) return setMsg("❌ Choose an Excel file first.");
+
+    setUploading(true);
+    setMsg("");
+
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheetName = wb.SheetNames?.[0];
+      if (!sheetName) throw new Error("No sheet found in Excel.");
+
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setMsg("❌ Empty sheet (no rows).");
+        setUploading(false);
+        return;
+      }
+
+      const colName = variant === "documents" ? "documents" : "records";
+
+      let imported = 0;
+      let skipped = 0;
+
+      // ✅ batch for speed (max 500 writes per batch)
+      let batch = writeBatch(db);
+      let ops = 0;
+
+      const commitIfNeeded = async () => {
+        if (ops >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          ops = 0;
+        }
+      };
+
+      for (const r of rows) {
+        const data = normalizeRow(r);
+
+        // ✅ required fields
+        if (!data.fsicAppNo || !data.ownerName || !data.establishmentName) {
+          skipped++;
+          continue;
+        }
+
+        const ref = fsDoc(collection(db, colName)); // auto id
+        batch.set(ref, {
+          ...data,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          importSource: "excel",
+        });
+
+        imported++;
+        ops++;
+        await commitIfNeeded();
+      }
+
+      if (ops > 0) await batch.commit();
+
+      setMsg(`✅ Imported: ${imported} row(s). Skipped: ${skipped}`);
+      setFile(null);
+      if (inputRef.current) inputRef.current.value = "";
+      onDone?.();
+    } catch (e) {
+      setMsg(`❌ ${e.message || "Import failed"}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const S = {
@@ -323,13 +412,7 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
   };
 
   return (
-    <div
-      style={S.wrap}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragLeave={onDragLeave}
-    >
-      {/* HEADER */}
+    <div style={S.wrap} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={onDragLeave}>
       <div style={S.head}>
         <div>
           <div style={S.title}>{title}</div>
@@ -342,7 +425,6 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
         </div>
       </div>
 
-      {/* BODY */}
       <div style={S.body}>
         <div style={S.drop}>
           <div style={S.dropTop}>
@@ -351,19 +433,13 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
             </div>
 
             <div style={S.dropText}>
-              <div style={S.dropMain}>
-                Drag & drop Excel here, or choose a file
-              </div>
+              <div style={S.dropMain}>Drag & drop Excel here, or choose a file</div>
               <div style={S.dropHint}>Only .xlsx / .xls accepted</div>
             </div>
           </div>
 
           <div style={S.actions}>
-            <label
-              style={S.pickBtn}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0px)")}
-            >
+            <label style={S.pickBtn}>
               <HiOutlineDocumentText size={18} />
               Choose Excel
               <input
@@ -375,19 +451,12 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
               />
             </label>
 
-            <button
-              style={S.primary}
-              onClick={upload}
-              disabled={uploading || !file}
-              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.99)")}
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
+            <button style={S.primary} onClick={upload} disabled={uploading || !file}>
               <HiOutlineUpload size={18} />
-              {uploading ? "Importing..." : "Upload & Import"}
+              {uploading ? "Importing..." : "Import to Firestore"}
             </button>
           </div>
 
-          {/* FILE PREVIEW */}
           {file ? (
             <div style={S.fileCard}>
               <div style={S.fileLeft}>
@@ -396,25 +465,16 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={S.fileName}>{file.name}</div>
-                  <div style={S.fileMeta}>
-                    Size: {(file.size / 1024 / 1024).toFixed(2)} MB
-                  </div>
+                  <div style={S.fileMeta}>Size: {(file.size / 1024 / 1024).toFixed(2)} MB</div>
                 </div>
               </div>
 
-              <button
-                style={S.xBtn}
-                onClick={clearFile}
-                title="Remove selected file"
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "rotate(6deg)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "rotate(0deg)")}
-              >
+              <button style={S.xBtn} onClick={clearFile} title="Remove selected file">
                 <HiOutlineX size={18} />
               </button>
             </div>
           ) : null}
 
-          {/* MESSAGE */}
           {msg && (
             <div style={S.msg(okMsg)}>
               {okMsg ? (
@@ -426,7 +486,6 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
             </div>
           )}
 
-          {/* PROGRESS BAR (visual) */}
           <div style={S.barWrap}>
             <div style={S.bar} />
           </div>
@@ -437,18 +496,11 @@ function UploadBox({ title, sub, endpoint, api, onDone, variant = "records" }) {
 }
 
 export default function ImportExcel({ setRefresh }) {
-  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-    /\/+$/,
-    ""
-  );
-
   return (
     <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
       <UploadBox
         title="Import to Records"
         sub="Upload Excel → mo-sulod sa Records"
-        endpoint="/import/records"
-        api={API}
         variant="records"
         onDone={() => setRefresh?.((p) => !p)}
       />
@@ -456,8 +508,6 @@ export default function ImportExcel({ setRefresh }) {
       <UploadBox
         title="Import to Documents"
         sub="Upload Excel → mo-sulod sa Documents"
-        endpoint="/import/documents"
-        api={API}
         variant="documents"
         onDone={() => setRefresh?.((p) => !p)}
       />

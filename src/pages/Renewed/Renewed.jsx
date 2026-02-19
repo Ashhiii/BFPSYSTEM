@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { db } from "../../firebase"; // ✅ adjust path
+
 import RenewedTable from "../Renewed/RenewedTable.jsx";
 import RecordDetailsPanel from "../Records/RecordDetailsPanel.jsx";
 
 export default function Renewed({ refresh, setRefresh }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
   const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -45,12 +46,7 @@ export default function Renewed({ refresh, setRefresh }) {
   };
 
   const hTitle = { fontSize: 18, fontWeight: 950, color: C.primaryDark };
-  const hSub = {
-    fontSize: 12,
-    fontWeight: 800,
-    color: C.muted,
-    marginTop: 6,
-  };
+  const hSub = { fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 6 };
 
   const input = {
     padding: "10px 12px",
@@ -62,24 +58,6 @@ export default function Renewed({ refresh, setRefresh }) {
     fontWeight: 850,
     flex: 1,
     minWidth: 260,
-  };
-
-  const btn = {
-    padding: "10px 12px",
-    borderRadius: 12,
-    cursor: "pointer",
-    fontWeight: 950,
-    border: `1px solid ${C.border}`,
-    background: "#fff",
-    color: C.text,
-    whiteSpace: "nowrap",
-  };
-
-  const btnGold = {
-    ...btn,
-    border: `1px solid ${C.gold}`,
-    background: C.gold,
-    color: "#111827",
   };
 
   const contentWrap = {
@@ -113,14 +91,8 @@ export default function Renewed({ refresh, setRefresh }) {
     flexWrap: "wrap",
   };
 
-  const scroll = {
-    flex: 1,
-    overflowY: "auto",
-    overflowX: "hidden",
-    minHeight: 0,
-  };
+  const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0 };
 
-  // Pass theme-friendly table cell + buttons into RecordDetailsPanel
   const panelStyles = {
     td: {
       padding: 10,
@@ -129,52 +101,25 @@ export default function Renewed({ refresh, setRefresh }) {
       fontSize: 13,
       color: C.text,
     },
-    primaryBtn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: `1px solid ${C.primary}`,
-      background: C.primary,
-      color: "#fff",
-      fontWeight: 950,
-      cursor: "pointer",
-    },
-    dangerBtn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: `1px solid ${C.danger}`,
-      background: C.softBg,
-      color: C.danger,
-      fontWeight: 950,
-      cursor: "pointer",
-    },
   };
 
-  const normalizeOne = (x) => {
-    if (!x) return x;
-    const d = x.data && typeof x.data === "object" ? x.data : {};
+  const normalizeSnap = (docSnap) => {
+    const data = docSnap.data() || {};
     return {
-      ...x,
-      ...d,
-      id: x.id ?? d.id,
-      entityKey: x.entityKey ?? d.entityKey ?? "",
-      teamLeader: x.teamLeader ?? d.teamLeader ?? "",
-      kind: x.kind ?? d.kind,
-      source: x.source ?? d.source,
-      createdAt: x.createdAt ?? d.createdAt,
-      changedAt: x.changedAt ?? d.changedAt,
+      id: docSnap.id,
+      ...data,
+      entityKey: data.entityKey || (data.fsicAppNo ? `fsic:${data.fsicAppNo}` : ""),
+      teamLeader: data.teamLeader || "",
+      kind: data.kind || "renewed",
     };
   };
 
   const loadRenewed = async () => {
     try {
-      const res = await fetch(`${API}/manager/items?scope=renewed&month=`);
-      const data = await res.json();
-
-      // Backend returns { success:true, items:[...] }
-      const raw = Array.isArray(data) ? data : data.items || data.records || [];
-      const onlyRenewed = raw.filter((r) => (r.kind || "") === "renewed");
-
-      setRecords(onlyRenewed.map(normalizeOne));
+      const qy = query(collection(db, "renewed"), orderBy("changedAt", "desc"));
+      const snap = await getDocs(qy);
+      const list = snap.docs.map(normalizeSnap);
+      setRecords(list);
     } catch (e) {
       console.error("loadRenewed error:", e);
       setRecords([]);
@@ -232,9 +177,7 @@ export default function Renewed({ refresh, setRefresh }) {
         <div style={card}>
           <div style={cardHead}>
             <div>Renewed List</div>
-            <div style={{ opacity: 0.85, color: C.muted }}>
-              Results: {filtered.length}
-            </div>
+            <div style={{ opacity: 0.85, color: C.muted }}>Results: {filtered.length}</div>
           </div>
 
           <div style={scroll}>
@@ -248,6 +191,7 @@ export default function Renewed({ refresh, setRefresh }) {
           source="Renewed"
           isArchive={true}
           onRenewSaved={() => setRefresh((p) => !p)}
+          onUpdated={() => setRefresh((p) => !p)}
         />
       </div>
     </div>

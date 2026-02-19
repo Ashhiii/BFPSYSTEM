@@ -1,4 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+} from "firebase/firestore";
+
+import { db } from "../../firebase"; // ✅ Firestore
 import AddDocument from "../../components/AddDocument.jsx";
 import DocumentsTable from "./DocumentsTable.jsx";
 import DocumentDetailsPanel from "./DocumentDetailsPanel.jsx";
@@ -18,6 +26,7 @@ const C = {
 };
 
 export default function Documents({ refresh, setRefresh }) {
+  // ✅ keep Render API only for PDF generation buttons (LibreOffice)
   const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const [tab, setTab] = useState("view"); // view | add
@@ -26,9 +35,15 @@ export default function Documents({ refresh, setRefresh }) {
   const [selectedDoc, setSelectedDoc] = useState(null);
 
   const fetchDocs = async () => {
-    const res = await fetch(`${API}/documents`);
-    const data = await res.json();
-    setDocs(data || []);
+    try {
+      const qy = query(collection(db, "documents"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(qy);
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setDocs(list);
+    } catch (e) {
+      console.error("fetchDocs error:", e);
+      setDocs([]);
+    }
   };
 
   useEffect(() => {
@@ -38,6 +53,8 @@ export default function Documents({ refresh, setRefresh }) {
 
   const filtered = useMemo(() => {
     const key = search.toLowerCase().trim();
+    if (!key) return docs;
+
     return (docs || []).filter((d) => {
       return (
         (d.ownerName || "").toLowerCase().includes(key) ||
@@ -60,7 +77,6 @@ export default function Documents({ refresh, setRefresh }) {
     whiteSpace: "nowrap",
   });
 
-  // Layout same idea sa Records: table left, panel right
   const content = {
     flex: 1,
     overflow: "hidden",
@@ -92,7 +108,6 @@ export default function Documents({ refresh, setRefresh }) {
   };
 
   const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden" };
-
 
   return (
     <div>
@@ -183,6 +198,7 @@ export default function Documents({ refresh, setRefresh }) {
               <DocumentsTable
                 docs={filtered}
                 onRowClick={(d) => setSelectedDoc(d)}
+                apiBase={API}
               />
             </div>
           </div>
@@ -191,7 +207,6 @@ export default function Documents({ refresh, setRefresh }) {
           <DocumentDetailsPanel
             doc={selectedDoc}
             onUpdated={(updated) => {
-              // update list locally
               setDocs((prev) => {
                 const copy = [...(prev || [])];
                 const idx = copy.findIndex((x) => String(x.id) === String(updated.id));

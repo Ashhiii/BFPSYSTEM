@@ -1,6 +1,5 @@
 import React from "react";
 
-/* 🔥 BFP COLORS */
 const C = {
   primary: "#b91c1c",
   primaryDark: "#7f1d1d",
@@ -22,12 +21,12 @@ const C = {
   nfsiText: "#166534",
 };
 
-export default function DocumentsTable({ docs = [], onRowClick }) {
-  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
+  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
   const open = (url, e) => {
     e?.stopPropagation?.();
-    window.location.href = url;
+    window.open(url, "_blank");
   };
 
   const clamp2 = {
@@ -37,6 +36,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
     maxWidth: "100%",
     textTransform: "uppercase",
   };
+
   const S = {
     wrap: { width: "100%", overflowX: "auto" },
     table: {
@@ -90,13 +90,7 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
     btnIO: { border: `1px solid ${C.ioBorder}`, background: C.ioBg, color: C.ioText },
     btnReinspect: { border: `1px solid ${C.reBorder}`, background: C.reBg, color: C.reText },
     btnNFSI: { border: `1px solid ${C.nfsiBorder}`, background: C.nfsiBg, color: C.nfsiText },
-    empty: {
-      textAlign: "center",
-      padding: 22,
-      color: C.muted,
-      background: "#fff",
-      fontWeight: 800,
-    },
+    empty: { textAlign: "center", padding: 22, color: C.muted, background: "#fff", fontWeight: 800 },
   };
 
   return (
@@ -132,65 +126,21 @@ export default function DocumentsTable({ docs = [], onRowClick }) {
                 }
                 onClick={() => onRowClick?.(d)}
               >
-                <td style={S.td}>
-                  <div style={clamp2} title={d.fsicAppNo || "-"}>
-                    {d.fsicAppNo || "-"}
-                  </div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2} title={d.ownerName || "-"}>
-                    {d.ownerName || "-"}
-                  </div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2} title={d.establishmentName || "-"}>
-                    {d.establishmentName || "-"}
-                  </div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2} title={d.businessAddress || "-"}>
-                    {d.businessAddress || "-"}
-                  </div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2} title={d.chiefName || "-"}>
-                    {d.chiefName || "-"}
-                  </div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2} title={d.marshalName || "-"}>
-                    {d.marshalName || "-"}
-                  </div>
-                </td>
+                <td style={S.td}><div style={clamp2}>{d.fsicAppNo || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.ownerName || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.establishmentName || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.businessAddress || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.chiefName || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.marshalName || "-"}</div></td>
 
                 <td style={S.actionsTd}>
-                  <button
-                    style={{ ...S.btn, ...S.btnIO }}
-                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
-                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}
-                  >
+                  <button style={{ ...S.btn, ...S.btnIO }} onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}>
                     IO
                   </button>
-
-                  <button
-                    style={{ ...S.btn, ...S.btnReinspect }}
-                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
-                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}
-                  >
+                  <button style={{ ...S.btn, ...S.btnReinspect }} onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}>
                     Reinspection
                   </button>
-
-                  <button
-                    style={{ ...S.btn, ...S.btnNFSI }}
-                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
-                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}
-                  >
+                  <button style={{ ...S.btn, ...S.btnNFSI }} onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}>
                     NFSI
                   </button>
                 </td>

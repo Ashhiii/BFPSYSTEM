@@ -1,13 +1,6 @@
 import React from "react";
 
 export default function RenewedTable({ records = [], onRowClick }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-  const open = (url, e) => {
-    e.stopPropagation();
-    window.open(url, "_blank");
-  };
-
   const clamp = {
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -15,7 +8,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
     maxWidth: "100%",
   };
 
-  /* 🔥 BFP COLORS */
   const C = {
     primary: "#b91c1c",
     primaryDark: "#7f1d1d",
@@ -33,7 +25,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
 
   const S = {
     wrap: { width: "100%", overflowX: "hidden" },
-
     table: {
       width: "100%",
       borderCollapse: "separate",
@@ -43,7 +34,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       border: `1px solid ${C.border}`,
       borderRadius: 14,
     },
-
     th: {
       position: "sticky",
       top: 0,
@@ -57,7 +47,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       borderBottom: `2px solid ${C.primary}`,
       whiteSpace: "nowrap",
     },
-
     td: {
       padding: "12px 12px",
       fontSize: 13,
@@ -66,18 +55,12 @@ export default function RenewedTable({ records = [], onRowClick }) {
       borderBottom: `1px solid ${C.border}`,
       color: C.text,
     },
-
-    row: {
-      cursor: "pointer",
-      transition: "background .15s ease",
-    },
-
+    row: { cursor: "pointer", transition: "background .15s ease" },
     actionsTd: {
       padding: "10px 12px",
       borderBottom: `1px solid ${C.border}`,
       whiteSpace: "nowrap",
     },
-
     btn: {
       padding: "8px 12px",
       borderRadius: 999,
@@ -88,28 +71,10 @@ export default function RenewedTable({ records = [], onRowClick }) {
       border: `1px solid ${C.border}`,
       background: "#fff",
       color: C.text,
-      transition: "transform .05s ease, background .15s ease, border .15s ease",
     },
-
-    btnOwner: {
-      border: `1px solid ${C.ownerBorder}`,
-      background: C.ownerBg,
-      color: "#9a3412",
-    },
-
-    btnBfp: {
-      border: `1px solid ${C.bfpBorder}`,
-      background: C.bfpBg,
-      color: C.primaryDark,
-    },
-
-    empty: {
-      textAlign: "center",
-      padding: 22,
-      color: C.muted,
-      background: "#fff",
-      fontWeight: 800,
-    },
+    btnOwner: { border: `1px solid ${C.ownerBorder}`, background: C.ownerBg, color: "#9a3412" },
+    btnBfp: { border: `1px solid ${C.bfpBorder}`, background: C.bfpBg, color: C.primaryDark },
+    empty: { textAlign: "center", padding: 22, color: C.muted, background: "#fff", fontWeight: 800 },
   };
 
   return (
@@ -137,10 +102,7 @@ export default function RenewedTable({ records = [], onRowClick }) {
             records.map((r, i) => (
               <tr
                 key={r.id || i}
-                style={{
-                  ...S.row,
-                  background: i % 2 === 0 ? "#fff" : "#fafafa",
-                }}
+                style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
                 onMouseLeave={(e) =>
                   (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
@@ -163,26 +125,11 @@ export default function RenewedTable({ records = [], onRowClick }) {
                   <div style={clamp}>{r.dateInspected || "-"}</div>
                 </td>
 
+                {/* OPTIONAL: PDF buttons (needs Cloud Functions endpoints) */}
                 <td style={S.actionsTd}>
-                  <button
-                    style={{ ...S.btn, ...S.btnOwner }}
-                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
-                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
-                  >
-                    Owner PDF
-                  </button>
-
-                  <button
-                    style={{ ...S.btn, ...S.btnBfp }}
-                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(.97)")}
-                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
-                  >
-                    BFP PDF
-                  </button>
+                  <span style={{ color: C.muted, fontWeight: 800, fontSize: 12 }}>
+                    Select row → view details
+                  </span>
                 </td>
               </tr>
             ))

@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase";
 
 /**
  * ✅ Format "YYYY-MM-DD" => "January 2, 2026"
@@ -39,9 +41,6 @@ const addYearsYMD = (yyyy_mm_dd, years = 1) => {
   return `${yy}-${mm}-${dd}`;
 };
 
-/**
- * ✅ Backend keys (same as your server expects)
- */
 const INITIAL_FORM = {
   appno: "",
   fsicAppNo: "",
@@ -144,8 +143,6 @@ const FIELDS = [
 ];
 
 export default function AddRecord({ setRefresh }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
@@ -164,14 +161,19 @@ export default function AddRecord({ setRefresh }) {
     return miss;
   }, [form, requiredKeys]);
 
-  // ✅ convert date fields to "January 2, 2026" BEFORE sending to backend
   const buildPayload = () => {
     const payload = { ...form };
+
+    // keep YMD in state, but store long format for display
     payload.dateInspected = formatDateLong(form.dateInspected);
     payload.ioDate = formatDateLong(form.ioDate);
     payload.nfsiDate = formatDateLong(form.nfsiDate);
     payload.orDate = formatDateLong(form.orDate);
-    // fsicValidity is already auto-set (string), keep as is
+
+    // timestamps for sorting
+    payload.createdAt = serverTimestamp();
+    payload.updatedAt = serverTimestamp();
+
     return payload;
   };
 
@@ -191,7 +193,7 @@ export default function AddRecord({ setRefresh }) {
       alignItems: "center",
     },
     title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
-    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6},
+    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 },
 
     btn: {
       padding: "10px 12px",
@@ -267,9 +269,8 @@ export default function AddRecord({ setRefresh }) {
   const onChange = (e) => {
     const { name, value } = e.target;
 
-    // ✅ if Date Inspected changes: auto compute FSIC Validity (+1 year)
     if (name === "dateInspected") {
-      const untilYMD = addYearsYMD(value, 1); // +1 year
+      const untilYMD = addYearsYMD(value, 1);
       const validityText = untilYMD ? `${formatDateLong(untilYMD)}` : "";
 
       setForm((p) => ({
@@ -280,7 +281,6 @@ export default function AddRecord({ setRefresh }) {
       return;
     }
 
-    // ✅ uppercase-save only for text keys (dates stay as YYYY-MM-DD in state)
     const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
     setForm((p) => ({ ...p, [name]: v }));
   };
@@ -295,25 +295,10 @@ export default function AddRecord({ setRefresh }) {
 
     setSaving(true);
     try {
-      const payload = buildPayload(); // ✅ dates become "January 2, 2026"
+      const payload = buildPayload();
 
-      const res = await fetch(`${API}/records`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-      let data = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
-        console.log("Non-JSON:", text);
-      }
-
-      if (!res.ok || data.success === false) {
-        return alert(data.message || "Failed to add record");
-      }
+      // ✅ SAVE TO FIRESTORE
+      await addDoc(collection(db, "records"), payload);
 
       alert("Record added!");
       setForm(INITIAL_FORM);
@@ -321,7 +306,7 @@ export default function AddRecord({ setRefresh }) {
       setRefresh?.((p) => !p);
     } catch (e) {
       console.error(e);
-      alert("Server error. Check backend terminal.");
+      alert("Firestore error. Check rules / permissions.");
     } finally {
       setSaving(false);
     }
@@ -356,7 +341,6 @@ export default function AddRecord({ setRefresh }) {
       <div style={styles.grid}>
         {FIELDS.map((f) => {
           const showError = f.required && touched[f.key] && missingRequired[f.key];
-
           const isValidity = f.key === "fsicValidity";
 
           return (
@@ -382,7 +366,6 @@ export default function AddRecord({ setRefresh }) {
                 type={f.type || "text"}
                 placeholder={f.placeholder || ""}
                 autoComplete="off"
-                // ✅ optional: make validity read-only since it's auto
                 readOnly={isValidity}
                 style={{
                   ...styles.input,

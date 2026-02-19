@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { doc as fsDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No" },
@@ -16,7 +18,6 @@ const FIELDS = [
   { key: "marshalName", label: "Marshal" },
 ];
 
-// ✅ inputs ra i-CAPS (ayaw apila dates)
 const CAPS_KEYS = new Set([
   "fsicAppNo",
   "ownerName",
@@ -34,13 +35,10 @@ const CAPS_KEYS = new Set([
 const DATE_KEYS = new Set(["ioDate", "nfsiDate"]);
 
 export default function DocumentDetailsPanel({ doc, onUpdated }) {
-  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
-
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
 
-  /* 🔥 BFP COLORS */
   const C = {
     primary: "#b91c1c",
     primaryDark: "#7f1d1d",
@@ -66,6 +64,74 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
   const title = useMemo(() => {
     return doc?.establishmentName || doc?.fsicAppNo || "Document";
   }, [doc]);
+
+  const inputStyle = (k) => ({
+    width: "100%",
+    padding: "9px 10px",
+    borderRadius: 12,
+    border: `1px solid ${C.border}`,
+    outline: "none",
+    fontSize: 13,
+    color: C.text,
+    background: "#fff",
+    boxSizing: "border-box",
+    fontWeight: 850,
+    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
+  });
+
+  const setField = (k, v) => {
+    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
+    setForm((p) => ({ ...p, [k]: next }));
+  };
+
+  const btn = (variant) => {
+    const common = {
+      padding: "10px 12px",
+      borderRadius: 12,
+      fontWeight: 950,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+      opacity: saving ? 0.7 : 1,
+    };
+    if (variant === "primary")
+      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
+    if (variant === "gold")
+      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
+    if (variant === "danger")
+      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
+    return common;
+  };
+
+  const save = async () => {
+    if (!doc?.id) return;
+
+    try {
+      setSaving(true);
+
+      const payload = {};
+      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
+
+      // ✅ update firestore directly
+      const ref = fsDoc(db, "documents", String(doc.id));
+      await setDoc(
+        ref,
+        {
+          ...payload,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const updated = { ...doc, ...payload };
+      setEditing(false);
+      onUpdated?.(updated);
+    } catch (e) {
+      console.error("update document error:", e);
+      alert(`❌ ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const panel = {
     overflow: "hidden",
@@ -108,82 +174,6 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
   };
 
   const valueTd = { ...baseTd, color: C.text, background: "#fff" };
-
-  // ✅ input style (caps only if key is in CAPS_KEYS)
-  const inputStyle = (k) => ({
-    width: "100%",
-    padding: "9px 10px",
-    borderRadius: 12,
-    border: `1px solid ${C.border}`,
-    outline: "none",
-    fontSize: 13,
-    color: C.text,
-    background: "#fff",
-    boxSizing: "border-box",
-    fontWeight: 850,
-    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
-  });
-
-  // ✅ store CAPS in state for inputs only
-  const setField = (k, v) => {
-    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
-    setForm((p) => ({ ...p, [k]: next }));
-  };
-
-  const btn = (variant) => {
-    const common = {
-      padding: "10px 12px",
-      borderRadius: 12,
-      fontWeight: 950,
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-      opacity: saving ? 0.7 : 1,
-    };
-    if (variant === "primary")
-      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
-    if (variant === "gold")
-      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
-    if (variant === "danger")
-      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
-    return common;
-  };
-
-  const save = async () => {
-    if (!doc?.id) return;
-
-    try {
-      setSaving(true);
-
-      // ✅ send ALL fields
-      const payload = {};
-      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
-
-      const res = await fetch(`${API}/documents/${doc.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-      let data = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(text || "Update failed");
-      }
-
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || "Update failed");
-      }
-
-      setEditing(false);
-      onUpdated?.(data.data);
-    } catch (e) {
-      alert(`❌ ${e.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (!doc) {
     return (
@@ -233,8 +223,6 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
             {FIELDS.map((f) => (
               <tr key={f.key}>
                 <td style={labelTd}>{f.label}</td>
-
-                {/* ✅ table values NOT forced caps, inputs ra */}
                 <td style={valueTd}>
                   {editing ? (
                     <input
@@ -264,3 +252,4 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     </div>
   );
 }
+  

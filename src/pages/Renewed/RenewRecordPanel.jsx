@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import RenewRecordPanel from "./RenewRecordPanel.jsx"; // ✅ adjust path
+import {
+  doc as fsDoc,
+  updateDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore";
+
+import { db } from "../../firebase"; // ✅ adjust path
+import RenewRecordPanel from "./RenewRecordPanel.jsx";
 
 const FIELDS = [
   { key: "no", label: "No" },
@@ -36,10 +45,8 @@ export default function RecordDetailsPanel({
   source,
   isArchive,
   onRenewSaved,
-  onUpdated, // ✅ optional: para ma refresh list after edit
+  onUpdated,
 }) {
-  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
-
   const [mode, setMode] = useState("view"); // view | edit | renew
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
@@ -103,14 +110,7 @@ export default function RecordDetailsPanel({
       verticalAlign: "top",
     });
 
-  const labelTd = {
-    ...baseTd,
-    fontWeight: 950,
-    width: 160,
-    color: C.primaryDark,
-    background: "#fff",
-  };
-
+  const labelTd = { ...baseTd, fontWeight: 950, width: 160, color: C.primaryDark, background: "#fff" };
   const valueTd = { ...baseTd, color: C.text, background: "#fff" };
 
   const inputStyle = {
@@ -144,7 +144,16 @@ export default function RecordDetailsPanel({
     return common;
   };
 
-  // ✅ EDIT: update existing record (needs PUT endpoint)
+  // Determine which collection this record belongs to
+  // If you opened this page from Renewed screen => collection is "renewed"
+  // If from Records screen => collection is "records"
+  const collectionName = useMemo(() => {
+    const s = String(source || "").toLowerCase();
+    if (s.includes("renew")) return "renewed";
+    if (s.includes("archive")) return "archive"; // (if you implement archive in firestore)
+    return "records";
+  }, [source]);
+
   const saveEdit = async () => {
     if (!record?.id) return;
 
@@ -154,26 +163,14 @@ export default function RecordDetailsPanel({
       const payload = {};
       FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
       payload.teamLeader = form.teamLeader ?? "";
+      payload.updatedAt = serverTimestamp();
 
-      // ⚠️ make sure backend has PUT /records/:id
-      const res = await fetch(`${API}/records/${record.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-      let data = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(text || "Update failed");
-      }
-
-      if (!res.ok || data?.success === false) throw new Error(data?.message || "Update failed");
+      // update in same collection where record came from
+      const ref = fsDoc(db, collectionName, String(record.id));
+      await updateDoc(ref, payload);
 
       setMode("view");
-      onUpdated?.(data.data);
+      onUpdated?.({ ...record, ...payload });
     } catch (e) {
       alert(`❌ ${e.message}`);
     } finally {
@@ -208,14 +205,12 @@ export default function RecordDetailsPanel({
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {/* ✅ Like Documents: Edit button */}
           {mode === "view" && (
             <button style={btn("primary")} onClick={() => setMode("edit")}>
               Edit
             </button>
           )}
 
-          {/* ✅ Renew button only if archive */}
           {isArchive && mode === "view" && (
             <button style={btn("gold")} onClick={() => setMode("renew")}>
               Renew
@@ -242,7 +237,6 @@ export default function RecordDetailsPanel({
       </div>
 
       <div style={body}>
-        {/* ✅ VIEW / EDIT table */}
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
             {FIELDS.map((f) => (
@@ -285,7 +279,6 @@ export default function RecordDetailsPanel({
           </tbody>
         </table>
 
-        {/* ✅ Renew section = separate file/component */}
         {mode === "renew" && (
           <RenewRecordPanel
             record={record}

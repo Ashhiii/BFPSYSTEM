@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase";
 
 export default function AddDocument({ onSaved }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
   const initial = useMemo(
     () => ({
       fsicAppNo: "",
@@ -27,7 +27,6 @@ export default function AddDocument({ onSaved }) {
     []
   );
 
-  // ✅ uppercase-save only for these keys (text only)
   const UPPER_KEYS = useMemo(
     () =>
       new Set([
@@ -52,7 +51,7 @@ export default function AddDocument({ onSaved }) {
 
   const change = (e) => {
     const { name, value } = e.target;
-    const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value; // ✅ save as CAPS for text keys
+    const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
     setForm((p) => ({ ...p, [name]: v }));
   };
 
@@ -67,19 +66,20 @@ export default function AddDocument({ onSaved }) {
 
     try {
       setLoading(true);
-      const res = await fetch(`${API}/documents`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
 
-      if (!res.ok) throw new Error((await res.text()) || "FAILED TO ADD DOCUMENT");
+      // ✅ SAVE TO FIRESTORE
+      await addDoc(collection(db, "documents"), {
+        ...form,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
       setForm(initial);
       setMsg("✅ DOCUMENT ADDED SUCCESSFULLY");
       onSaved?.();
     } catch (err) {
-      setMsg(`❌ ${String(err.message || err).toUpperCase()}`);
+      setMsg("❌ FIRESTORE ERROR (CHECK RULES).");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -141,7 +141,7 @@ export default function AddDocument({ onSaved }) {
     fontWeight: 700,
     color: "#0f172a",
     background: "#fff",
-    textTransform: "uppercase", // ✅ display CAPS
+    textTransform: "uppercase",
   };
 
   const hint = { marginTop: 8, fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" };

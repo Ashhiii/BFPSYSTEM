@@ -3,6 +3,9 @@ import bgVideo from "../assets/background/bg1.mp4";
 import logo from "../assets/logo/bfp-logo.png";
 import { useNavigate } from "react-router-dom";
 
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
+
 export default function PinUnlock() {
   const [pin, setPin] = useState("");
   const [msg, setMsg] = useState("");
@@ -11,8 +14,6 @@ export default function PinUnlock() {
   const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(false);
   const navigate = useNavigate();
-
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -26,28 +27,27 @@ export default function PinUnlock() {
   const submit = async (e) => {
     e.preventDefault();
     setMsg("");
-    if (!pin) return setMsg("Enter PIN.");
+
+    const cleanPin = String(pin || "").trim();
+    if (!/^\d{1,6}$/.test(cleanPin)) return setMsg("Enter PIN (numbers only).");
 
     try {
       setLoading(true);
 
-      const res = await fetch(`${API}/auth/pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-      });
+      // ✅ EXACTLY matches your Firestore location:
+      // pinunlock (collection) -> config (doc) -> pin (field)
+      const snap = await getDoc(doc(db, "pinunlock", "config"));
+      const savedPin = snap.exists() ? String(snap.data()?.pin || "").trim() : "";
 
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error("Invalid PIN");
+      if (!savedPin) throw new Error("PIN not configured");
+
+      const ok = cleanPin === savedPin;
+      if (!ok) throw new Error("Invalid PIN");
 
       sessionStorage.setItem("unlocked", "1");
-
-      // ✅ transparent overlay loading (same screen)
       setFireLoading(true);
 
-      setTimeout(() => {
-        navigate("/app/records");
-      }, 5500);
+      setTimeout(() => navigate("/app/records"), 2200);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
       setPin("");
@@ -55,8 +55,6 @@ export default function PinUnlock() {
       setLoading(false);
     }
   };
-
-  /* ================= VIDEO BG ================= */
 
   const bg = {
     height: "95vh",
@@ -80,12 +78,9 @@ export default function PinUnlock() {
   const overlay = {
     position: "absolute",
     inset: 0,
-    background:
-      "radial-gradient(circle at 30% 20%, rgba(0,0,0,.35), rgba(0,0,0,.65))",
+    background: "radial-gradient(circle at 30% 20%, rgba(0,0,0,.35), rgba(0,0,0,.65))",
     zIndex: 1,
   };
-
-  /* ================= CARD + ANIMATIONS ================= */
 
   const wrap = {
     position: "relative",
@@ -116,9 +111,7 @@ export default function PinUnlock() {
     position: "absolute",
     top: 0,
     left: "50%",
-    transform: active
-      ? "translate(-50%, -70px) scale(0.92)"
-      : "translate(-50%, -50px) scale(1)",
+    transform: active ? "translate(-50%, -70px) scale(0.92)" : "translate(-50%, -50px) scale(1)",
     transition: "transform .45s cubic-bezier(.2,.9,.2,1)",
     zIndex: 3,
     width: 130,
@@ -144,9 +137,7 @@ export default function PinUnlock() {
     width: "95%",
     padding: "12px 14px",
     borderRadius: 14,
-    border: msg
-      ? "1px solid rgba(254,202,202,.75)"
-      : "1px solid rgba(255,255,255,0.28)",
+    border: msg ? "1px solid rgba(254,202,202,.75)" : "1px solid rgba(255,255,255,0.28)",
     background: "rgba(255,255,255,0.18)",
     color: "#fff",
     outline: "none",
@@ -154,7 +145,6 @@ export default function PinUnlock() {
     fontWeight: 950,
     letterSpacing: 10,
     textAlign: "center",
-    transition: "transform .12s ease, border .2s ease, box-shadow .2s ease",
   };
 
   const btn = {
@@ -167,21 +157,10 @@ export default function PinUnlock() {
     fontWeight: 950,
     cursor: loading ? "not-allowed" : "pointer",
     opacity: loading ? 0.75 : 1,
-    transform: loading ? "scale(.99)" : "scale(1)",
-    transition: "transform .12s ease, opacity .2s ease",
     boxShadow: "0 18px 40px rgba(185,28,28,.28)",
   };
 
-  const msgStyle = {
-    fontSize: 12,
-    color: "#fecaca",
-    fontWeight: 900,
-    minHeight: 16,
-  };
-
-  const hintRow = { marginTop: 10, fontSize: 11, opacity: 0.82, fontWeight: 800 };
-
-  /* ================= TRANSPARENT LOADING OVERLAY ================= */
+  const msgStyle = { fontSize: 12, color: "#fecaca", fontWeight: 900, minHeight: 16 };
 
   const loadingOverlay = {
     position: "absolute",
@@ -189,10 +168,9 @@ export default function PinUnlock() {
     zIndex: 6,
     display: "grid",
     placeItems: "center",
-    background: "rgba(0,0,0,0.35)", // ✅ transparent
+    background: "rgba(0,0,0,0.35)",
     backdropFilter: "blur(10px)",
     WebkitBackdropFilter: "blur(10px)",
-    animation: "fadeIn .18s ease",
   };
 
   const loadingCard = {
@@ -221,34 +199,20 @@ export default function PinUnlock() {
       <video style={videoStyle} src={bgVideo} autoPlay loop muted playsInline />
       <div style={overlay} />
 
-      {/* ✅ overlay loading on top of same login */}
       {fireLoading && (
         <div style={loadingOverlay}>
           <div style={loadingCard}>
-<img
-  src={logo}
-  alt="BFP Logo Loading"
-  style={{
-    width: 90,
-    height: 90,
-    objectFit: "contain",
-    animation: "pulseLogo 1.8s ease-in-out infinite",
-    filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))"
-  }}
-/>
+            <img
+              src={logo}
+              alt="BFP Logo Loading"
+              style={{ width: 90, height: 90, objectFit: "contain", filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))" }}
+            />
             <div style={{ marginTop: 8, fontWeight: 950 }}>Securing system...</div>
             <div style={{ marginTop: 14 }}>
               <div style={spinner} />
             </div>
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.9, fontWeight: 800 }}>
-              Please wait…
-            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
-
-          <style>{`
-            @keyframes spin { to { transform: rotate(360deg); } }
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-          `}</style>
         </div>
       )}
 
@@ -261,12 +225,7 @@ export default function PinUnlock() {
           <div style={title}>BFP RECORDS SYSTEM</div>
           <div style={sub}>Enter PIN to unlock</div>
 
-          <form
-            onSubmit={submit}
-            onFocus={() => setActive(true)}
-            onBlur={() => setActive(Boolean(pin))}
-            style={inputWrap}
-          >
+          <form onSubmit={submit} style={inputWrap}>
             <input
               type="password"
               maxLength={6}
@@ -276,16 +235,6 @@ export default function PinUnlock() {
               style={input}
               autoFocus
               disabled={loading || fireLoading}
-              onFocus={(e) => {
-                setActive(true);
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 16px 40px rgba(0,0,0,.25)";
-              }}
-              onBlur={(e) => {
-                setActive(Boolean(pin));
-                e.currentTarget.style.transform = "translateY(0px)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
             />
 
             <div style={msgStyle}>{msg || ""}</div>
@@ -293,8 +242,6 @@ export default function PinUnlock() {
             <button type="submit" style={btn} disabled={loading || fireLoading}>
               {loading ? "Checking..." : fireLoading ? "Entering..." : "Unlock"}
             </button>
-
-            <div style={hintRow}>Tip: numbers only • max 6 digits</div>
           </form>
         </div>
       </div>
