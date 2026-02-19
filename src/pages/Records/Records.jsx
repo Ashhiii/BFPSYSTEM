@@ -1,3 +1,5 @@
+// Records.jsx (FULL UPDATED) — Firestore Current + Archive + Close Month (Batch)
+
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
@@ -5,13 +7,12 @@ import { db } from "../../firebase";
 import {
   collection,
   doc,
-  getDoc,
   getDocs,
-  addDoc,
   setDoc,
   deleteDoc,
   query,
   orderBy,
+  writeBatch, // ✅ ADDED
 } from "firebase/firestore";
 
 import RecordsTable from "./RecordsTable.jsx";
@@ -65,9 +66,10 @@ export default function Records({ refresh, setRefresh }) {
   };
 
   const fetchMonths = async () => {
+    // expects archives/{month} docs with field { month }
     const qy = query(collection(db, "archives"), orderBy("month", "desc"));
     const snap = await getDocs(qy);
-    setMonths(snap.docs.map((d) => d.id));
+    setMonths(snap.docs.map((d) => d.id)); // month doc id = YYYY-MM
   };
 
   const fetchArchiveMonth = async (m) => {
@@ -107,49 +109,79 @@ export default function Records({ refresh, setRefresh }) {
   };
 
   // =========================
-  // CLOSE MONTH (ARCHIVE)
+  // CLOSE MONTH (ARCHIVE) ✅ FIXED (writeBatch)
   // =========================
   const closeMonth = async () => {
-    if (!window.confirm("Close month and archive records?")) return;
+    try {
+      if (!window.confirm("Close month and archive records?")) return;
 
-    const month = monthKeyNow();
+      const month = monthKeyNow();
 
-    // get all current
-    const currentSnap = await getDocs(collection(db, "records"));
-    const archivedCount = currentSnap.size;
+      // get all current
+      const currentSnap = await getDocs(collection(db, "records"));
+      const archivedCount = currentSnap.size;
 
-    // ensure month doc exists
-    await setDoc(
-      doc(db, "archives", month),
-      { month, closedAt: new Date().toISOString() },
-      { merge: true }
-    );
+      if (archivedCount === 0) {
+        alert("No records to archive.");
+        return;
+      }
 
-    // move docs
-    const ops = [];
-    for (const d of currentSnap.docs) {
-      const data = d.data();
+      // NOTE: Firestore batch limit is 500 operations.
+      // Each record uses 2 ops (set archive + delete current).
+      // So safe up to ~249 records. If you may exceed, tell me for chunked version.
+      const opsNeeded = archivedCount * 2 + 1; // +1 for month doc
+      if (opsNeeded > 500) {
+        alert(
+          `Too many records for one batch (${archivedCount}). Need chunked batching.`
+        );
+        return;
+      }
 
-      // copy to archive
-      ops.push(
-        setDoc(doc(db, "archives", month, "records", d.id), {
-          ...data,
-          archivedAt: new Date().toISOString(),
-        })
+      const batch = writeBatch(db);
+
+      // ensure month doc exists (for dropdown)
+      batch.set(
+        doc(db, "archives", month),
+        {
+          month,
+          closedAt: new Date().toISOString(),
+          count: archivedCount,
+        },
+        { merge: true }
       );
 
-      // delete current
-      ops.push(deleteDoc(doc(db, "records", d.id)));
+      // move docs
+      currentSnap.docs.forEach((d) => {
+        const data = d.data();
+
+        // copy to archive subcollection
+        batch.set(doc(db, "archives", month, "records", d.id), {
+          ...data,
+          archivedAt: new Date().toISOString(),
+          sourceMonth: month,
+        });
+
+        // delete current
+        batch.delete(doc(db, "records", d.id));
+      });
+
+      await batch.commit();
+
+      alert(`✅ Archived ${archivedCount} records for ${month}`);
+
+      // reset UI
+      setMode("current");
+      setSelectedMonth("");
+      setSelectedRecord(null);
+
+      await fetchMonths();
+      await fetchCurrent();
+    } catch (e) {
+      console.error("closeMonth failed:", e);
+      alert(
+        "❌ Close Month failed. Most common reason: Firestore rules block write/delete."
+      );
     }
-
-    await Promise.all(ops);
-
-    alert(`Archived ${archivedCount} records for ${month}`);
-    setMode("current");
-    setSelectedMonth("");
-    setSelectedRecord(null);
-    await fetchMonths();
-    await fetchCurrent();
   };
 
   const onSelectRow = (record) => {
