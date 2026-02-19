@@ -1,4 +1,8 @@
 // Records.jsx (FULL UPDATED) — Firestore Current + Archive + Close Month (Batch)
+// ✅ PH monthKeyNow
+// ✅ Close Month: archives/YYYY-MM/records + delete current
+// ✅ Prevent double-close
+// ✅ Refresh months + current after close
 
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
@@ -7,12 +11,12 @@ import { db } from "../../firebase";
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
-  deleteDoc,
   query,
   orderBy,
-  writeBatch, // ✅ ADDED
+  writeBatch,
 } from "firebase/firestore";
 
 import RecordsTable from "./RecordsTable.jsx";
@@ -20,10 +24,11 @@ import RecordDetailsPanel from "./RecordDetailsPanel.jsx";
 import AddRecord from "../../components/AddRecords.jsx";
 import injectTableStyles from "./injectTableStyles.jsx";
 
+/** ✅ Month key in PH timezone */
 const monthKeyNow = () => {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 };
 
@@ -35,8 +40,9 @@ export default function Records({ refresh, setRefresh }) {
   const [mode, setMode] = useState("current"); // current | archive
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [closing, setClosing] = useState(false);
 
-  // ✅ keep Render API only for PDF opening
+  // ✅ keep API only for PDF opening
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => injectTableStyles(), []);
@@ -59,6 +65,7 @@ export default function Records({ refresh, setRefresh }) {
   // =========================
 
   const fetchCurrent = async () => {
+    // NOTE: requires records to have createdAt (serverTimestamp or ISO string)
     const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
     const snap = await getDocs(qy);
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -66,10 +73,10 @@ export default function Records({ refresh, setRefresh }) {
   };
 
   const fetchMonths = async () => {
-    // expects archives/{month} docs with field { month }
+    // expects archives/{month} doc with field { month }
     const qy = query(collection(db, "archives"), orderBy("month", "desc"));
     const snap = await getDocs(qy);
-    setMonths(snap.docs.map((d) => d.id)); // month doc id = YYYY-MM
+    setMonths(snap.docs.map((d) => d.id)); // doc id = YYYY-MM
   };
 
   const fetchArchiveMonth = async (m) => {
@@ -87,6 +94,10 @@ export default function Records({ refresh, setRefresh }) {
     fetchMonths().catch(() => setMonths([]));
   }, []);
 
+  // =========================
+  // FILTER
+  // =========================
+
   const filtered = useMemo(() => {
     const key = search.toLowerCase().trim();
     return (records || []).filter((r) => {
@@ -101,6 +112,10 @@ export default function Records({ refresh, setRefresh }) {
     });
   }, [records, search]);
 
+  // =========================
+  // EXPORT
+  // =========================
+
   const exportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filtered);
     const workbook = XLSX.utils.book_new();
@@ -109,51 +124,90 @@ export default function Records({ refresh, setRefresh }) {
   };
 
   // =========================
-  // CLOSE MONTH (ARCHIVE) ✅ FIXED (writeBatch)
+  // CLOSE MONTH (ARCHIVE) ✅
   // =========================
-const closeMonth = async () => {
-  try {
-    if (!window.confirm("Close month and archive records?")) return;
 
-    const month = monthKeyNow();
-    const currentSnap = await getDocs(collection(db, "records"));
+  const closeMonth = async () => {
+    try {
+      if (closing) return;
+      if (!window.confirm("Close month and archive ALL current records?")) return;
 
-    if (currentSnap.empty) return alert("No records to archive.");
+      setClosing(true);
 
-    await setDoc(doc(db, "archives", month), {
-      month,
-      closedAt: new Date().toISOString(),
-    }, { merge: true });
+      const month = monthKeyNow();
+      const monthDocRef = doc(db, "archives", month);
 
-    const docsArr = currentSnap.docs;
-    let i = 0;
+      // ✅ Prevent double-close
+      const monthDoc = await getDoc(monthDocRef);
+      if (monthDoc.exists() && monthDoc.data()?.closedAt) {
+        alert(`Month ${month} is already closed.`);
+        setClosing(false);
+        return;
+      }
 
-    while (i < docsArr.length) {
-      const batch = writeBatch(db);
-      const slice = docsArr.slice(i, i + 200);
+      // ✅ Read current records
+      const currentSnap = await getDocs(collection(db, "records"));
+      if (currentSnap.empty) {
+        alert("No records to archive.");
+        setClosing(false);
+        return;
+      }
 
-      slice.forEach((d) => {
-        const data = d.data();
-        batch.set(doc(db, "archives", month, "records", d.id), {
-          ...data,
-          archivedAt: new Date().toISOString(),
+      // ✅ Create/merge month header doc
+      await setDoc(
+        monthDocRef,
+        { month, closedAt: new Date().toISOString() },
+        { merge: true }
+      );
+
+      const docsArr = currentSnap.docs;
+      let i = 0;
+
+      // ✅ Firestore batch limit: 500 writes max
+      // Each record = 2 writes (set + delete)
+      // So 200 records => 400 writes safe.
+      while (i < docsArr.length) {
+        const batch = writeBatch(db);
+        const slice = docsArr.slice(i, i + 200);
+
+        slice.forEach((d) => {
+          const data = d.data();
+          // write to archives subcollection
+          batch.set(doc(db, "archives", month, "records", d.id), {
+            ...data,
+            archivedAt: new Date().toISOString(),
+          });
+          // delete from current
+          batch.delete(doc(db, "records", d.id));
         });
-        batch.delete(doc(db, "records", d.id));
-      });
 
-      await batch.commit();
-      i += 200;
+        await batch.commit();
+        i += 200;
+      }
+
+      // ✅ Reset UI to current after closing
+      setMode("current");
+      setSelectedMonth("");
+      setSelectedRecord(null);
+      setSearch("");
+
+      alert(`✅ Archived ${docsArr.length} records for ${month}`);
+
+      await fetchMonths();
+      await fetchCurrent();
+    } catch (e) {
+      console.error("Close Month error:", e);
+      alert(
+        "❌ Close Month failed.\n\nPossible causes:\n- Firestore rules not allowing write/delete\n- Records missing required permissions\n- createdAt/orderBy mismatch\n\nCheck console for details."
+      );
+    } finally {
+      setClosing(false);
     }
+  };
 
-    alert(`Archived ${docsArr.length} records for ${month}`);
-    await fetchMonths();
-    await fetchCurrent();
-  } catch (e) {
-    console.error(e);
-    alert("❌ Close Month failed. Check that PIN login succeeded and rules are published.");
-  }
-};
-
+  // =========================
+  // TABLE SELECT + RENEW
+  // =========================
 
   const onSelectRow = (record) => {
     if (!record) return;
@@ -277,7 +331,7 @@ const closeMonth = async () => {
 
   const btnGold = { ...btn, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
   const btnGreen = { ...btn, border: `1px solid ${C.green}`, background: "#f0fdf4", color: "#166534" };
-  const btnRed = { ...btn, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
+  const btnRed = { ...btn, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff", opacity: closing ? 0.7 : 1 };
 
   const content = {
     flex: 1,
@@ -361,7 +415,13 @@ const closeMonth = async () => {
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button style={btnGold} onClick={exportExcel}>Export Excel</button>
-                <button style={btnRed} onClick={closeMonth}>Close Month</button>
+
+                {/* ✅ only close month when in current mode */}
+                {mode === "current" && (
+                  <button style={btnRed} onClick={closeMonth} disabled={closing}>
+                    {closing ? "Closing..." : "Close Month"}
+                  </button>
+                )}
               </div>
 
               <div style={{ width: "100%", display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
