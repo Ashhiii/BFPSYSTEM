@@ -1,16 +1,6 @@
-import React, { useMemo } from "react";
+import React from "react";
 
-export default function RenewedTable({ records = [], onRowClick, apiBase }) {
-  const API = useMemo(
-    () => (apiBase || import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, ""),
-    [apiBase]
-  );
-
-  const open = (url, e) => {
-    e?.stopPropagation?.();
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
+export default function RenewedTable({ records = [], onRowClick }) {
   const clamp = {
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -21,7 +11,9 @@ export default function RenewedTable({ records = [], onRowClick, apiBase }) {
   const C = {
     primary: "#b91c1c",
     primaryDark: "#7f1d1d",
+    gold: "#f59e0b",
     softBg: "#fef2f2",
+    bg: "#ffffff",
     border: "#e5e7eb",
     text: "#111827",
     muted: "#6b7280",
@@ -82,7 +74,6 @@ export default function RenewedTable({ records = [], onRowClick, apiBase }) {
     },
     btnOwner: { border: `1px solid ${C.ownerBorder}`, background: C.ownerBg, color: "#9a3412" },
     btnBfp: { border: `1px solid ${C.bfpBorder}`, background: C.bfpBg, color: C.primaryDark },
-    btnDisabled: { opacity: 0.55, cursor: "not-allowed" },
     empty: { textAlign: "center", padding: 22, color: C.muted, background: "#fff", fontWeight: 800 },
   };
 
@@ -103,47 +94,53 @@ export default function RenewedTable({ records = [], onRowClick, apiBase }) {
         <tbody>
           {records.length === 0 ? (
             <tr>
-              <td colSpan={6} style={S.empty}>No renewed records found</td>
+              <td colSpan={6} style={S.empty}>
+                No renewed records found
+              </td>
             </tr>
           ) : (
-            records.map((r, i) => {
-              const id = r?.id;
-              const disabled = !id;
+            records.map((r, i) => (
+              <tr
+                key={r.id || i}
+                style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
+                }
+                onClick={() => onRowClick?.(r)}
+              >
+                <td style={S.td}>
+                  <div style={clamp}>{r.fsicAppNo || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.ownerName || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.establishmentName || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.businessAddress || "-"}</div>
+                </td>
+                <td style={S.td}>
+                  <div style={clamp}>{r.dateInspected || "-"}</div>
+                </td>
 
-              return (
-                <tr
-                  key={id || i}
-                  style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
-                  onClick={() => onRowClick?.(r)}
-                >
-                  <td style={S.td}><div style={clamp}>{r.fsicAppNo || "-"}</div></td>
-                  <td style={S.td}><div style={clamp}>{r.ownerName || "-"}</div></td>
-                  <td style={S.td}><div style={clamp}>{r.establishmentName || "-"}</div></td>
-                  <td style={S.td}><div style={clamp}>{r.businessAddress || "-"}</div></td>
-                  <td style={S.td}><div style={clamp}>{r.dateInspected || "-"}</div></td>
-
-                  <td style={S.actionsTd}>
-                    <button
-                      style={{ ...S.btn, ...S.btnOwner, ...(disabled ? S.btnDisabled : {}) }}
-                      disabled={disabled}
-                      onClick={(e) => !disabled && open(`${API}/renewed/${id}/certificate/owner/pdf`, e)}
-                    >
-                      Owner PDF
-                    </button>
-
-                    <button
-                      style={{ ...S.btn, ...S.btnBfp, ...(disabled ? S.btnDisabled : {}) }}
-                      disabled={disabled}
-                      onClick={(e) => !disabled && open(`${API}/renewed/${id}/certificate/bfp/pdf`, e)}
-                    >
-                      BFP PDF
-                    </button>
-                  </td>
-                </tr>
-              );
-            })
+                <td style={S.actionsTd}>
+                  <button
+                    style={{ ...S.btn, ...S.btnOwner }}
+                      onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
+                  >
+                    Owner PDF
+                  </button>
+                  <button
+                    style={{ ...S.btn, ...S.btnBfp }}
+                      onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
+                  >
+                    BFP PDF
+                  </button>
+                </td>
+              </tr>
+            ))
           )}
         </tbody>
       </table>

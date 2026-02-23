@@ -1,5 +1,4 @@
-// DocumentsTable.jsx (UPDATED API BASE ONLY)
-// ✅ now uses VITE_API_URL like your other tables
+// DocumentsTable.jsx (FULL) — shows records as documents + PDF buttons
 
 import React from "react";
 
@@ -25,11 +24,11 @@ const C = {
 };
 
 export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
-  const API = (apiBase || import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
   const open = (url, e) => {
     e?.stopPropagation?.();
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(url, "_blank");
   };
 
   const clamp2 = {
@@ -106,14 +105,16 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
             <th style={{ ...S.th, width: 220 }}>Address</th>
             <th style={{ ...S.th, width: 220 }}>Chief</th>
             <th style={{ ...S.th, width: 220 }}>Marshal</th>
-            <th style={{ ...S.th, width: 260 }}>Generate</th>
+            <th style={{ ...S.th, width: 280 }}>Generate</th>
           </tr>
         </thead>
 
         <tbody>
           {docs.length === 0 ? (
             <tr>
-              <td colSpan={7} style={S.empty}>No documents found</td>
+              <td colSpan={7} style={S.empty}>
+                No records found
+              </td>
             </tr>
           ) : (
             docs.map((d, i) => (
@@ -132,13 +133,17 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 <td style={S.td}><div style={clamp2}>{d.marshalName || "-"}</div></td>
 
                 <td style={S.actionsTd}>
-                  <button style={{ ...S.btn, ...S.btnIO }} onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}>
+                  {/* ✅ Since source is records, use /records/:id/... */}
+                  <button style={{ ...S.btn, ...S.btnIO }} onClick={(e) => open(`${API}/records/${d.id}/io/pdf`, e)}>
                     IO
                   </button>
-                  <button style={{ ...S.btn, ...S.btnReinspect }} onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}>
+                  <button
+                    style={{ ...S.btn, ...S.btnReinspect }}
+                    onClick={(e) => open(`${API}/records/${d.id}/reinspection/pdf`, e)}
+                  >
                     Reinspection
                   </button>
-                  <button style={{ ...S.btn, ...S.btnNFSI }} onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}>
+                  <button style={{ ...S.btn, ...S.btnNFSI }} onClick={(e) => open(`${API}/records/${d.id}/nfsi/pdf`, e)}>
                     NFSI
                   </button>
                 </td>
