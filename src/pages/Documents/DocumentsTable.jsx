@@ -1,3 +1,6 @@
+// DocumentsTable.jsx (UPDATED API BASE ONLY)
+// ✅ now uses VITE_API_URL like your other tables
+
 import React from "react";
 
 const C = {
@@ -22,11 +25,11 @@ const C = {
 };
 
 export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
-  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
+  const API = (apiBase || import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const open = (url, e) => {
     e?.stopPropagation?.();
-    window.open(url, "_blank");
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const clamp2 = {
@@ -118,9 +121,7 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 key={d.id || i}
                 style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
-                }
+                onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
                 onClick={() => onRowClick?.(d)}
               >
                 <td style={S.td}><div style={clamp2}>{d.fsicAppNo || "-"}</div></td>
@@ -131,22 +132,13 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 <td style={S.td}><div style={clamp2}>{d.marshalName || "-"}</div></td>
 
                 <td style={S.actionsTd}>
-                  <button
-                    style={{ ...S.btn, ...S.btnIO }}
-onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}
-                  >
+                  <button style={{ ...S.btn, ...S.btnIO }} onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}>
                     IO
                   </button>
-                  <button
-                    style={{ ...S.btn, ...S.btnReinspect }}
-onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}
-                  >
+                  <button style={{ ...S.btn, ...S.btnReinspect }} onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}>
                     Reinspection
                   </button>
-                  <button
-                    style={{ ...S.btn, ...S.btnNFSI }}
-onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}
-                  >
+                  <button style={{ ...S.btn, ...S.btnNFSI }} onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}>
                     NFSI
                   </button>
                 </td>
