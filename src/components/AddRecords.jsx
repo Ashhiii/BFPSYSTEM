@@ -1,7 +1,9 @@
+// ✅ AddRecord.jsx (FULL) — updated to use the same glass modal style
 import React, { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 
+import TopRightToast from "../components/TopRightToast"; // adjust path
 /**
  * ✅ Format "YYYY-MM-DD" => "January 2, 2026"
  */
@@ -147,6 +149,9 @@ export default function AddRecord({ setRefresh }) {
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
 
+  // ✅ success modal
+  const [toastOpen, setToastOpen] = useState(false);
+
   const requiredKeys = useMemo(
     () => FIELDS.filter((f) => f.required).map((f) => f.key),
     []
@@ -290,20 +295,21 @@ export default function AddRecord({ setRefresh }) {
   const submit = async () => {
     if (!form.fsicAppNo?.trim() || !form.ownerName?.trim()) {
       setTouched((p) => ({ ...p, fsicAppNo: true, ownerName: true }));
-      return alert("Required: FSIC App No and Owner");
+      return;
     }
 
     setSaving(true);
     try {
       const payload = buildPayload();
 
-      // ✅ SAVE TO FIRESTORE
-      await addDoc(collection(db, "records"), payload);
+await addDoc(collection(db, "records"), payload);
 
-      alert("Record added!");
-      setForm(INITIAL_FORM);
-      setTouched({});
-      setRefresh?.((p) => !p);
+// show toast
+setToastOpen(true);
+
+setForm(INITIAL_FORM);
+setTouched({});
+setRefresh?.((p) => !p);
     } catch (e) {
       console.error(e);
       alert("Firestore error. Check rules / permissions.");
@@ -312,73 +318,99 @@ export default function AddRecord({ setRefresh }) {
     }
   };
 
+  const C = useMemo(
+    () => ({
+      primary: "#b91c1c",
+      primaryDark: "#7f1d1d",
+      border: "rgba(226,232,240,1)",
+      muted: "#64748b",
+    }),
+    []
+  );
+
   return (
-    <div style={styles.wrap}>
-      <div style={styles.headerRow}>
-        <div>
-          <div style={styles.title}>Add Record</div>
-          <div style={styles.sub}>Fill up the fields then save.</div>
-        </div>
+    <>
+      <div style={styles.wrap}>
+        <div style={styles.headerRow}>
+          <div>
+            <div style={styles.title}>Add Record</div>
+            <div style={styles.sub}>Fill up the fields then save.</div>
+          </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            style={styles.btn}
-            onClick={() => {
-              setForm(INITIAL_FORM);
-              setTouched({});
-            }}
-            disabled={saving}
-          >
-            Clear
-          </button>
-
-          <button style={styles.primary} onClick={submit} disabled={saving}>
-            {saving ? "Saving..." : "Save Record"}
-          </button>
-        </div>
-      </div>
-
-      <div style={styles.grid}>
-        {FIELDS.map((f) => {
-          const showError = f.required && touched[f.key] && missingRequired[f.key];
-          const isValidity = f.key === "fsicValidity";
-
-          return (
-            <div
-              key={f.key}
-              style={{
-                ...styles.card,
-                gridColumn: f.span === 2 ? "1 / -1" : "auto",
-                border: showError ? "1px solid #fecdd3" : styles.card.border,
-                opacity: isValidity ? 0.98 : 1,
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              style={styles.btn}
+              onClick={() => {
+                setForm(INITIAL_FORM);
+                setTouched({});
               }}
+              disabled={saving}
             >
-              <div style={styles.cardTop}>
-                <div style={styles.cardLabel}>{f.label}</div>
-                {f.required && <div style={styles.reqPill}>Required</div>}
-              </div>
+              Clear
+            </button>
 
-              <input
-                name={f.key}
-                value={form[f.key] ?? ""}
-                onChange={onChange}
-                onBlur={() => onBlur(f.key)}
-                type={f.type || "text"}
-                placeholder={f.placeholder || ""}
-                autoComplete="off"
-                readOnly={isValidity}
+            <button style={styles.primary} onClick={submit} disabled={saving}>
+              {saving ? "Saving..." : "Save Record"}
+            </button>
+          </div>
+        </div>
+
+        <div style={styles.grid}>
+          {FIELDS.map((f) => {
+            const showError = f.required && touched[f.key] && missingRequired[f.key];
+            const isValidity = f.key === "fsicValidity";
+
+            return (
+              <div
+                key={f.key}
                 style={{
-                  ...styles.input,
-                  border: showError ? "1px solid #dc2626" : styles.input.border,
-                  textTransform: f.type === "date" ? "none" : "uppercase",
-                  background: isValidity ? "#f8fafc" : styles.input.background,
-                  cursor: isValidity ? "not-allowed" : "text",
+                  ...styles.card,
+                  gridColumn: f.span === 2 ? "1 / -1" : "auto",
+                  border: showError ? "1px solid #fecdd3" : styles.card.border,
+                  opacity: isValidity ? 0.98 : 1,
                 }}
-              />
-            </div>
-          );
-        })}
+              >
+                <div style={styles.cardTop}>
+                  <div style={styles.cardLabel}>{f.label}</div>
+                  {f.required && <div style={styles.reqPill}>Required</div>}
+                </div>
+
+                <input
+                  name={f.key}
+                  value={form[f.key] ?? ""}
+                  onChange={onChange}
+                  onBlur={() => onBlur(f.key)}
+                  type={f.type || "text"}
+                  placeholder={f.placeholder || ""}
+                  autoComplete="off"
+                  readOnly={isValidity}
+                  style={{
+                    ...styles.input,
+                    border: showError ? "1px solid #dc2626" : styles.input.border,
+                    textTransform: f.type === "date" ? "none" : "uppercase",
+                    background: isValidity ? "#f8fafc" : styles.input.background,
+                    cursor: isValidity ? "not-allowed" : "text",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      {/* ✅ Success Modal (glass style same sa sample) */}
+      <TopRightToast
+        C={{
+          border: "rgba(226,232,240,1)",
+          text: "#0f172a",
+          muted: "#64748b",
+        }}
+        open={toastOpen}
+        title="Added to Records"
+        message="Record saved successfully."
+        autoCloseMs={1600}
+        onClose={() => setToastOpen(false)}
+      />
+    </>
   );
 }

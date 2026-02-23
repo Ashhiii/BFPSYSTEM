@@ -87,7 +87,7 @@ export default function RenewedTable({ records = [], onRowClick }) {
             <th style={{ ...S.th, width: 180 }}>Establishment</th>
             <th style={{ ...S.th, width: 200 }}>Address</th>
             <th style={{ ...S.th, width: 180 }}>Date Inspected</th>
-            <th style={{ ...S.th, width: 280 }}>Actions</th>
+            <th style={{ ...S.th, width: 280 }}>Generate</th>
           </tr>
         </thead>
 
@@ -125,11 +125,19 @@ export default function RenewedTable({ records = [], onRowClick }) {
                   <div style={clamp}>{r.dateInspected || "-"}</div>
                 </td>
 
-                {/* OPTIONAL: PDF buttons (needs Cloud Functions endpoints) */}
                 <td style={S.actionsTd}>
-                  <span style={{ color: C.muted, fontWeight: 800, fontSize: 12 }}>
-                    Select row → view details
-                  </span>
+                  <button
+                    style={{ ...S.btn, ...S.btnOwner }}
+                      onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
+                  >
+                    Owner PDF
+                  </button>
+                  <button
+                    style={{ ...S.btn, ...S.btnBfp }}
+                      onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
+                  >
+                    BFP PDF
+                  </button>
                 </td>
               </tr>
             ))

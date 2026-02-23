@@ -1,105 +1,290 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
-  HiOutlineUpload,
-  HiOutlineDocumentText,
   HiOutlineCloudUpload,
-  HiOutlineX,
+  HiOutlineDocumentText,
+  HiOutlineInformationCircle,
+  HiOutlineTrash,
   HiOutlineCheckCircle,
   HiOutlineExclamationCircle,
 } from "react-icons/hi";
-
 import * as XLSX from "xlsx";
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-  writeBatch,
-  doc as fsDoc,
-} from "firebase/firestore";
-
+import { collection, writeBatch, serverTimestamp, doc as fsDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
-function UploadBox({ title, sub, onDone, variant = "records" }) {
+export default function ImportExcelFullScreen({ setRefresh, onClose }) {
   const inputRef = useRef(null);
-
   const [file, setFile] = useState(null);
-  const [msg, setMsg] = useState("");
-  const [uploading, setUploading] = useState(false);
   const [drag, setDrag] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const ok = msg.startsWith("✅");
 
-  const okMsg = msg.startsWith("✅");
-
-  const C = useMemo(() => {
-    const base = {
-      bg: "#ffffff",
+  // ✅ YOUR COLOR CODING
+  const C = useMemo(
+    () => ({
+      primary: "#b91c1c",
+      primaryDark: "#7f1d1d",
+      softBg: "#fef2f2",
       border: "#e5e7eb",
-      text: "#0f172a",
-      muted: "#64748b",
-      soft: "#f8fafc",
-      shadow: "0 18px 45px rgba(2,6,23,0.08)",
-      red: "#b91c1c",
-      redDark: "#7f1d1d",
-      gold: "#f59e0b",
-      blue: "#2563eb",
-      green: "#16a34a",
-      rose: "#e11d48",
-    };
+      text: "#111827",
+      muted: "#6b7280",
+      ownerBg: "#fff7ed",
+      ownerBorder: "#fb923c",
+      bfpBg: "#fef2f2",
+      dashed: "#d1d5db",
+      shadow: "0 10px 25px rgba(0,0,0,.06)",
+    }),
+    []
+  );
 
-    if (variant === "documents") return { ...base, accent: base.blue, accentDark: "#1d4ed8" };
-    return { ...base, accent: base.red, accentDark: base.redDark };
-  }, [variant]);
+  const S = useMemo(
+    () => ({
+      page: {
+        width: "100%",
+        height: "80vh", 
+        display: "flex",
+        flexDirection: "column",
+        background: "#fff",
+        overflow: "hidden",
+      },
+
+      body: {
+        flex: 1,
+        padding: 18,
+        display: "grid",
+        placeItems: "center",
+        overflow: "hidden",
+        minHeight: 0,
+        background:
+          "radial-gradient(circle at 15% 10%, rgba(185,28,28,.06), transparent 35%), radial-gradient(circle at 85% 30%, rgba(251,146,60,.10), transparent 40%), #fff",
+      },
+
+      wrap: {
+width: "min(1500px, 96vw)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        minHeight: 0,
+      },
+
+      drop: {
+        width: "100%",
+        height: "calc(100vh - 70px - 36px)", // footer 70 + padding 18*2
+        minHeight: 360,
+        maxHeight: 550,
+        borderRadius: 18,
+        border: `2px dashed ${drag ? C.primary : C.dashed}`,
+        background: drag ? C.softBg : "#fff",
+        boxShadow: C.shadow,
+        display: "grid",
+        placeItems: "center",
+        padding: 0,
+        cursor: "pointer",
+        transition: "0.15s",
+        overflow: "hidden",
+      },
+
+      hero: {
+        textAlign: "center",
+        display: "grid",
+        gap: 8,
+        placeItems: "center",
+        maxWidth: 620,
+      },
+
+      art: {
+        width: 240,
+        height: 132,
+        borderRadius: 18,
+        border: `1px solid ${C.border}`,
+        background:
+          "radial-gradient(circle at 30% 30%, rgba(185,28,28,.18), transparent 55%), radial-gradient(circle at 70% 50%, rgba(251,146,60,.18), transparent 60%), #f8fafc",
+        display: "grid",
+        placeItems: "center",
+        marginBottom: 10,
+      },
+
+      folders: { display: "flex", gap: 12 },
+      folder: (bg, borderColor, textColor) => ({
+        width: 58,
+        height: 46,
+        borderRadius: 12,
+        border: `1px solid ${borderColor}`,
+        background: bg,
+        display: "grid",
+        placeItems: "center",
+        fontWeight: 950,
+        fontSize: 12,
+        color: textColor,
+        boxShadow: "0 10px 18px rgba(2,6,23,0.08)",
+      }),
+
+      main: { fontSize: 16, fontWeight: 950, color: C.text },
+      link: { color: C.primary, cursor: "pointer", textDecoration: "underline" },
+      sub: { fontSize: 12, fontWeight: 800, color: C.muted },
+
+      hint: {
+        marginTop: 10,
+        fontSize: 12,
+        fontWeight: 900,
+        color: C.muted,
+        display: "inline-flex",
+        gap: 8,
+        alignItems: "center",
+      },
+
+      fileCard: {
+        marginTop: 12,
+        width: "min(720px, 100%)",
+        borderRadius: 14,
+        border: `1px solid ${C.border}`,
+        padding: 12,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        background: "#fff",
+        boxShadow: "0 12px 24px rgba(0,0,0,.05)",
+      },
+
+      fileLeft: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 },
+      fIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 12,
+        border: `1px solid ${C.border}`,
+        background: C.bfpBg,
+        display: "grid",
+        placeItems: "center",
+        color: C.primaryDark,
+      },
+
+      fName: {
+        fontWeight: 950,
+        fontSize: 13,
+        color: C.text,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        maxWidth: 520,
+      },
+      fMeta: { marginTop: 3, fontWeight: 800, color: C.muted, fontSize: 12 },
+
+      remove: {
+        padding: "8px 10px",
+        borderRadius: 12,
+        border: `1px solid ${C.ownerBorder}`,
+        background: C.ownerBg,
+        cursor: "pointer",
+        fontWeight: 950,
+        display: "inline-flex",
+        gap: 8,
+        alignItems: "center",
+        color: "#9a3412",
+      },
+
+      msg: {
+        marginTop: 12,
+        width: "min(720px, 100%)",
+        padding: "10px 12px",
+        borderRadius: 14,
+        border: `1px solid ${ok ? "#86efac" : "#fecdd3"}`,
+        background: ok ? "#f0fdf4" : "#fff1f2",
+        color: ok ? "#166534" : "#9f1239",
+        fontWeight: 950,
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+      },
+
+      barWrap: {
+        marginTop: 10,
+        width: "min(720px, 100%)",
+        height: 8,
+        borderRadius: 999,
+        background: "#e5e7eb",
+        overflow: "hidden",
+      },
+      bar: {
+        height: "100%",
+        width: uploading ? "72%" : ok ? "100%" : "0%",
+        transition: "0.35s",
+        background: ok
+          ? "linear-gradient(90deg,#16a34a,#22c55e)"
+          : `linear-gradient(90deg, ${C.primary}, ${C.primaryDark})`,
+      },
+
+      footer: {
+        height: 80,
+        flexShrink: 0,
+        borderTop: `1px solid ${C.border}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 18px",
+        gap: 12,
+        background: "#fff",
+      },
+
+      fInfo: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        color: C.muted,
+        fontWeight: 800,
+        fontSize: 12,
+      },
+
+      actions: { display: "flex", gap: 10, alignItems: "center" },
+
+      btn: {
+        padding: "10px 16px",
+        borderRadius: 12,
+        border: `1px solid ${C.border}`,
+        background: "#fff",
+        cursor: "pointer",
+        fontWeight: 950,
+        minWidth: 110,
+      },
+
+      primary: {
+        padding: "10px 16px",
+        borderRadius: 12,
+        border: `1px solid ${C.primary}`,
+        background: `linear-gradient(180deg, ${C.primary}, ${C.primaryDark})`,
+        color: "#fff",
+        cursor: uploading || !file ? "not-allowed" : "pointer",
+        opacity: uploading || !file ? 0.65 : 1,
+        fontWeight: 980,
+        minWidth: 110,
+        boxShadow: "0 12px 24px rgba(185,28,28,0.18)",
+      },
+    }),
+    [C, drag, uploading, file, ok]
+  );
 
   const isExcel = (f) => {
-    const name = String(f?.name || "").toLowerCase();
-    return name.endsWith(".xlsx") || name.endsWith(".xls");
+    const n = String(f?.name || "").toLowerCase();
+    return n.endsWith(".xlsx") || n.endsWith(".xls");
   };
 
-  const setPickedFile = (f) => {
+  const pick = (f) => {
     setMsg("");
     if (!f) return;
-
     if (!isExcel(f)) {
       setFile(null);
       setMsg("❌ Please select an Excel file (.xlsx or .xls).");
       return;
     }
-
     setFile(f);
-    setMsg("");
   };
 
-  const pick = (e) => {
-    const f = e.target.files?.[0];
-    setPickedFile(f);
-  };
-
-  const clearFile = () => {
+  const clear = () => {
     setFile(null);
     setMsg("");
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const onDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDrag(false);
-    const f = e.dataTransfer?.files?.[0];
-    setPickedFile(f);
-  };
-
-  const onDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!drag) setDrag(true);
-  };
-
-  const onDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDrag(false);
-  };
-
-  // ✅ Map excel row headers -> firestore fields
   const normalizeRow = (r) => {
     const get = (...keys) => {
       for (const k of keys) {
@@ -108,7 +293,6 @@ function UploadBox({ title, sub, onDone, variant = "records" }) {
       }
       return "";
     };
-
     return {
       fsicAppNo: get("fsicAppNo", "FSIC App No", "FSIC"),
       ownerName: get("ownerName", "Owner"),
@@ -125,13 +309,6 @@ function UploadBox({ title, sub, onDone, variant = "records" }) {
       teamLeader: get("teamLeader", "Team Leader"),
       chiefName: get("chiefName", "Chief"),
       marshalName: get("marshalName", "Marshal"),
-      occupancyType: get("occupancyType", "Occupancy"),
-      buildingDesc: get("buildingDesc", "Building Desc"),
-      floorArea: get("floorArea", "Floor Area"),
-      buildingHeight: get("buildingHeight", "Height"),
-      storeyCount: get("storeyCount", "Storey"),
-      highRise: get("highRise", "High Rise"),
-      fsmr: get("fsmr", "FSMR"),
       remarks: get("remarks", "Remarks"),
       orNumber: get("orNumber", "OR No"),
       orAmount: get("orAmount", "OR Amount"),
@@ -141,52 +318,28 @@ function UploadBox({ title, sub, onDone, variant = "records" }) {
 
   const upload = async () => {
     if (!file) return setMsg("❌ Choose an Excel file first.");
-
     setUploading(true);
     setMsg("");
-
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const sheetName = wb.SheetNames?.[0];
-      if (!sheetName) throw new Error("No sheet found in Excel.");
+      const name = wb.SheetNames?.[0];
+      if (!name) throw new Error("No sheet found in Excel.");
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: "" });
+      if (!rows.length) throw new Error("Empty sheet (no rows).");
 
-      const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-
-      if (!Array.isArray(rows) || rows.length === 0) {
-        setMsg("❌ Empty sheet (no rows).");
-        setUploading(false);
-        return;
-      }
-
-      const colName = variant === "documents" ? "documents" : "records";
-
-      let imported = 0;
-      let skipped = 0;
-
-      // ✅ batch for speed (max 500 writes per batch)
-      let batch = writeBatch(db);
-      let ops = 0;
+      let imported = 0, skipped = 0;
+      let batch = writeBatch(db), ops = 0;
 
       const commitIfNeeded = async () => {
-        if (ops >= 450) {
-          await batch.commit();
-          batch = writeBatch(db);
-          ops = 0;
-        }
+        if (ops >= 450) { await batch.commit(); batch = writeBatch(db); ops = 0; }
       };
 
       for (const r of rows) {
         const data = normalizeRow(r);
+        if (!data.fsicAppNo || !data.ownerName || !data.establishmentName) { skipped++; continue; }
 
-        // ✅ required fields
-        if (!data.fsicAppNo || !data.ownerName || !data.establishmentName) {
-          skipped++;
-          continue;
-        }
-
-        const ref = fsDoc(collection(db, colName)); // auto id
+        const ref = fsDoc(collection(db, "records"));
         batch.set(ref, {
           ...data,
           createdAt: serverTimestamp(),
@@ -194,323 +347,114 @@ function UploadBox({ title, sub, onDone, variant = "records" }) {
           importSource: "excel",
         });
 
-        imported++;
-        ops++;
-        await commitIfNeeded();
+        imported++; ops++; await commitIfNeeded();
       }
+      if (ops) await batch.commit();
 
-      if (ops > 0) await batch.commit();
-
-      setMsg(`✅ Imported: ${imported} row(s). Skipped: ${skipped}`);
-      setFile(null);
-      if (inputRef.current) inputRef.current.value = "";
-      onDone?.();
+      setMsg(`✅ Imported: ${imported} row(s). Skipped: ${skipped}.`);
+      setRefresh?.((p) => !p);
     } catch (e) {
-      setMsg(`❌ ${e.message || "Import failed"}`);
+      console.error(e);
+      setMsg(`❌ ${e?.message || "Import failed"}`);
     } finally {
       setUploading(false);
     }
   };
 
-  const S = {
-    wrap: {
-      flex: 1,
-      minWidth: 320,
-      borderRadius: 20,
-      border: `1px solid ${C.border}`,
-      background: C.bg,
-      boxShadow: C.shadow,
-      overflow: "hidden",
-      transform: drag ? "translateY(-2px)" : "translateY(0px)",
-      transition: "transform .18s ease, box-shadow .18s ease",
-    },
-
-    head: {
-      padding: "14px 14px 12px",
-      background:
-        "linear-gradient(135deg, rgba(185,28,28,.14), rgba(245,158,11,.10), rgba(37,99,235,.06))",
-      borderBottom: `1px solid ${C.border}`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-
-    badge: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "8px 10px",
-      borderRadius: 999,
-      border: `1px solid rgba(0,0,0,.08)`,
-      background: "rgba(255,255,255,.75)",
-      backdropFilter: "blur(10px)",
-      WebkitBackdropFilter: "blur(10px)",
-      fontWeight: 950,
-      color: C.text,
-      letterSpacing: 0.2,
-      textTransform: "uppercase",
-      fontSize: 12,
-    },
-
-    title: {
-      fontSize: 15,
-      fontWeight: 950,
-      color: C.text,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-    },
-    sub: { fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 4 },
-
-    body: { padding: 14 },
-
-    drop: {
-      borderRadius: 18,
-      border: drag ? `2px dashed ${C.accent}` : "2px dashed #cbd5e1",
-      background: drag ? "rgba(37,99,235,.06)" : C.soft,
-      padding: 16,
-      display: "grid",
-      gap: 12,
-      transition: "border .18s ease, background .18s ease",
-    },
-
-    dropTop: { display: "flex", alignItems: "center", gap: 12 },
-
-    iconCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      display: "grid",
-      placeItems: "center",
-      background: `linear-gradient(180deg, ${C.accent}, ${C.accentDark})`,
-      boxShadow: "0 14px 28px rgba(2,6,23,0.20)",
-      color: "#fff",
-      flexShrink: 0,
-    },
-
-    dropText: { display: "grid", gap: 2 },
-    dropMain: { fontWeight: 950, color: C.text, fontSize: 13 },
-    dropHint: { fontWeight: 800, color: C.muted, fontSize: 12 },
-
-    actions: {
-      display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      alignItems: "center",
-      marginTop: 2,
-    },
-
-    pickBtn: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "10px 12px",
-      borderRadius: 14,
-      border: `1px solid ${C.border}`,
-      background: "#fff",
-      cursor: "pointer",
-      fontWeight: 950,
-      textTransform: "uppercase",
-      transition: "transform .12s ease, box-shadow .12s ease",
-      boxShadow: "0 10px 18px rgba(2,6,23,0.06)",
-    },
-
-    primary: {
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      padding: "10px 12px",
-      borderRadius: 14,
-      border: `1px solid ${C.accent}`,
-      background: `linear-gradient(180deg, ${C.accent}, ${C.accentDark})`,
-      color: "#fff",
-      cursor: uploading || !file ? "not-allowed" : "pointer",
-      fontWeight: 950,
-      textTransform: "uppercase",
-      opacity: uploading || !file ? 0.65 : 1,
-      transition: "transform .12s ease, opacity .12s ease",
-      boxShadow: `0 16px 34px rgba(2,6,23,0.18)`,
-    },
-
-    fileCard: {
-      marginTop: 10,
-      borderRadius: 16,
-      border: `1px solid ${C.border}`,
-      background: "#fff",
-      padding: 12,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 10,
-    },
-
-    fileLeft: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 },
-    fileIcon: {
-      width: 38,
-      height: 38,
-      borderRadius: 12,
-      border: `1px solid ${C.border}`,
-      background: C.soft,
-      display: "grid",
-      placeItems: "center",
-      color: C.text,
-      flexShrink: 0,
-    },
-
-    fileName: {
-      fontWeight: 950,
-      color: C.text,
-      fontSize: 13,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      maxWidth: 260,
-    },
-    fileMeta: { fontWeight: 800, color: C.muted, fontSize: 12, marginTop: 2 },
-
-    xBtn: {
-      width: 34,
-      height: 34,
-      borderRadius: 12,
-      border: `1px solid ${C.border}`,
-      background: "#fff",
-      cursor: "pointer",
-      display: "grid",
-      placeItems: "center",
-      transition: "transform .12s ease",
-    },
-
-    msg: (ok) => ({
-      marginTop: 10,
-      padding: "10px 12px",
-      borderRadius: 14,
-      border: ok ? "1px solid #86efac" : "1px solid #fecdd3",
-      background: ok ? "#f0fdf4" : "#fff1f2",
-      color: ok ? "#166534" : "#9f1239",
-      fontWeight: 900,
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-    }),
-
-    barWrap: {
-      height: 8,
-      background: "rgba(2,6,23,0.08)",
-      borderRadius: 999,
-      overflow: "hidden",
-      marginTop: 10,
-    },
-    bar: {
-      height: "100%",
-      width: uploading ? "78%" : okMsg ? "100%" : "0%",
-      transition: "width .35s ease",
-      background: okMsg
-        ? "linear-gradient(90deg, #16a34a, #22c55e)"
-        : `linear-gradient(90deg, ${C.accent}, ${C.gold})`,
-    },
-  };
-
   return (
-    <div style={S.wrap} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={onDragLeave}>
-      <div style={S.head}>
-        <div>
-          <div style={S.title}>{title}</div>
-          <div style={S.sub}>{sub}</div>
-        </div>
-
-        <div style={S.badge} title="Excel Import">
-          <HiOutlineDocumentText size={18} />
-          Excel
-        </div>
-      </div>
-
+    <div style={S.page}>
       <div style={S.body}>
-        <div style={S.drop}>
-          <div style={S.dropTop}>
-            <div style={S.iconCircle}>
-              <HiOutlineCloudUpload size={22} />
-            </div>
+        <div style={S.wrap}>
+          <div
+            style={S.drop}
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={(e) => { e.preventDefault(); setDrag(false); }}
+            onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer?.files?.[0]); }}
+          >
+            <div style={S.hero}>
+              <div style={S.art}>
+                <div style={S.folders}>
+                  <div style={S.folder(C.bfpBg, C.primary, C.primaryDark)}>FILE</div>
+                  <div style={S.folder(C.ownerBg, C.ownerBorder, "#9a3412")}>XLSX</div>
+                </div>
+              </div>
 
-            <div style={S.dropText}>
-              <div style={S.dropMain}>Drag & drop Excel here, or choose a file</div>
-              <div style={S.dropHint}>Only .xlsx / .xls accepted</div>
-            </div>
-          </div>
+              <div style={S.main}>
+                Drag & Drop or{" "}
+                <span style={S.link} onClick={() => inputRef.current?.click()}>
+                  Select
+                </span>{" "}
+                files to upload
+              </div>
 
-          <div style={S.actions}>
-            <label style={S.pickBtn}>
-              <HiOutlineDocumentText size={18} />
-              Choose Excel
+              <div style={S.sub}>Supported formats: .xlsx, .xls (Excel)</div>
+
+              <div style={S.hint}>
+                <HiOutlineCloudUpload size={18} /> Import will go to Firestore: <b>records</b>
+              </div>
+
               <input
                 ref={inputRef}
                 type="file"
                 accept=".xlsx,.xls"
-                onChange={pick}
+                onChange={(e) => pick(e.target.files?.[0])}
                 style={{ display: "none" }}
               />
-            </label>
 
-            <button style={S.primary} onClick={upload} disabled={uploading || !file}>
-              <HiOutlineUpload size={18} />
-              {uploading ? "Importing..." : "Import to Firestore"}
-            </button>
-          </div>
+              {file ? (
+                <>
+                  <div style={S.fileCard}>
+                    <div style={S.fileLeft}>
+                      <div style={S.fIcon}><HiOutlineDocumentText size={22} /></div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={S.fName}>{file.name}</div>
+                        <div style={S.fMeta}>
+                          Size: {(file.size / 1024 / 1024).toFixed(2)} MB • Ready
+                        </div>
+                      </div>
+                    </div>
 
-          {file ? (
-            <div style={S.fileCard}>
-              <div style={S.fileLeft}>
-                <div style={S.fileIcon}>
-                  <HiOutlineDocumentText size={20} />
+                    <button style={S.remove} onClick={clear} disabled={uploading}>
+                      <HiOutlineTrash size={18} /> Remove
+                    </button>
+                  </div>
+
+                  {msg ? (
+                    <div style={S.msg}>
+                      {ok ? <HiOutlineCheckCircle size={18} /> : <HiOutlineExclamationCircle size={18} />}
+                      <span>{msg}</span>
+                    </div>
+                  ) : null}
+
+                  <div style={S.barWrap}><div style={S.bar} /></div>
+                </>
+              ) : msg ? (
+                <div style={S.msg}>
+                  <HiOutlineExclamationCircle size={18} />
+                  <span>{msg}</span>
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={S.fileName}>{file.name}</div>
-                  <div style={S.fileMeta}>Size: {(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                </div>
-              </div>
-
-              <button style={S.xBtn} onClick={clearFile} title="Remove selected file">
-                <HiOutlineX size={18} />
-              </button>
+              ) : null}
             </div>
-          ) : null}
-
-          {msg && (
-            <div style={S.msg(okMsg)}>
-              {okMsg ? (
-                <HiOutlineCheckCircle size={18} />
-              ) : (
-                <HiOutlineExclamationCircle size={18} />
-              )}
-              <span>{msg}</span>
-            </div>
-          )}
-
-          <div style={S.barWrap}>
-            <div style={S.bar} />
           </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-export default function ImportExcel({ setRefresh }) {
-  return (
-    <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-      <UploadBox
-        title="Import to Records"
-        sub="Upload Excel → mo-sulod sa Records"
-        variant="records"
-        onDone={() => setRefresh?.((p) => !p)}
-      />
+      <div style={S.footer}>
+        <div style={S.fInfo}>
+          <HiOutlineInformationCircle size={18} />
+          Duplicate detection depends on your Excel content (FSIC/AppNo).
+        </div>
 
-      <UploadBox
-        title="Import to Documents"
-        sub="Upload Excel → mo-sulod sa Documents"
-        variant="documents"
-        onDone={() => setRefresh?.((p) => !p)}
-      />
+        <div style={S.actions}>
+          <button style={S.btn} onClick={() => { clear(); onClose?.(); }} disabled={uploading}>
+            Cancel
+          </button>
+          <button style={S.primary} onClick={upload} disabled={uploading || !file}>
+            {uploading ? "Importing..." : "Import"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

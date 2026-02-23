@@ -5,13 +5,19 @@ import {
   HiOutlineTrash,
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
-    HiOutlineUpload, // ✅ NEW
+  HiOutlineViewGrid,
 } from "react-icons/hi";
 
 import bfpLogo from "../assets/logo/bfp-logo.png";
-import { sidebarWrap, navBtn, arrowBtn, C } from "./shellStyles";
-import LockButton from "./LockButton"; // ✅ new
+import {
+  sidebarWrapOpen,
+  sidebarWrapClosed,
+  navBtn,
+  arrowBtn,
+  C,
+} from "./shellStyles";
 
+import LockButton from "./LockButton";
 
 export default function Sidebar({
   collapsed,
@@ -20,32 +26,32 @@ export default function Sidebar({
   navigate,
   onLock,
 }) {
+  const wrapStyle = collapsed ? sidebarWrapClosed : sidebarWrapOpen;
   const iconStyle = { fontSize: 20, color: "#fff" };
-  const labelStyle = { display: collapsed ? "none" : "inline" };
 
   return (
-    <aside style={sidebarWrap}>
-      {/* LOGO */}
+    <aside style={wrapStyle}>
+      {/* ================= LOGO ================= */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "10px 12px",
+          padding: collapsed ? 10 : "10px 12px",
           justifyContent: collapsed ? "center" : "flex-start",
           borderBottom: "1px solid rgba(255,255,255,0.12)",
-          marginBottom: 6,
+          marginBottom: 8,
+          width: collapsed ? "auto" : "100%",
         }}
-        title="Bureau of Fire Protection"
       >
         <div
           style={{
-            width: collapsed ? 40 : 46,
-            height: collapsed ? 30 : 46,
+            width: collapsed ? 40 : 48,
+            height: collapsed ? 40 : 48,
             borderRadius: "50%",
             overflow: "hidden",
-            background: "rgba(255,255,255,0.08)",
             border: `2px solid ${C.gold}`,
+            background: "rgba(255,255,255,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -54,13 +60,19 @@ export default function Sidebar({
           <img
             src={bfpLogo}
             alt="BFP Logo"
-            style={{ width: "100%", height: "100%", objectFit: "cover"}}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
           />
         </div>
 
         {!collapsed && (
           <div style={{ lineHeight: 1.1 }}>
-            <div style={{ fontWeight: 950, fontSize: 14 }}>BFP SYSTEM</div>
+            <div style={{ fontWeight: 950, fontSize: 14 }}>
+              BFP SYSTEM
+            </div>
             <div style={{ fontSize: 10, opacity: 0.75 }}>
               Bureau of Fire Protection
             </div>
@@ -68,41 +80,63 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* NAV */}
-      <div style={navBtn(active.records)} onClick={() => navigate("/app/records")}>
+      {/* ================= NAV ================= */}
+      <div
+        style={navBtn(active.dashboard, collapsed)}
+        onClick={() => navigate("/app/dashboard")}
+      >
+        <HiOutlineViewGrid style={iconStyle} />
+        {!collapsed && <span>Dashboard</span>}
+      </div>
+
+      <div
+        style={navBtn(active.records, collapsed)}
+        onClick={() => navigate("/app/records")}
+      >
         <HiOutlineClipboardList style={iconStyle} />
-        <span style={labelStyle}>Records</span>
+        {!collapsed && <span>Records</span>}
       </div>
 
-      <div style={navBtn(active.documents)} onClick={() => navigate("/app/documents")}>
+      <div
+        style={navBtn(active.documents, collapsed)}
+        onClick={() => navigate("/app/documents")}
+      >
         <HiOutlineDocumentText style={iconStyle} />
-        <span style={labelStyle}>Documents</span>
+        {!collapsed && <span>Documents</span>}
       </div>
 
-      <div style={navBtn(active.renewed)} onClick={() => navigate("/app/renewed")}>
+      <div
+        style={navBtn(active.renewed, collapsed)}
+        onClick={() => navigate("/app/renewed")}
+      >
         <HiOutlineRefresh style={iconStyle} />
-        <span style={labelStyle}>Renewed</span>
+        {!collapsed && <span>Renewed</span>}
       </div>
 
-      <div style={navBtn(active.filemgmt)} onClick={() => navigate("/app/filemgmt")}>
+      <div
+        style={navBtn(active.filemgmt, collapsed)}
+        onClick={() => navigate("/app/filemgmt")}
+      >
         <HiOutlineTrash style={iconStyle} />
-        <span style={labelStyle}>Data Deletion</span>
+        {!collapsed && <span>Data Deletion</span>}
       </div>
 
-            <div style={navBtn(active.importexcel)} onClick={() => navigate("/app/import")}>
-  <HiOutlineUpload style={iconStyle} />
-  <span style={labelStyle}>Import Excel</span>
-</div>
-
-      {/* ✅ LOCK BUTTON SEPARATE */}
-      <LockButton collapsed={collapsed} onClick={onLock} />
-
-      {/* COLLAPSE */}
-      <div style={arrowBtn} onClick={() => setCollapsed(!collapsed)}>
-        {collapsed ? <HiOutlineChevronRight /> : <HiOutlineChevronLeft />}
+      {/* ================= LOCK ================= */}
+      <div style={{ marginTop: "auto", paddingBottom: 15 }}>
+        <LockButton collapsed={collapsed} onClick={onLock} />
       </div>
 
-
+      {/* ================= COLLAPSE BUTTON ================= */}
+      <div
+        style={arrowBtn}
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        {collapsed ? (
+          <HiOutlineChevronRight />
+        ) : (
+          <HiOutlineChevronLeft />
+        )}
+      </div>
     </aside>
   );
 }

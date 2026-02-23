@@ -1,3 +1,7 @@
+// DocumentDetailsPanel.jsx (FULL)
+// ✅ edits Chief/Marshal + other doc fields
+// ✅ saves back to Firestore records/{id}
+
 import React, { useEffect, useMemo, useState } from "react";
 import { doc as fsDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -8,12 +12,14 @@ const FIELDS = [
   { key: "establishmentName", label: "Establishment" },
   { key: "businessAddress", label: "Address" },
   { key: "contactNumber", label: "Contact Number" },
+
   { key: "ioDate", label: "IO Date" },
   { key: "ioNumber", label: "IO Number" },
   { key: "nfsiNumber", label: "NFSI Number" },
   { key: "nfsiDate", label: "NFSI Date" },
   { key: "inspectors", label: "Inspectors" },
   { key: "teamLeader", label: "Team Leader" },
+
   { key: "chiefName", label: "Chief" },
   { key: "marshalName", label: "Marshal" },
 ];
@@ -34,22 +40,22 @@ const CAPS_KEYS = new Set([
 
 const DATE_KEYS = new Set(["ioDate", "nfsiDate"]);
 
+const C = {
+  primary: "#b91c1c",
+  primaryDark: "#7f1d1d",
+  gold: "#f59e0b",
+  softBg: "#fef2f2",
+  bg: "#ffffff",
+  border: "#e5e7eb",
+  text: "#111827",
+  muted: "#6b7280",
+  danger: "#dc2626",
+};
+
 export default function DocumentDetailsPanel({ doc, onUpdated }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
-
-  const C = {
-    primary: "#b91c1c",
-    primaryDark: "#7f1d1d",
-    gold: "#f59e0b",
-    softBg: "#fef2f2",
-    bg: "#ffffff",
-    border: "#e5e7eb",
-    text: "#111827",
-    muted: "#6b7280",
-    danger: "#dc2626",
-  };
 
   useEffect(() => {
     setEditing(false);
@@ -93,12 +99,9 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       whiteSpace: "nowrap",
       opacity: saving ? 0.7 : 1,
     };
-    if (variant === "primary")
-      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
-    if (variant === "gold")
-      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
-    if (variant === "danger")
-      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
+    if (variant === "primary") return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
+    if (variant === "gold") return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
+    if (variant === "danger") return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
     return common;
   };
 
@@ -111,8 +114,8 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       const payload = {};
       FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
 
-      // ✅ update firestore directly
-      const ref = fsDoc(db, "documents", String(doc.id));
+      // ✅ SAVE BACK TO records/{id}
+      const ref = fsDoc(db, "records", String(doc.id));
       await setDoc(
         ref,
         {
@@ -126,7 +129,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       setEditing(false);
       onUpdated?.(updated);
     } catch (e) {
-      console.error("update document error:", e);
+      console.error("update record (documents view) error:", e);
       alert(`❌ ${e.message}`);
     } finally {
       setSaving(false);
@@ -165,14 +168,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     verticalAlign: "top",
   };
 
-  const labelTd = {
-    ...baseTd,
-    fontWeight: 950,
-    width: 160,
-    color: C.primaryDark,
-    background: "#fff",
-  };
-
+  const labelTd = { ...baseTd, fontWeight: 950, width: 160, color: C.primaryDark, background: "#fff" };
   const valueTd = { ...baseTd, color: C.text, background: "#fff" };
 
   if (!doc) {
@@ -180,11 +176,9 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       <div style={panel}>
         <div style={head}>
           <b style={{ color: C.primaryDark }}>Details</b>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>Documents</span>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>Documents (from Records)</span>
         </div>
-        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>
-          Click a row to show details here.
-        </div>
+        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>Click a row to show details here.</div>
       </div>
     );
   }
@@ -195,7 +189,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
         <div>
           <div style={{ fontWeight: 950, color: C.primaryDark }}>{title}</div>
           <div style={{ fontSize: 12, color: C.muted, fontWeight: 800, marginTop: 4 }}>
-            Doc ID: {doc.id}
+            Record ID: {doc.id}
           </div>
         </div>
 
@@ -245,11 +239,10 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
 
         {!editing ? (
           <div style={{ marginTop: 12, color: C.muted, fontWeight: 850 }}>
-            Tip: After editing, generate PDF again.
+            Tip: After editing Chief/Marshal, generate PDF again.
           </div>
         ) : null}
       </div>
     </div>
   );
 }
-  

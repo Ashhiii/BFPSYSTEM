@@ -47,7 +47,7 @@ export default function PinUnlock() {
       sessionStorage.setItem("unlocked", "1");
       setFireLoading(true);
 
-      setTimeout(() => navigate("/app/records"), 2200);
+      setTimeout(() => navigate("/app/dashboard"), 2200);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
       setPin("");

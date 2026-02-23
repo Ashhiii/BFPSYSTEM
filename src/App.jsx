@@ -16,27 +16,30 @@ import ImportExcel from "./pages/ImportExcel/ImportExcel.jsx";
 
 import logo from "./assets/logo/bfp-logo.png";
 
+import Dashboard from "./pages/Home/Dashboard.jsx";
+import Archive from "./pages/Archive/Archive.jsx";
 
+import AddRecordPage from "./components/AddRecords.jsx";
 
+// App.jsx (Shell part only) — FULL return with onLock connected
 function Shell() {
   const navigate = useNavigate();
   const [refresh, setRefresh] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-
-  // 🔥 lock animation state
   const [locking, setLocking] = useState(false);
 
-  // active nav (based on URL)
   const path = window.location.pathname;
   const active = {
+    dashboard: path.includes("/app/dashboard"),
+    archive: path.includes("/app/archive"),
     records: path.includes("/app/records"),
     documents: path.includes("/app/documents"),
     renewed: path.includes("/app/renewed"),
     filemgmt: path.includes("/app/filemgmt"),
-      importexcel: path.includes("/app/import"), // ✅ NEW
+    importexcel: path.includes("/app/import"),
   };
 
-  // ✅ LOCK WITH FIRE OVERLAY (NO WHITE BG)
+  // ✅ LOCK FUNCTION HERE
   const requestLock = () => {
     if (locking) return;
     setLocking(true);
@@ -48,36 +51,41 @@ function Shell() {
   };
 
   return (
-    <div style={layout(collapsed)}>
-      <Sidebar
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
-        active={active}
-        navigate={navigate}
-        onLock={requestLock}
-      />
+    <>
+      <div style={layout(collapsed)}>
+        <Sidebar
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          active={active}
+          navigate={navigate}
+          onLock={requestLock} // ✅ PASS IT DOWN
+        />
 
-      <main style={main}>
-        <Routes>
-          <Route path="records" element={<Records refresh={refresh} setRefresh={setRefresh} />} />
-          <Route path="documents" element={<Documents refresh={refresh} setRefresh={setRefresh} />} />
-          <Route path="renewed" element={<Renewed refresh={refresh} setRefresh={setRefresh} />} />
-          <Route path="filemgmt" element={<FileManagement refresh={refresh} setRefresh={setRefresh} />} />
-          <Route path="import" element={<ImportExcel refresh={refresh} setRefresh={setRefresh} />} />
-          <Route path="*" element={<Navigate to="records" replace />} />
-        </Routes>
-      </main>
+        <main style={main}>
+          <Routes>
+            <Route path="dashboard" element={<Dashboard setRefresh={setRefresh} />} />
+            <Route path="records" element={<Records refresh={refresh} setRefresh={setRefresh} />} />
+            <Route path="add-record" element={<AddRecordPage setRefresh={setRefresh} />} />
+            <Route path="documents" element={<Documents refresh={refresh} setRefresh={setRefresh} />} />
+            <Route path="renewed" element={<Renewed refresh={refresh} setRefresh={setRefresh} />} />
+            <Route path="filemgmt" element={<FileManagement refresh={refresh} setRefresh={setRefresh} />} />
+            <Route path="import" element={<ImportExcel refresh={refresh} setRefresh={setRefresh} />} />
+            <Route path="archive" element={<Archive />} />
+            <Route path="*" element={<Navigate to="dashboard" replace />} />
+          </Routes>
+        </main>
+      </div>
 
-      {/* 🔥 FIRE LOCK OVERLAY */}
+      {/* 🔥 FIRE LOCK OVERLAY OUTSIDE GRID (para di magbug) */}
       {locking && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            zIndex: 9999,
+            zIndex: 999999,
             display: "grid",
             placeItems: "center",
-            background: "rgba(0,0,0,0.65)", // ✅ no white background
+            background: "rgba(0,0,0,0.65)",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
           }}
@@ -91,25 +99,24 @@ function Shell() {
                 height: 120,
                 objectFit: "contain",
                 animation: "pulseLogo 1.8s ease-in-out infinite",
-                filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))"
+                filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))",
               }}
             />
-
             <div style={{ marginTop: 10, fontWeight: 950 }}>Locking system...</div>
           </div>
 
           <style>{`
-            @keyframes firePulse {
-              from { transform: scale(1); opacity: 0.75; }
-              to { transform: scale(1.25); opacity: 1; }
+            @keyframes pulseLogo {
+              0% { transform: scale(1); }
+              50% { transform: scale(1.08); }
+              100% { transform: scale(1); }
             }
           `}</style>
         </div>
       )}
-    </div>
+    </>
   );
 }
-
 export default function App() {
   return (
     <Routes>
