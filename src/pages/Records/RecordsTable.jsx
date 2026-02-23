@@ -1,5 +1,4 @@
-// ✅ RecordsTable.jsx (FULL) — with highlight + safe PDF open (fix "record not found" when id missing)
-// ✅ Added: disable buttons if r.id missing + show tiny warning badge
+// ✅ RecordsTable.jsx (FULL) — with highlight when navigated from Dashboard
 import React, { useEffect, useRef } from "react";
 
 export default function RecordsTable({
@@ -10,10 +9,9 @@ export default function RecordsTable({
 }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
-  // ✅ safer open (stop row click + noopener)
   const open = (url, e) => {
-    e?.stopPropagation?.();
-    window.open(url, "_blank", "noopener,noreferrer");
+    e.stopPropagation();
+    window.open(url, "_blank");
   };
 
   const wrap = {
@@ -79,7 +77,6 @@ export default function RecordsTable({
       padding: "10px",
       borderBottom: `1px solid ${C.border}`,
       textAlign: "left",
-      whiteSpace: "nowrap",
     },
 
     btn: {
@@ -105,24 +102,6 @@ export default function RecordsTable({
       color: C.primaryDark,
     },
 
-    btnDisabled: {
-      opacity: 0.55,
-      cursor: "not-allowed",
-    },
-
-    warn: {
-      display: "inline-block",
-      marginLeft: 6,
-      padding: "4px 8px",
-      borderRadius: 999,
-      border: `1px solid ${C.border}`,
-      color: C.muted,
-      fontSize: 11,
-      fontWeight: 900,
-      background: "#fff",
-      verticalAlign: "middle",
-    },
-
     empty: {
       textAlign: "center",
       padding: 22,
@@ -135,10 +114,7 @@ export default function RecordsTable({
   const activeRowRef = useRef(null);
   useEffect(() => {
     if (activeRowRef.current) {
-      activeRowRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      activeRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [activeId]);
 
@@ -167,12 +143,10 @@ export default function RecordsTable({
           ) : (
             records.map((r, i) => {
               const isActive = activeId && r.id === activeId;
-              const rid = r?.id; // ✅ must exist for PDF endpoints
-              const disabled = !rid;
 
               return (
                 <tr
-                  key={rid || i}
+                  key={r.id || i}
                   ref={isActive ? activeRowRef : null}
                   style={{
                     ...S.row,
@@ -214,38 +188,22 @@ export default function RecordsTable({
 
                   <td style={S.actionsTd}>
                     <button
-                      style={{
-                        ...S.btn,
-                        ...S.btnOwner,
-                        ...(disabled ? S.btnDisabled : {}),
-                      }}
-                      disabled={disabled}
-                      title={disabled ? "Missing record id" : "Open Owner PDF"}
-                      onClick={(e) => {
-                        if (disabled) return;
-                        open(`${API}/records/${rid}/certificate/owner/pdf`, e);
-                      }}
+                      style={{ ...S.btn, ...S.btnOwner }}
+                      onClick={(e) =>
+                        open(`${API}/records/${r.id}/certificate/owner/pdf`, e)
+                      }
                     >
                       Owner PDF
                     </button>
 
                     <button
-                      style={{
-                        ...S.btn,
-                        ...S.btnBfp,
-                        ...(disabled ? S.btnDisabled : {}),
-                      }}
-                      disabled={disabled}
-                      title={disabled ? "Missing record id" : "Open BFP PDF"}
-                      onClick={(e) => {
-                        if (disabled) return;
-                        open(`${API}/records/${rid}/certificate/bfp/pdf`, e);
-                      }}
+                      style={{ ...S.btn, ...S.btnBfp }}
+                      onClick={(e) =>
+                        open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)
+                      }
                     >
                       BFP PDF
                     </button>
-
-                    {disabled && <span style={S.warn}>⚠️ no id</span>}
                   </td>
                 </tr>
               );
