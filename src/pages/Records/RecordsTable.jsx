@@ -1,14 +1,14 @@
 import React from "react";
 
 export default function RecordsTable({ records = [], onRowClick, apiBase }) {
-  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
+  const API = (apiBase || import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const open = (url, e) => {
-    e.stopPropagation();
-    window.open(url, "_blank");
+    e?.stopPropagation?.();
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const wrap2 = {
+  const clamp = {
     whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -28,7 +28,7 @@ export default function RecordsTable({ records = [], onRowClick, apiBase }) {
   };
 
   const S = {
-    tableWrap: { width: "100%", overflowX: "auto" },
+    wrap: { width: "100%", overflowX: "auto" },
     table: {
       width: "100%",
       borderCollapse: "separate",
@@ -78,11 +78,12 @@ export default function RecordsTable({ records = [], onRowClick, apiBase }) {
     },
     btnOwner: { border: `1px solid ${C.ownerBorder}`, background: C.ownerBg, color: "#9a3412" },
     btnBfp: { border: `1px solid ${C.primary}`, background: C.bfpBg, color: C.primaryDark },
+    btnDisabled: { opacity: 0.55, cursor: "not-allowed" },
     empty: { textAlign: "center", padding: 22, color: C.muted, background: "#fff", fontWeight: 800 },
   };
 
   return (
-    <div style={S.tableWrap}>
+    <div style={S.wrap}>
       <table style={S.table}>
         <thead>
           <tr>
@@ -103,38 +104,48 @@ export default function RecordsTable({ records = [], onRowClick, apiBase }) {
               <td colSpan={8} style={S.empty}>No records found</td>
             </tr>
           ) : (
-            records.map((r, i) => (
-              <tr
-                key={r.id || i}
-                style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
-                onClick={() => onRowClick?.(r)}
-              >
-                <td style={S.td}><div style={wrap2}>{r.no || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.fsicAppNo || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.natureOfInspection || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.ownerName || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.establishmentName || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.businessAddress || "-"}</div></td>
-                <td style={S.td}><div style={wrap2}>{r.dateInspected || "-"}</div></td>
+            records.map((r, i) => {
+              const id = r?.id;
+              const disabled = !id;
 
-                <td style={S.actionsTd}>
-                  <button
-                    style={{ ...S.btn, ...S.btnOwner }}
-onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
-                  >
-                    Owner PDF
-                  </button>
-                  <button
-                    style={{ ...S.btn, ...S.btnBfp }}
-onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
-                  >
-                    BFP PDF
-                  </button>
-                </td>
-              </tr>
-            ))
+              return (
+                <tr
+                  key={id || i}
+                  style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
+                  onClick={() => onRowClick?.(r)}
+                >
+                  <td style={S.td}><div style={clamp}>{r.no || "-"}</div></td>
+                  <td style={S.td}><div style={clamp}>{r.fsicAppNo || "-"}</div></td>
+                  <td style={S.td}><div style={clamp}>{r.natureOfInspection || "-"}</div></td>
+                  <td style={S.td}><div style={clamp}>{r.ownerName || "-"}</div></td>
+                  <td style={S.td}><div style={clamp}>{r.establishmentName || "-"}</div></td>
+                  <td style={S.td}><div style={clamp}>{r.businessAddress || "-"}</div></td>
+                  <td style={S.td}><div style={clamp}>{r.dateInspected || "-"}</div></td>
+
+                  <td style={S.actionsTd}>
+                    <button
+                      style={{ ...S.btn, ...S.btnOwner, ...(disabled ? S.btnDisabled : {}) }}
+                      disabled={disabled}
+                      title={disabled ? "Missing record id" : "Owner PDF"}
+                      onClick={(e) => !disabled && open(`${API}/records/${id}/certificate/owner/pdf`, e)}
+                    >
+                      Owner PDF
+                    </button>
+
+                    <button
+                      style={{ ...S.btn, ...S.btnBfp, ...(disabled ? S.btnDisabled : {}) }}
+                      disabled={disabled}
+                      title={disabled ? "Missing record id" : "BFP PDF"}
+                      onClick={(e) => !disabled && open(`${API}/records/${id}/certificate/bfp/pdf`, e)}
+                    >
+                      BFP PDF
+                    </button>
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
