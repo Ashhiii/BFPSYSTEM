@@ -1,6 +1,3 @@
-// DocumentsTable.jsx (FULL) — shows records as documents + PDF buttons
-// ✅ FIXED: wrapper is scrollable (vertical + horizontal) like RecordsTable
-
 import React from "react";
 
 const C = {
@@ -41,13 +38,7 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
   };
 
   const S = {
-    // ✅ SAME BEHAVIOR AS RecordsTable: the wrapper is the scroller
-    wrap: {
-      width: "100%",
-      height: "100%",   // ✅ fill the card body
-      overflow: "auto", // ✅ vertical + horizontal scroll
-    },
-
+    wrap: { width: "100%", overflowX: "auto" },
     table: {
       width: "100%",
       minWidth: 1100,
@@ -57,7 +48,6 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
       border: `1px solid ${C.border}`,
       borderRadius: 14,
     },
-
     th: {
       position: "sticky",
       top: 0,
@@ -71,7 +61,6 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
       borderBottom: `2px solid ${C.primary}`,
       whiteSpace: "nowrap",
     },
-
     td: {
       padding: "12px 12px",
       fontSize: 13,
@@ -80,15 +69,12 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
       borderBottom: `1px solid ${C.border}`,
       color: C.text,
     },
-
     row: { cursor: "pointer", transition: "background .15s ease" },
-
     actionsTd: {
       padding: "10px 12px",
       borderBottom: `1px solid ${C.border}`,
       whiteSpace: "nowrap",
     },
-
     btn: {
       padding: "8px 12px",
       borderRadius: 999,
@@ -100,18 +86,10 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
       background: "#fff",
       color: C.text,
     },
-
     btnIO: { border: `1px solid ${C.ioBorder}`, background: C.ioBg, color: C.ioText },
     btnReinspect: { border: `1px solid ${C.reBorder}`, background: C.reBg, color: C.reText },
     btnNFSI: { border: `1px solid ${C.nfsiBorder}`, background: C.nfsiBg, color: C.nfsiText },
-
-    empty: {
-      textAlign: "center",
-      padding: 22,
-      color: C.muted,
-      background: "#fff",
-      fontWeight: 800,
-    },
+    empty: { textAlign: "center", padding: 22, color: C.muted, background: "#fff", fontWeight: 800 },
   };
 
   return (
@@ -125,16 +103,14 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
             <th style={{ ...S.th, width: 220 }}>Address</th>
             <th style={{ ...S.th, width: 220 }}>Chief</th>
             <th style={{ ...S.th, width: 220 }}>Marshal</th>
-            <th style={{ ...S.th, width: 280 }}>Generate</th>
+            <th style={{ ...S.th, width: 260 }}>Generate</th>
           </tr>
         </thead>
 
         <tbody>
           {docs.length === 0 ? (
             <tr>
-              <td colSpan={7} style={S.empty}>
-                No records found
-              </td>
+              <td colSpan={7} style={S.empty}>No documents found</td>
             </tr>
           ) : (
             docs.map((d, i) => (
@@ -142,40 +118,35 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 key={d.id || i}
                 style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
+                }
                 onClick={() => onRowClick?.(d)}
               >
-                <td style={S.td}>
-                  <div style={clamp2}>{d.fsicAppNo || "-"}</div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2}>{d.ownerName || "-"}</div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2}>{d.establishmentName || "-"}</div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2}>{d.businessAddress || "-"}</div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2}>{d.chiefName || "-"}</div>
-                </td>
-                <td style={S.td}>
-                  <div style={clamp2}>{d.marshalName || "-"}</div>
-                </td>
+                <td style={S.td}><div style={clamp2}>{d.fsicAppNo || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.ownerName || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.establishmentName || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.businessAddress || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.chiefName || "-"}</div></td>
+                <td style={S.td}><div style={clamp2}>{d.marshalName || "-"}</div></td>
 
                 <td style={S.actionsTd}>
-                  {/* ✅ Since source is records, use /records/:id/... */}
-                  <button style={{ ...S.btn, ...S.btnIO }} onClick={(e) => open(`${API}/records/${d.id}/io/pdf`, e)}>
+                  <button
+                    style={{ ...S.btn, ...S.btnIO }}
+onClick={(e) => open(`${API}/documents/${d.id}/io/pdf`, e)}
+                  >
                     IO
                   </button>
                   <button
                     style={{ ...S.btn, ...S.btnReinspect }}
-                    onClick={(e) => open(`${API}/records/${d.id}/reinspection/pdf`, e)}
+onClick={(e) => open(`${API}/documents/${d.id}/reinspection/pdf`, e)}
                   >
                     Reinspection
                   </button>
-                  <button style={{ ...S.btn, ...S.btnNFSI }} onClick={(e) => open(`${API}/records/${d.id}/nfsi/pdf`, e)}>
+                  <button
+                    style={{ ...S.btn, ...S.btnNFSI }}
+onClick={(e) => open(`${API}/documents/${d.id}/nfsi/pdf`, e)}
+                  >
                     NFSI
                   </button>
                 </td>
