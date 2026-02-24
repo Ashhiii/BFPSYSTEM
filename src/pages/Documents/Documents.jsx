@@ -1,9 +1,3 @@
-// Documents.jsx (FULL) — AUTO from Firestore "records" (NO AddDocument)
-// ✅ Documents page = Current records list
-// ✅ Edit Chief/Marshal/etc saves back to records/{id}
-// ✅ Generate PDF buttons use /records/:id/... endpoints
-// ✅ FIXED: table area is scrollable (same behavior as RecordsTable)
-
 import React, { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -23,7 +17,6 @@ const C = {
 };
 
 export default function Documents({ refresh, setRefresh }) {
-  // ✅ keep Render API only for PDF generation buttons (LibreOffice)
   const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const [docs, setDocs] = useState([]);
@@ -32,7 +25,6 @@ export default function Documents({ refresh, setRefresh }) {
 
   const fetchDocs = async () => {
     try {
-      // ✅ SOURCE = records
       const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qy);
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -45,7 +37,6 @@ export default function Documents({ refresh, setRefresh }) {
 
   useEffect(() => {
     fetchDocs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
   const filtered = useMemo(() => {
@@ -64,7 +55,6 @@ export default function Documents({ refresh, setRefresh }) {
     });
   }, [docs, search]);
 
-  // ✅ SAME IDEA AS Records.jsx (locks height so inner scroll works)
   const page = {
     height: "calc(100vh - 70px)",
     display: "flex",
@@ -106,7 +96,7 @@ const header = {
     display: "grid",
     gridTemplateColumns: "1fr 420px",
     gap: 12,
-    minHeight: 0, // ✅ IMPORTANT
+    minHeight: 0,
   };
 
   const card = {
@@ -117,7 +107,7 @@ const header = {
     boxShadow: "0 10px 25px rgba(0,0,0,.06)",
     display: "flex",
     flexDirection: "column",
-    minHeight: 0, // ✅ IMPORTANT
+    minHeight: 0,
   };
 
   const cardHead = {
@@ -132,13 +122,10 @@ const header = {
     background: C.softBg,
   };
 
-  // ✅ IMPORTANT:
-  // We keep this container "overflow: hidden" and let DocumentsTable be the scroller
   const scrollSlot = { flex: 1, overflow: "hidden", minHeight: 0 };
 
   return (
     <div style={page}>
-      {/* HEADER */}
       <div style={header}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 950, color: C.bg }}>Documents</div>
@@ -148,7 +135,6 @@ const header = {
         </div>  
       </div>
 
-      {/* SEARCH */}
       <div style={searchCard}>
         <input
           placeholder="🔍 Search documents..."
@@ -169,12 +155,10 @@ const header = {
         </div>
       </div>
 
-      {/* CONTENT */}
       <div style={content}>
-        {/* LEFT: TABLE */}
         <div style={card}>
           <div style={cardHead}>
-            <div>Documents List (from Records)</div>
+            <div>Documents List</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: C.muted }}>Results: {filtered.length}</div>
           </div>
 
@@ -183,7 +167,6 @@ const header = {
           </div>
         </div>
 
-        {/* RIGHT: DETAILS */}
         <DocumentDetailsPanel
           doc={selectedDoc}
           onUpdated={(updated) => {

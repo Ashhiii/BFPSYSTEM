@@ -153,21 +153,28 @@ export default function Archive() {
     overflow: "hidden",
   };
 
-  const header = {
-    borderRadius: 16,
-    border: `1px solid ${C.border}`,
-    background: C.softBg,
-    boxShadow: "0 10px 25px rgba(0,0,0,.06)",
-    padding: 14,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    flexWrap: "wrap",
-  };
+const header = {
+  borderRadius: 24,
+  padding: 20,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
 
-  const hTitle = { fontSize: 18, fontWeight: 950, color: C.primaryDark };
-  const hSub = { fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 6 };
+  color: "#fff",
+
+  background: `
+    radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 40%),
+    linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #080404 100%)
+  `,
+
+  boxShadow: "0 20px 40px rgba(0,0,0,.25)",
+};
+
+
+  const hTitle = { fontSize: 18, fontWeight: 950, color: C.bg };
+  const hSub = { fontSize: 12, fontWeight: 800, color: C.bg, marginTop: 6 };
 
   const bar = {
     borderRadius: 16,

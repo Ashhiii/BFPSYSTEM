@@ -176,7 +176,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       <div style={panel}>
         <div style={head}>
           <b style={{ color: C.primaryDark }}>Details</b>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>Documents (from Records)</span>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>Documents</span>
         </div>
         <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>Click a row to show details here.</div>
       </div>
