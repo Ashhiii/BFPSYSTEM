@@ -1,9 +1,10 @@
-// ✅ AddRecord.jsx (FULL) — updated to use the same glass modal style
+// ✅ AddRecord.jsx (FULL) — Save/Clear moved to BOTTOM (footer bar)
 import React, { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 
 import TopRightToast from "../components/TopRightToast"; // adjust path
+
 /**
  * ✅ Format "YYYY-MM-DD" => "January 2, 2026"
  */
@@ -149,7 +150,7 @@ export default function AddRecord({ setRefresh }) {
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
 
-  // ✅ success modal
+  // ✅ success toast
   const [toastOpen, setToastOpen] = useState(false);
 
   const requiredKeys = useMemo(
@@ -183,13 +184,14 @@ export default function AddRecord({ setRefresh }) {
   };
 
   const styles = {
-    wrap: {
-      background: "#fff",
-      border: "1px solid #e5e7eb",
-      borderRadius: 16,
-      padding: 14,
-      boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
-    },
+  wrap: {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 16,
+    padding: 14,
+    paddingBottom: 30, 
+    boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
+  },
     headerRow: {
       display: "flex",
       justifyContent: "space-between",
@@ -269,6 +271,24 @@ export default function AddRecord({ setRefresh }) {
       boxSizing: "border-box",
       textTransform: "uppercase",
     },
+
+    // ✅ NEW: bottom action bar
+    footerBar: {
+      marginTop: 14,
+      paddingTop: 12,
+      borderTop: "1px solid #e2e8f0",
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: 10,
+      flexWrap: "wrap",
+      alignItems: "center",
+    },
+    footerLeft: {
+      marginRight: "auto",
+      fontSize: 12,
+      fontWeight: 800,
+      color: "#64748b",
+    },
   };
 
   const onChange = (e) => {
@@ -302,14 +322,14 @@ export default function AddRecord({ setRefresh }) {
     try {
       const payload = buildPayload();
 
-await addDoc(collection(db, "records"), payload);
+      await addDoc(collection(db, "records"), payload);
 
-// show toast
-setToastOpen(true);
+      // show toast
+      setToastOpen(true);
 
-setForm(INITIAL_FORM);
-setTouched({});
-setRefresh?.((p) => !p);
+      setForm(INITIAL_FORM);
+      setTouched({});
+      setRefresh?.((p) => !p);
     } catch (e) {
       console.error(e);
       alert("Firestore error. Check rules / permissions.");
@@ -337,22 +357,7 @@ setRefresh?.((p) => !p);
             <div style={styles.sub}>Fill up the fields then save.</div>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              style={styles.btn}
-              onClick={() => {
-                setForm(INITIAL_FORM);
-                setTouched({});
-              }}
-              disabled={saving}
-            >
-              Clear
-            </button>
-
-            <button style={styles.primary} onClick={submit} disabled={saving}>
-              {saving ? "Saving..." : "Save Record"}
-            </button>
-          </div>
+          {/* ✅ Buttons moved to bottom */}
         </div>
 
         <div style={styles.grid}>
@@ -396,9 +401,33 @@ setRefresh?.((p) => !p);
             );
           })}
         </div>
+
+        {/* ✅ BOTTOM ACTIONS */}
+        <div style={styles.footerBar}>
+          <div style={styles.footerLeft}>
+            {Object.keys(missingRequired).length > 0
+              ? "Please fill required fields before saving."
+              : "Ready to save."}
+          </div>
+
+          <button
+            style={styles.btn}
+            onClick={() => {
+              setForm(INITIAL_FORM);
+              setTouched({});
+            }}
+            disabled={saving}
+          >
+            Clear
+          </button>
+
+          <button style={styles.primary} onClick={submit} disabled={saving}>
+            {saving ? "Saving..." : "Save Record"}
+          </button>
+        </div>
       </div>
 
-      {/* ✅ Success Modal (glass style same sa sample) */}
+      {/* ✅ Success Toast (top-right) */}
       <TopRightToast
         C={{
           border: "rgba(226,232,240,1)",
