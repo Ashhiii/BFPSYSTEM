@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase";
 
+import ConfirmModal from "../FileManagement/deleteConfirmModal";
+import TopRightToast from "../../components/TopRightToast";
+
 export default function RenewedManager({ C, refresh, setRefresh }) {
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
@@ -10,6 +13,15 @@ export default function RenewedManager({ C, refresh, setRefresh }) {
   // ✅ pagination
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // ✅ confirm modal + deleting state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [targetRow, setTargetRow] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // ✅ toast
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState("Deleted successfully.");
 
   const toMillisSafe = (v) => {
     if (v?.toMillis) return v.toMillis();
@@ -50,6 +62,7 @@ export default function RenewedManager({ C, refresh, setRefresh }) {
               rec.businessAddress ||
               rec.entityKey ||
               data.entityKey);
+
           if (!hasSomething) return null;
 
           const entityKey = data.entityKey || rec.entityKey || d.id;
@@ -105,32 +118,47 @@ export default function RenewedManager({ C, refresh, setRefresh }) {
   const startIndex = (safePage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
 
-  const pageRows = useMemo(
-    () => filtered.slice(startIndex, endIndex),
-    [filtered, startIndex, endIndex]
-  );
+  const pageRows = useMemo(() => filtered.slice(startIndex, endIndex), [filtered, startIndex, endIndex]);
 
   const canPrev = safePage > 1;
   const canNext = safePage < totalPages;
   const goPrev = () => canPrev && setPage((p) => Math.max(1, p - 1));
   const goNext = () => canNext && setPage((p) => Math.min(totalPages, p + 1));
 
-  const deleteRenewed = async (r) => {
-    if (!window.confirm("Delete this RENEWED entry only? (Record will stay)")) return;
+  /* ================= DELETE (CONFIRM MODAL) ================= */
+
+  const requestDelete = (r) => {
+    setTargetRow(r);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!targetRow) return;
+    setDeleting(true);
 
     try {
-      const renewedDocId = String(r._docId || r.id);
+      const renewedDocId = String(targetRow._docId || targetRow.id);
       await deleteDoc(doc(db, "renewals", renewedDocId));
 
       setRows((prev) => (prev || []).filter((x) => String(x._docId || x.id) !== renewedDocId));
+
+      setConfirmOpen(false);
+      setTargetRow(null);
+
+      // ✅ toast
+      setToastMsg("Deleted successfully.");
+      setToastOpen(true);
+
       setRefresh?.((p) => !p);
     } catch (e) {
       console.error("Delete renewed failed:", e);
       alert(`Delete failed: ${e?.code || ""} ${e?.message || ""}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  /* ===== styles (same) ===== */
+  /* ===== styles (same as your current) ===== */
   const toolRow = {
     display: "flex",
     gap: 10,
@@ -275,6 +303,37 @@ export default function RenewedManager({ C, refresh, setRefresh }) {
 
   return (
     <>
+      <ConfirmModal
+        C={C}
+        open={confirmOpen}
+        title="Delete Renewed"
+        subtitle="This will delete ONLY the renewed entry"
+        message={
+          targetRow
+            ? `Delete this renewed entry?\n\nFSIC: ${targetRow.fsicAppNo || "-"}\nOwner: ${targetRow.ownerName || "-"}`
+            : "Delete this renewed entry?"
+        }
+        danger
+        busy={deleting}
+        cancelText="Cancel"
+        confirmText={deleting ? "Deleting..." : "Yes, Delete"}
+        onCancel={() => {
+          if (deleting) return;
+          setConfirmOpen(false);
+          setTargetRow(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+
+      <TopRightToast
+        C={{ border: "rgba(226,232,240,1)", text: "#0f172a", muted: "#64748b" }}
+        open={toastOpen}
+        title="Deleted"
+        message={toastMsg}
+        autoCloseMs={1400}
+        onClose={() => setToastOpen(false)}
+      />
+
       <div style={toolRow}>
         <div style={toolLeft}>
           <input
@@ -283,6 +342,7 @@ export default function RenewedManager({ C, refresh, setRefresh }) {
             onChange={(e) => setSearch(e.target.value)}
             style={input}
           />
+
           <select
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
@@ -298,13 +358,16 @@ export default function RenewedManager({ C, refresh, setRefresh }) {
 
         <div style={toolRight}>
           <div style={statPill}>{loading ? "Loading..." : `${total} item(s)`}</div>
+
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <button style={pagerBtnBox(!canPrev)} onClick={goPrev} disabled={!canPrev}>
               Prev
             </button>
+
             <div style={pagerPageBox}>
               Page {safePage} / {totalPages}
             </div>
+
             <button style={pagerBtnBox(!canNext)} onClick={goNext} disabled={!canNext}>
               Next
             </button>
@@ -348,8 +411,9 @@ export default function RenewedManager({ C, refresh, setRefresh }) {
                   <td style={td}>{r.ownerName || r.title || "-"}</td>
                   <td style={td}>{r.establishmentName || "-"}</td>
                   <td style={td}>{r.businessAddress || "-"}</td>
+
                   <td style={{ ...td, textAlign: "center" }}>
-                    <button onClick={() => deleteRenewed(r)} style={delBtn}>
+                    <button onClick={() => requestDelete(r)} style={delBtn} disabled={deleting}>
                       🗑 Delete Renewed
                     </button>
                   </td>

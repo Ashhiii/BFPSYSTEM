@@ -1,13 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  collection,
-  getDocs,
-  doc,
-  orderBy,
-  query,
-  deleteDoc,
-} from "firebase/firestore";
+import { collection, getDocs, doc, orderBy, query, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+
+import ConfirmModal from "../FileManagement/deleteConfirmModal";
+import TopRightToast from "../../components/TopRightToast";
 
 export default function RecordsManager({ C, refresh, setRefresh }) {
   const [rows, setRows] = useState([]);
@@ -15,11 +11,20 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   const [loading, setLoading] = useState(false);
 
   // ✅ ONLY FILTER: MONTH
-  const [month, setMonth] = useState("all"); // all | YYYY-MM | UNKNOWN
+  const [month, setMonth] = useState("all"); // all | current | YYYY-MM | UNKNOWN
 
   // ✅ PAGINATION
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // ✅ Modal
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [targetRow, setTargetRow] = useState(null);
+
+  // ✅ Toast
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState("Deleted successfully.");
 
   /* ================= HELPERS ================= */
 
@@ -35,16 +40,12 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   };
 
   const getMonthKey = (data) => {
-    // priority: closeMonth/closedMonth/monthKey -> createdAt -> dateInspected
-    const cm = String(
-      data?.closeMonth || data?.closedMonth || data?.monthKey || ""
-    ).trim();
+    const cm = String(data?.closeMonth || data?.closedMonth || data?.monthKey || "").trim();
     if (/^\d{4}-\d{2}$/.test(cm)) return cm;
 
-    const ms =
-      toMillisSafe(data?.createdAt) || toMillisSafe(data?.dateInspected) || 0;
-
+    const ms = toMillisSafe(data?.createdAt) || toMillisSafe(data?.dateInspected) || 0;
     if (!ms) return "UNKNOWN";
+
     const d = new Date(ms);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -64,50 +65,34 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
         const snap = await getDocs(qy);
         snap.docs.forEach((d) => {
           const data = d.data() || {};
-          all.push({
-            id: d.id,
-            _docId: d.id,
-            _source: "records",
-            ...data,
-          });
+          all.push({ id: d.id, _docId: d.id, _source: "records", ...data });
         });
       } catch (e) {}
 
-      // B1) records_archive (if exists)
+      // B1) records_archive
       try {
-        const qyA = query(
-          collection(db, "records_archive"),
-          orderBy("createdAt", "desc")
-        );
+        const qyA = query(collection(db, "records_archive"), orderBy("createdAt", "desc"));
         const snapA = await getDocs(qyA);
         snapA.docs.forEach((d) => {
           const data = d.data() || {};
-          all.push({
-            id: d.id,
-            _docId: d.id,
-            _source: "records_archive",
-            ...data,
-          });
+          all.push({ id: d.id, _docId: d.id, _source: "records_archive", ...data });
         });
       } catch (e) {}
 
-      // B2) archives/{month}/records (Close Month style)
+      // B2) archives/{month}/records
       try {
         const monthsSnap = await getDocs(collection(db, "archives"));
         for (const mDoc of monthsSnap.docs) {
           const monthId = mDoc.id;
           try {
-            const recSnap = await getDocs(
-              collection(db, "archives", monthId, "records")
-            );
+            const recSnap = await getDocs(collection(db, "archives", monthId, "records"));
             recSnap.docs.forEach((d) => {
               const data = d.data() || {};
               all.push({
                 id: d.id,
                 _docId: d.id,
                 _source: `archives/${monthId}/records`,
-                closeMonth:
-                  data.closeMonth || data.closedMonth || data.monthKey || monthId,
+                closeMonth: data.closeMonth || data.closedMonth || data.monthKey || monthId,
                 ...data,
               });
             });
@@ -138,23 +123,17 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   }, [refresh]);
 
   /* ================= MONTH OPTIONS ================= */
-const monthOptions = useMemo(() => {
-  // months ONLY from archive sources
-  const set = new Set(
-    (rows || [])
-      .filter(
-        (r) =>
-          r._source === "records_archive" ||
-          String(r._source || "").startsWith("archives/")
-      )
-      .map((r) => r._month || "UNKNOWN")
-  );
 
-  const months = Array.from(set).filter(Boolean).sort().reverse();
+  const monthOptions = useMemo(() => {
+    const set = new Set(
+      (rows || [])
+        .filter((r) => r._source === "records_archive" || String(r._source || "").startsWith("archives/"))
+        .map((r) => r._month || "UNKNOWN")
+    );
 
-  // values: all, current, YYYY-MM...
-  return ["all", "current", ...months];
-}, [rows]);
+    const months = Array.from(set).filter(Boolean).sort().reverse();
+    return ["all", "current", ...months];
+  }, [rows]);
 
   /* ================= SEARCH + MONTH FILTER ================= */
 
@@ -162,13 +141,12 @@ const monthOptions = useMemo(() => {
     const q = search.toLowerCase().trim();
 
     return (rows || []).filter((r) => {
-    // ✅ Month filter
-if (month === "current") {
-  if (r._source !== "records") return false;
-} else if (month !== "all") {
-  const mk = r._month || "UNKNOWN";
-  if (mk !== month) return false;
-}
+      if (month === "current") {
+        if (r._source !== "records") return false;
+      } else if (month !== "all") {
+        const mk = r._month || "UNKNOWN";
+        if (mk !== month) return false;
+      }
 
       if (!q) return true;
 
@@ -184,9 +162,7 @@ if (month === "current") {
     });
   }, [rows, search, month]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, month, refresh, pageSize]);
+  useEffect(() => setPage(1), [search, month, refresh, pageSize]);
 
   /* ================= PAGINATION ================= */
 
@@ -196,23 +172,27 @@ if (month === "current") {
   const startIndex = (safePage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
 
-  const pageRows = useMemo(
-    () => filtered.slice(startIndex, endIndex),
-    [filtered, startIndex, endIndex]
-  );
+  const pageRows = useMemo(() => filtered.slice(startIndex, endIndex), [filtered, startIndex, endIndex]);
 
   const canPrev = safePage > 1;
   const canNext = safePage < totalPages;
-
   const goPrev = () => canPrev && setPage((p) => Math.max(1, p - 1));
   const goNext = () => canNext && setPage((p) => Math.min(totalPages, p + 1));
 
-  /* ================= DELETE (PERMANENT) ================= */
+  /* ================= DELETE via MODAL ================= */
 
-  const deleteRow = async (r) => {
-    if (!window.confirm("Delete this item permanently?")) return;
+  const requestDelete = (r) => {
+    setTargetRow(r);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!targetRow) return;
+    setDeleting(true);
 
     try {
+      const r = targetRow;
+
       if (r._source === "records") {
         await deleteDoc(doc(db, "records", String(r._docId || r.id)));
       } else if (r._source === "records_archive") {
@@ -225,18 +205,31 @@ if (month === "current") {
 
       setRows((prev) =>
         (prev || []).filter(
-          (x) => !(String(x._docId || x.id) === String(r._docId || r.id) && x._source === r._source)
+          (x) =>
+            !(
+              String(x._docId || x.id) === String(r._docId || r.id) &&
+              String(x._source) === String(r._source)
+            )
         )
       );
+
+      // ✅ close modal + show toast
+      setConfirmOpen(false);
+      setTargetRow(null);
+
+      setToastMsg("Deleted successfully.");
+      setToastOpen(true);
 
       setRefresh?.((p) => !p);
     } catch (e) {
       console.error("Delete failed:", e);
       alert(`Delete failed: ${e?.code || ""} ${e?.message || ""}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  /* ================= STYLES (SAME AS YOUR ORIGINAL) ================= */
+  /* ================= STYLES (same) ================= */
 
   const toolRow = {
     display: "flex",
@@ -247,20 +240,8 @@ if (month === "current") {
     alignItems: "center",
     justifyContent: "space-between",
   };
-
-  const toolLeft = {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    flexWrap: "wrap",
-  };
-
-  const toolRight = {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    flexWrap: "wrap",
-  };
+  const toolLeft = { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" };
+  const toolRight = { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" };
 
   const input = {
     flex: "0 0 240px",
@@ -360,9 +341,7 @@ if (month === "current") {
     background: "#fff",
   };
 
-  const rowHover = {
-    transition: "background 0.12s ease",
-  };
+  const rowHover = { transition: "background 0.12s ease" };
 
   const delBtn = {
     border: `1px solid rgba(220,38,38,0.6)`,
@@ -393,39 +372,56 @@ if (month === "current") {
     flexWrap: "wrap",
   };
 
-  const showing = {
-    fontSize: 12,
-    fontWeight: 900,
-    color: C.muted,
-  };
+  const showing = { fontSize: 12, fontWeight: 900, color: C.muted };
 
   return (
     <>
-      {/* ✅ TOP TOOLS: SAME DESIGN */}
+      <ConfirmModal
+        C={C}
+        open={confirmOpen}
+        title="Delete Record"
+        subtitle="Permanent delete"
+        message={
+          targetRow
+            ? `Delete permanently this record?\n\nFSIC: ${targetRow.fsicAppNo || "-"}\nOwner: ${
+                targetRow.ownerName || "-"
+              }`
+            : "Delete this item?"
+        }
+        danger
+        busy={deleting}
+        cancelText="Cancel"
+        confirmText={deleting ? "Deleting..." : "Yes, Delete"}
+        onCancel={() => {
+          if (deleting) return;
+          setConfirmOpen(false);
+          setTargetRow(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+
+      <TopRightToast
+        C={{ border: "rgba(226,232,240,1)", text: "#0f172a", muted: "#64748b" }}
+        open={toastOpen}
+        title="Deleted"
+        message={toastMsg}
+        autoCloseMs={1400}
+        onClose={() => setToastOpen(false)}
+      />
+
       <div style={toolRow}>
         <div style={toolLeft}>
-          <input
-            placeholder="🔍 Search records..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={input}
-          />
+          <input placeholder="🔍 Search records..." value={search} onChange={(e) => setSearch(e.target.value)} style={input} />
 
-          {/* ✅ Month filter only */}
           <select value={month} onChange={(e) => setMonth(e.target.value)} style={select} title="Month">
             {monthOptions.map((m) => (
-            <option key={m} value={m}>
+              <option key={m} value={m}>
                 {m === "all" ? "All months" : m === "current" ? "Current" : m}
-            </option>
+              </option>
             ))}
           </select>
 
-          <select
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            style={select}
-            title="Rows per page"
-          >
+          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={select} title="Rows per page">
             <option value={5}>5 / page</option>
             <option value={10}>10 / page</option>
             <option value={20}>20 / page</option>
@@ -437,20 +433,7 @@ if (month === "current") {
           <div style={statPill}>{loading ? "Loading..." : `${total} item(s)`}</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <button
-              style={pagerBtnBox(!canPrev)}
-              onClick={goPrev}
-              disabled={!canPrev}
-              onMouseEnter={(e) => {
-                if (!canPrev) return;
-                e.currentTarget.style.boxShadow = "0 10px 18px rgba(0,0,0,0.06)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.04)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
+            <button style={pagerBtnBox(!canPrev)} onClick={() => canPrev && setPage((p) => Math.max(1, p - 1))} disabled={!canPrev}>
               Prev
             </button>
 
@@ -458,27 +441,13 @@ if (month === "current") {
               Page {safePage} / {totalPages}
             </div>
 
-            <button
-              style={pagerBtnBox(!canNext)}
-              onClick={goNext}
-              disabled={!canNext}
-              onMouseEnter={(e) => {
-                if (!canNext) return;
-                e.currentTarget.style.boxShadow = "0 10px 18px rgba(0,0,0,0.06)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.04)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
+            <button style={pagerBtnBox(!canNext)} onClick={() => canNext && setPage((p) => Math.min(totalPages, p + 1))} disabled={!canNext}>
               Next
             </button>
           </div>
         </div>
       </div>
 
-      {/* TABLE + STICKY FOOTER (SAME DESIGN) */}
       <div style={tableWrap}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -503,17 +472,9 @@ if (month === "current") {
               pageRows.map((r, idx) => (
                 <tr
                   key={(r._source || "") + ":" + (r._docId || r.id) + ":" + idx}
-                  style={{
-                    ...rowHover,
-                    background: idx % 2 === 0 ? "#fff" : "rgba(249,250,251,0.8)",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "rgba(254,242,242,0.6)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background =
-                      idx % 2 === 0 ? "#fff" : "rgba(249,250,251,0.8)")
-                  }
+                  style={{ ...rowHover, background: idx % 2 === 0 ? "#fff" : "rgba(249,250,251,0.8)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(254,242,242,0.6)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "rgba(249,250,251,0.8)")}
                 >
                   <td style={td}>{r.fsicAppNo || "-"}</td>
                   <td style={td}>{r.ownerName || r.title || "-"}</td>
@@ -522,20 +483,7 @@ if (month === "current") {
                   <td style={td}>{r._month || "UNKNOWN"}</td>
 
                   <td style={{ ...td, textAlign: "center" }}>
-                    <button
-                      onClick={() => deleteRow(r)}
-                      style={delBtn}
-                      onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
-                      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.boxShadow =
-                          "0 14px 22px rgba(220,38,38,0.14)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.boxShadow =
-                          "0 10px 18px rgba(0,0,0,0.05)")
-                      }
-                    >
+                    <button onClick={() => requestDelete(r)} style={delBtn}>
                       🗑 Delete
                     </button>
                   </td>
