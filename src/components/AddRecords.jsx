@@ -9,7 +9,7 @@ import { db } from "../firebase";
 import TopRightToast from "../components/TopRightToast"; // adjust path
 
 /**
- * ✅ Format "YYYY-MM-DD" => "January 2, 2026"
+ * ✅ Format "YYYY-MM-DD" => "January 2, 2026"  
  */
 const formatDateLong = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return "";
