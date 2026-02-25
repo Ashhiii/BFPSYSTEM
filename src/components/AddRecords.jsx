@@ -1,4 +1,5 @@
-// ✅ AddRecord.jsx (FULL) — Save/Clear moved to BOTTOM (footer bar)
+// ✅ AddRecord.jsx (FULL) — NTC + Team Leader/Inspectors 1-3 + Serials
+// ✅ FIXED: Team Leader & Inspectors keep EXACT casing (small/caps) as typed
 import React, { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
@@ -17,7 +18,6 @@ const formatDateLong = (yyyy_mm_dd) => {
     "January","February","March","April","May","June",
     "July","August","September","October","November","December",
   ];
-
   return `${months[m - 1]} ${d}, ${y}`;
 };
 
@@ -55,15 +55,33 @@ const INITIAL_FORM = {
   businessAddress: "",
   contactNumber: "",
   dateInspected: "",
+
   ioNumber: "",
   ioDate: "",
+
+  // ✅ NTC
   ntcNumber: "",
   ntcDate: "",
+
   nfsiNumber: "",
   nfsiDate: "",
+
+  // ✅ REINSPECTION TO: Team Leader + Inspectors 1/2/3 + serials
+  teamLeader: "",
+  teamLeaderSerial: "",
+
+  inspector1: "",
+  inspector1Serial: "",
+  inspector2: "",
+  inspector2Serial: "",
+  inspector3: "",
+  inspector3Serial: "",
+
+  // optional combined inspectors
+  inspectors: "",
+
   fsicValidity: "",
   defects: "",
-  inspectors: "",
   occupancyType: "",
   buildingDesc: "",
   floorArea: "",
@@ -72,11 +90,16 @@ const INITIAL_FORM = {
   highRise: "",
   fsmr: "",
   remarks: "",
+
   orNumber: "",
   orAmount: "",
   orDate: "",
 };
 
+/**
+ * ✅ ONLY THESE FIELDS WILL BE AUTO-UPPERCASED
+ * Names (teamLeader/inspectors1-3) are intentionally NOT included.
+ */
 const UPPER_KEYS = new Set([
   "appno",
   "fsicAppNo",
@@ -92,7 +115,6 @@ const UPPER_KEYS = new Set([
   "nfsiNumber",
   "fsicValidity",
   "defects",
-  "inspectors",
   "occupancyType",
   "buildingDesc",
   "floorArea",
@@ -102,6 +124,8 @@ const UPPER_KEYS = new Set([
   "fsmr",
   "remarks",
   "orNumber",
+  // optional combined inspectors (if you want it uppercase)
+  "inspectors",
 ]);
 
 const FIELDS = [
@@ -126,10 +150,24 @@ const FIELDS = [
   { key: "nfsiNumber", label: "NFSI Number", placeholder: "NFSI no", required: false, type: "text", span: 1 },
   { key: "nfsiDate", label: "NFSI Date", placeholder: "", required: false, type: "date", span: 1 },
 
+  // ✅ Reinspection "TO"
+  { key: "teamLeader", label: "Team Leader", placeholder: "Team leader", required: false, type: "text", span: 1 },
+  { key: "teamLeaderSerial", label: "Team Leader Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
+
+  { key: "inspector1", label: "Inspector 1", placeholder: "Inspector 1", required: false, type: "text", span: 1 },
+  { key: "inspector1Serial", label: "Inspector 1 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
+
+  { key: "inspector2", label: "Inspector 2", placeholder: "Inspector 2", required: false, type: "text", span: 1 },
+  { key: "inspector2Serial", label: "Inspector 2 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
+
+  { key: "inspector3", label: "Inspector 3", placeholder: "Inspector 3", required: false, type: "text", span: 1 },
+  { key: "inspector3Serial", label: "Inspector 3 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
+
+  // optional: combined inspectors field
+  { key: "inspectors", label: "Inspectors (combined)", placeholder: "Inspector names", required: false, type: "text", span: 2 },
+
   { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
   { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
-
-  { key: "inspectors", label: "Inspectors", placeholder: "Inspector names", required: false, type: "text", span: 2 },
 
   { key: "occupancyType", label: "Occupancy Type", placeholder: "Occupancy", required: false, type: "text", span: 1 },
   { key: "buildingDesc", label: "Building Description", placeholder: "Description", required: false, type: "text", span: 1 },
@@ -155,8 +193,6 @@ export default function AddRecord({ setRefresh }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
-
-  // ✅ success toast
   const [toastOpen, setToastOpen] = useState(false);
 
   const requiredKeys = useMemo(
@@ -176,29 +212,27 @@ export default function AddRecord({ setRefresh }) {
   const buildPayload = () => {
     const payload = { ...form };
 
-    // keep YMD in state, but store long format for display
+    // ✅ Store long dates for PDF/template
     payload.dateInspected = formatDateLong(form.dateInspected);
     payload.ioDate = formatDateLong(form.ioDate);
     payload.nfsiDate = formatDateLong(form.nfsiDate);
     payload.orDate = formatDateLong(form.orDate);
     payload.ntcDate = formatDateLong(form.ntcDate);
 
-    // timestamps for sorting
     payload.createdAt = serverTimestamp();
     payload.updatedAt = serverTimestamp();
-
     return payload;
   };
 
   const styles = {
-  wrap: {
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 16,
-    padding: 14,
-    paddingBottom: 30, 
-    boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
-  },
+    wrap: {
+      background: "#fff",
+      border: "1px solid #e5e7eb",
+      borderRadius: 16,
+      padding: 14,
+      paddingBottom: 30,
+      boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
+    },
     headerRow: {
       display: "flex",
       justifyContent: "space-between",
@@ -266,6 +300,7 @@ export default function AddRecord({ setRefresh }) {
       textTransform: "uppercase",
     },
 
+    // ✅ IMPORTANT: default is NOT uppercase anymore
     input: {
       width: "100%",
       padding: "10px 12px",
@@ -276,10 +311,9 @@ export default function AddRecord({ setRefresh }) {
       fontWeight: 800,
       background: "#fff",
       boxSizing: "border-box",
-      textTransform: "uppercase",
+      textTransform: "none",
     },
 
-    // ✅ NEW: bottom action bar
     footerBar: {
       marginTop: 14,
       paddingTop: 12,
@@ -313,6 +347,7 @@ export default function AddRecord({ setRefresh }) {
       return;
     }
 
+    // ✅ Only uppercase selected fields; others keep exact casing
     const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
     setForm((p) => ({ ...p, [name]: v }));
   };
@@ -328,12 +363,9 @@ export default function AddRecord({ setRefresh }) {
     setSaving(true);
     try {
       const payload = buildPayload();
-
       await addDoc(collection(db, "records"), payload);
 
-      // show toast
       setToastOpen(true);
-
       setForm(INITIAL_FORM);
       setTouched({});
       setRefresh?.((p) => !p);
@@ -345,16 +377,6 @@ export default function AddRecord({ setRefresh }) {
     }
   };
 
-  const C = useMemo(
-    () => ({
-      primary: "#b91c1c",
-      primaryDark: "#7f1d1d",
-      border: "rgba(226,232,240,1)",
-      muted: "#64748b",
-    }),
-    []
-  );
-
   return (
     <>
       <div style={styles.wrap}>
@@ -363,8 +385,6 @@ export default function AddRecord({ setRefresh }) {
             <div style={styles.title}>Add Record</div>
             <div style={styles.sub}>Fill up the fields then save.</div>
           </div>
-
-          {/* ✅ Buttons moved to bottom */}
         </div>
 
         <div style={styles.grid}>
@@ -399,7 +419,15 @@ export default function AddRecord({ setRefresh }) {
                   style={{
                     ...styles.input,
                     border: showError ? "1px solid #dc2626" : styles.input.border,
-                    textTransform: f.type === "date" ? "none" : "uppercase",
+
+                    // ✅ IMPORTANT: dates no transform; uppercase ONLY if in UPPER_KEYS
+                    textTransform:
+                      f.type === "date"
+                        ? "none"
+                        : UPPER_KEYS.has(f.key)
+                        ? "uppercase"
+                        : "none",
+
                     background: isValidity ? "#f8fafc" : styles.input.background,
                     cursor: isValidity ? "not-allowed" : "text",
                   }}
@@ -409,7 +437,6 @@ export default function AddRecord({ setRefresh }) {
           })}
         </div>
 
-        {/* ✅ BOTTOM ACTIONS */}
         <div style={styles.footerBar}>
           <div style={styles.footerLeft}>
             {Object.keys(missingRequired).length > 0
@@ -434,7 +461,6 @@ export default function AddRecord({ setRefresh }) {
         </div>
       </div>
 
-      {/* ✅ Success Toast (top-right) */}
       <TopRightToast
         C={{
           border: "rgba(226,232,240,1)",

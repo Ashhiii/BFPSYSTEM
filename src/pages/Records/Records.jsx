@@ -356,7 +356,7 @@ const header = {
               records={filtered}
               onRowClick={onSelectRow}
               apiBase={API}
-              activeId={selectedRecord?.id} // ✅ highlight selected + dashboard opened
+              activeId={selectedRecord?.id} 
             />
           </div>
         </div>
