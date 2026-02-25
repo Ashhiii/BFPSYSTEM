@@ -57,6 +57,8 @@ const INITIAL_FORM = {
   dateInspected: "",
   ioNumber: "",
   ioDate: "",
+  ntcNumber: "",
+  ntcDate: "",
   nfsiNumber: "",
   nfsiDate: "",
   fsicValidity: "",
@@ -86,6 +88,7 @@ const UPPER_KEYS = new Set([
   "businessAddress",
   "contactNumber",
   "ioNumber",
+  "ntcNumber",
   "nfsiNumber",
   "fsicValidity",
   "defects",
@@ -116,6 +119,9 @@ const FIELDS = [
 
   { key: "ioNumber", label: "IO Number", placeholder: "IO no", required: false, type: "text", span: 1 },
   { key: "ioDate", label: "IO Date", placeholder: "", required: false, type: "date", span: 1 },
+
+  { key: "ntcNumber", label: "NTC Number", placeholder: "NTC no", required: false, type: "text", span: 1 },
+  { key: "ntcDate", label: "NTC Date", placeholder: "", required: false, type: "date", span: 1 },
 
   { key: "nfsiNumber", label: "NFSI Number", placeholder: "NFSI no", required: false, type: "text", span: 1 },
   { key: "nfsiDate", label: "NFSI Date", placeholder: "", required: false, type: "date", span: 1 },
@@ -175,6 +181,7 @@ export default function AddRecord({ setRefresh }) {
     payload.ioDate = formatDateLong(form.ioDate);
     payload.nfsiDate = formatDateLong(form.nfsiDate);
     payload.orDate = formatDateLong(form.orDate);
+    payload.ntcDate = formatDateLong(form.ntcDate);
 
     // timestamps for sorting
     payload.createdAt = serverTimestamp();
