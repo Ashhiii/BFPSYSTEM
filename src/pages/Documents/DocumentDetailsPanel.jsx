@@ -1,5 +1,5 @@
-// DocumentDetailsPanel.jsx (FULL)
-// ✅ edits Chief/Marshal + other doc fields
+// DocumentDetailsPanel.jsx (FULL UPDATED)
+// ✅ edits Chief/Marshal + inspectors 1/2/3 + serial + TL serial + NTC fields
 // ✅ saves back to Firestore records/{id}
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -13,13 +13,34 @@ const FIELDS = [
   { key: "businessAddress", label: "Address" },
   { key: "contactNumber", label: "Contact Number" },
 
+  // IO / NFSI
   { key: "ioDate", label: "IO Date" },
   { key: "ioNumber", label: "IO Number" },
   { key: "nfsiNumber", label: "NFSI Number" },
   { key: "nfsiDate", label: "NFSI Date" },
-  { key: "inspectors", label: "Inspectors" },
-  { key: "teamLeader", label: "Team Leader" },
 
+  // ✅ ADD: NTC
+  { key: "ntcNumber", label: "NTC Number" },
+  { key: "ntcDate", label: "NTC Date" },
+
+  // ✅ Team Leader + Serial
+  { key: "teamLeader", label: "Team Leader" },
+  { key: "teamLeaderSerial", label: "Team Leader Serial" },
+
+  // ✅ Inspectors 1/2/3 + Serial
+  { key: "inspector1", label: "Inspector 1" },
+  { key: "inspector1Serial", label: "Inspector 1 Serial" },
+
+  { key: "inspector2", label: "Inspector 2" },
+  { key: "inspector2Serial", label: "Inspector 2 Serial" },
+
+  { key: "inspector3", label: "Inspector 3" },
+  { key: "inspector3Serial", label: "Inspector 3 Serial" },
+
+  // keep combined if you still use it
+  { key: "inspectors", label: "Inspectors (Combined)" },
+
+  // Signatories
   { key: "chiefName", label: "Chief" },
   { key: "marshalName", label: "Marshal" },
 ];
@@ -30,15 +51,34 @@ const CAPS_KEYS = new Set([
   "establishmentName",
   "businessAddress",
   "contactNumber",
+
   "ioNumber",
   "nfsiNumber",
-  "inspectors",
+
+  // ✅ NTC
+  "ntcNumber",
+
+  // ✅ TL / Inspectors
   "teamLeader",
+  "teamLeaderSerial",
+  "inspector1",
+  "inspector1Serial",
+  "inspector2",
+  "inspector2Serial",
+  "inspector3",
+  "inspector3Serial",
+  "inspectors",
+
   "chiefName",
   "marshalName",
 ]);
 
-const DATE_KEYS = new Set(["ioDate", "nfsiDate"]);
+const DATE_KEYS = new Set([
+  "ioDate",
+  "nfsiDate",
+  // ✅ NTC date
+  "ntcDate",
+]);
 
 const C = {
   primary: "#b91c1c",
@@ -99,9 +139,12 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       whiteSpace: "nowrap",
       opacity: saving ? 0.7 : 1,
     };
-    if (variant === "primary") return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
-    if (variant === "gold") return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
-    if (variant === "danger") return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
+    if (variant === "primary")
+      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
+    if (variant === "gold")
+      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
+    if (variant === "danger")
+      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
     return common;
   };
 
@@ -168,7 +211,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     verticalAlign: "top",
   };
 
-  const labelTd = { ...baseTd, fontWeight: 950, width: 160, color: C.primaryDark, background: "#fff" };
+  const labelTd = { ...baseTd, fontWeight: 950, width: 180, color: C.primaryDark, background: "#fff" };
   const valueTd = { ...baseTd, color: C.text, background: "#fff" };
 
   if (!doc) {
@@ -178,7 +221,9 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
           <b style={{ color: C.primaryDark }}>Details</b>
           <span style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>Documents</span>
         </div>
-        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>Click a row to show details here.</div>
+        <div style={{ padding: 14, color: C.muted, fontWeight: 800 }}>
+          Click a row to show details here.
+        </div>
       </div>
     );
   }
@@ -239,7 +284,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
 
         {!editing ? (
           <div style={{ marginTop: 12, color: C.muted, fontWeight: 850 }}>
-            Tip: After editing Chief/Marshal, generate PDF again.
+            Tip: After editing Inspectors/Serials + Chief/Marshal, generate PDF again.
           </div>
         ) : null}
       </div>
