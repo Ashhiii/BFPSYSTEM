@@ -64,8 +64,12 @@ export default function ImportPage({ setRefresh }) {
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button style={btn} onClick={() => navigate("/app/dashboard")}>← Dashboard</button>
-          <button style={btn} onClick={() => navigate("/app/records")}>🔎 Records</button>
+          <button style={btn} onClick={() => navigate("/app/dashboard")}>
+            ← Dashboard
+          </button>
+          <button style={btn} onClick={() => navigate("/app/records")}>
+            🔎 Records
+          </button>
         </div>
       </div>
 

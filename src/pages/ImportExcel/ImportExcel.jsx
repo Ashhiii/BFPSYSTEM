@@ -1,3 +1,4 @@
+// src/pages/ImportExcel/ImportExcel.jsx
 import React, { useMemo, useRef, useState } from "react";
 import {
   HiOutlineCloudUpload,
@@ -8,7 +9,12 @@ import {
   HiOutlineExclamationCircle,
 } from "react-icons/hi";
 import * as XLSX from "xlsx";
-import { collection, writeBatch, serverTimestamp, doc as fsDoc } from "firebase/firestore";
+import {
+  collection,
+  writeBatch,
+  serverTimestamp,
+  doc as fsDoc,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 
 export default function ImportExcelFullScreen({ setRefresh, onClose }) {
@@ -41,7 +47,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     () => ({
       page: {
         width: "100%",
-        height: "80vh", 
+        height: "80vh",
         display: "flex",
         flexDirection: "column",
         background: "#fff",
@@ -60,7 +66,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       },
 
       wrap: {
-width: "min(1500px, 96vw)",
+        width: "min(1500px, 96vw)",
         display: "flex",
         flexDirection: "column",
         gap: 14,
@@ -69,7 +75,7 @@ width: "min(1500px, 96vw)",
 
       drop: {
         width: "100%",
-        height: "calc(100vh - 70px - 36px)", // footer 70 + padding 18*2
+        height: "calc(100vh - 70px - 36px)",
         minHeight: 360,
         maxHeight: 550,
         borderRadius: 18,
@@ -285,38 +291,117 @@ width: "min(1500px, 96vw)",
     if (inputRef.current) inputRef.current.value = "";
   };
 
+  /* ================== ROBUST EXCEL HELPERS ================== */
+
+  const normKey = (s) =>
+    String(s ?? "")
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .replace(/[_-]/g, "")
+      .replace(/\./g, "");
+
+  const excelDateToISO = (v) => {
+    if (v == null || v === "") return "";
+    if (typeof v === "string") return v.trim();
+    if (typeof v === "number") {
+      const dt = new Date(Math.round((v - 25569) * 86400 * 1000));
+      if (!isNaN(dt.getTime())) {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, "0");
+        const d = String(dt.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+    }
+    return String(v).trim();
+  };
+
   const normalizeRow = (r) => {
-    const get = (...keys) => {
-      for (const k of keys) {
-        const v = r?.[k];
-        if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+    const headerMap = {};
+    for (const k of Object.keys(r || {})) headerMap[normKey(k)] = r[k];
+
+    const get = (...variants) => {
+      for (const v of variants) {
+        const val = headerMap[normKey(v)];
+        if (val !== undefined && val !== null && String(val).trim() !== "")
+          return String(val).trim();
       }
       return "";
     };
+
     return {
-      fsicAppNo: get("fsicAppNo", "FSIC App No", "FSIC"),
-      ownerName: get("ownerName", "Owner"),
-      establishmentName: get("establishmentName", "Establishment"),
-      businessAddress: get("businessAddress", "Address"),
-      contactNumber: get("contactNumber", "Contact"),
-      natureOfInspection: get("natureOfInspection", "Inspection"),
-      dateInspected: get("dateInspected", "Date Inspected"),
-      ioNumber: get("ioNumber", "IO No", "IO Number"),
-      ioDate: get("ioDate", "IO Date"),
-      nfsiNumber: get("nfsiNumber", "NFSI No", "NFSI Number"),
-      nfsiDate: get("nfsiDate", "NFSI Date"),
-      inspectors: get("inspectors", "Inspectors"),
-      teamLeader: get("teamLeader", "Team Leader"),
-      chiefName: get("chiefName", "Chief"),
-      marshalName: get("marshalName", "Marshal"),
-      remarks: get("remarks", "Remarks"),
-      orNumber: get("orNumber", "OR No"),
-      orAmount: get("orAmount", "OR Amount"),
-      orDate: get("orDate", "OR Date"),
+      fsicAppNo: get(
+        "fsicappno",
+        "fsicapp#",
+        "fsicno",
+        "fsicnumber",
+        "fsic",
+        "fsic app no",
+        "fsic app no."
+      ),
+      ownerName: get("ownername", "owner", "ownersname", "taxpayer"),
+      establishmentName: get(
+        "establishmentname",
+        "establishment",
+        "tradename",
+        "nameofestablishment"
+      ),
+      businessAddress: get("businessaddress", "address", "business address", "bussinessaddress"),
+      contactNumber: get("contactnumber", "contact", "mobile", "contact no", "contact #"),
+      natureOfInspection: get("natureofinspection", "inspection", "nature"),
+      dateInspected: excelDateToISO(get("dateinspected", "date inspected", "date")),
+
+      ioNumber: get("ionumber", "io no", "io#", "io"),
+      ioDate: excelDateToISO(get("iodate", "io date")),
+
+      nfsiNumber: get("nfsinumber", "nfsi no", "nfsi#", "nfsi"),
+      nfsiDate: excelDateToISO(get("nfsidate", "nfsi date")),
+
+      inspectors: get("inspectors", "inspector"),
+      teamLeader: get("teamleader", "team leader"),
+
+      chiefName: get("chiefname", "chief"),
+      marshalName: get("marshalname", "marshal"),
+
+      remarks: get("remarks", "remark"),
+
+      orNumber: get("ornumber", "or no", "or#"),
+      orAmount: get("oramount", "or amount"),
+      orDate: excelDateToISO(get("ordate", "or date")),
     };
   };
 
-  const upload = async () => {
+  const looksLikeTrashRow = (data) => {
+    const joined = [
+      data.fsicAppNo,
+      data.ownerName,
+      data.establishmentName,
+      data.businessAddress,
+      data.remarks,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return (
+      joined.includes("exit") ||
+      joined.includes("end") ||
+      joined.includes("prepared by") ||
+      joined.includes("signature") ||
+      joined.includes("noted by") ||
+      joined.includes("total") ||
+      joined.includes("grand total") ||
+      joined.includes("summary")
+    );
+  };
+
+  const isValidFsic = (v) => {
+    const s = String(v || "").trim();
+    // adjust if needed (example: 2026-00123)
+    return /^\d{4}-\d{3,}$/i.test(s) || s.length >= 4;
+  };
+
+  /* ================== UPLOAD ================== */
+
+  const uploadExcel = async () => {
     if (!file) return setMsg("❌ Choose an Excel file first.");
     setUploading(true);
     setMsg("");
@@ -325,19 +410,52 @@ width: "min(1500px, 96vw)",
       const wb = XLSX.read(buf, { type: "array" });
       const name = wb.SheetNames?.[0];
       if (!name) throw new Error("No sheet found in Excel.");
+
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: "" });
       if (!rows.length) throw new Error("Empty sheet (no rows).");
 
-      let imported = 0, skipped = 0;
-      let batch = writeBatch(db), ops = 0;
+      let imported = 0,
+        skipped = 0;
+      let batch = writeBatch(db),
+        ops = 0;
 
       const commitIfNeeded = async () => {
-        if (ops >= 450) { await batch.commit(); batch = writeBatch(db); ops = 0; }
+        if (ops >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          ops = 0;
+        }
       };
 
       for (const r of rows) {
         const data = normalizeRow(r);
-        if (!data.fsicAppNo || !data.ownerName || !data.establishmentName) { skipped++; continue; }
+
+        // skip totally empty row
+        const anyValue = Object.values(data).some(
+          (x) => String(x ?? "").trim() !== ""
+        );
+        if (!anyValue) {
+          skipped++;
+          continue;
+        }
+
+        // skip footer/trash rows like EXIT/END/etc
+        if (looksLikeTrashRow(data)) {
+          skipped++;
+          continue;
+        }
+
+        // required fields
+        if (!data.fsicAppNo || !data.ownerName || !data.establishmentName) {
+          skipped++;
+          continue;
+        }
+
+        // optional FSIC validation
+        if (!isValidFsic(data.fsicAppNo)) {
+          skipped++;
+          continue;
+        }
 
         const ref = fsDoc(collection(db, "records"));
         batch.set(ref, {
@@ -345,10 +463,14 @@ width: "min(1500px, 96vw)",
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           importSource: "excel",
+          sheetName: name,
         });
 
-        imported++; ops++; await commitIfNeeded();
+        imported++;
+        ops++;
+        await commitIfNeeded();
       }
+
       if (ops) await batch.commit();
 
       setMsg(`✅ Imported: ${imported} row(s). Skipped: ${skipped}.`);
@@ -368,21 +490,41 @@ width: "min(1500px, 96vw)",
           <div
             style={S.drop}
             onClick={() => inputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setDrag(false); }}
-            onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer?.files?.[0]); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDrag(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setDrag(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDrag(false);
+              pick(e.dataTransfer?.files?.[0]);
+            }}
           >
             <div style={S.hero}>
               <div style={S.art}>
                 <div style={S.folders}>
-                  <div style={S.folder(C.bfpBg, C.primary, C.primaryDark)}>FILE</div>
-                  <div style={S.folder(C.ownerBg, C.ownerBorder, "#9a3412")}>XLSX</div>
+                  <div style={S.folder(C.bfpBg, C.primary, C.primaryDark)}>
+                    FILE
+                  </div>
+                  <div style={S.folder(C.ownerBg, C.ownerBorder, "#9a3412")}>
+                    XLSX
+                  </div>
                 </div>
               </div>
 
               <div style={S.main}>
                 Drag & Drop or{" "}
-                <span style={S.link} onClick={() => inputRef.current?.click()}>
+                <span
+                  style={S.link}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    inputRef.current?.click();
+                  }}
+                >
                   Select
                 </span>{" "}
                 files to upload
@@ -391,7 +533,8 @@ width: "min(1500px, 96vw)",
               <div style={S.sub}>Supported formats: .xlsx, .xls (Excel)</div>
 
               <div style={S.hint}>
-                <HiOutlineCloudUpload size={18} /> Import will go to Firestore: <b>records</b>
+                <HiOutlineCloudUpload size={18} /> Import will go to Firestore:{" "}
+                <b>records</b>
               </div>
 
               <input
@@ -406,28 +549,44 @@ width: "min(1500px, 96vw)",
                 <>
                   <div style={S.fileCard}>
                     <div style={S.fileLeft}>
-                      <div style={S.fIcon}><HiOutlineDocumentText size={22} /></div>
+                      <div style={S.fIcon}>
+                        <HiOutlineDocumentText size={22} />
+                      </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={S.fName}>{file.name}</div>
                         <div style={S.fMeta}>
-                          Size: {(file.size / 1024 / 1024).toFixed(2)} MB • Ready
+                          Size: {(file.size / 1024 / 1024).toFixed(2)} MB •
+                          Ready
                         </div>
                       </div>
                     </div>
 
-                    <button style={S.remove} onClick={clear} disabled={uploading}>
+                    <button
+                      style={S.remove}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clear();
+                      }}
+                      disabled={uploading}
+                    >
                       <HiOutlineTrash size={18} /> Remove
                     </button>
                   </div>
 
                   {msg ? (
                     <div style={S.msg}>
-                      {ok ? <HiOutlineCheckCircle size={18} /> : <HiOutlineExclamationCircle size={18} />}
+                      {ok ? (
+                        <HiOutlineCheckCircle size={18} />
+                      ) : (
+                        <HiOutlineExclamationCircle size={18} />
+                      )}
                       <span>{msg}</span>
                     </div>
                   ) : null}
 
-                  <div style={S.barWrap}><div style={S.bar} /></div>
+                  <div style={S.barWrap}>
+                    <div style={S.bar} />
+                  </div>
                 </>
               ) : msg ? (
                 <div style={S.msg}>
@@ -447,10 +606,21 @@ width: "min(1500px, 96vw)",
         </div>
 
         <div style={S.actions}>
-          <button style={S.btn} onClick={() => { clear(); onClose?.(); }} disabled={uploading}>
+          <button
+            style={S.btn}
+            onClick={() => {
+              clear();
+              onClose?.();
+            }}
+            disabled={uploading}
+          >
             Cancel
           </button>
-          <button style={S.primary} onClick={upload} disabled={uploading || !file}>
+          <button
+            style={S.primary}
+            onClick={uploadExcel}
+            disabled={uploading || !file}
+          >
             {uploading ? "Importing..." : "Import"}
           </button>
         </div>
