@@ -15,8 +15,23 @@ const FIELDS = [
   { key: "ioDate", label: "IO Date" },
   { key: "nfsiNumber", label: "NFSI No" },
   { key: "nfsiDate", label: "NFSI Date" },
+  { key: "ntcNumber", label: "NTC No" },
+  { key: "ntcDate", label: "NTC Date" },
   { key: "fsicValidity", label: "FSIC Validity" },
   { key: "defects", label: "Defects" },
+  { key: "teamLeader", label: "Team Leader" },
+  { key: "teamLeaderSerial", label: "Team Leader Serial" },
+  { key: "inspector1", label: "Inspector 1" },
+  { key: "inspector1Serial", label: "Inspector 1 Serial" },
+
+  { key: "inspector2", label: "Inspector 2" },
+  { key: "inspector2Serial", label: "Inspector 2 Serial" },
+
+  { key: "inspector3", label: "Inspector 3" },
+  { key: "inspector3Serial", label: "Inspector 3 Serial" },
+
+  // (keep your old inspectors field if you still use it)
+  { key: "inspectors", label: "Inspectors (Combined)" },
   { key: "inspectors", label: "Inspectors" },
   { key: "occupancyType", label: "Occupancy" },
   { key: "buildingDesc", label: "Building Desc" },
@@ -34,13 +49,58 @@ const FIELDS = [
 ];
 
 const CAPS_KEYS = new Set([
-  "fsicAppNo","natureOfInspection","ownerName","establishmentName","businessAddress","contactNumber",
-  "ioNumber","nfsiNumber","fsicValidity","defects","inspectors","occupancyType","buildingDesc",
-  "floorArea","buildingHeight","storeyCount","highRise","fsmr","remarks","orNumber","orAmount",
-  "chiefName","marshalName",
+  "fsicAppNo",
+  "natureOfInspection",
+  "ownerName",
+  "establishmentName",
+  "businessAddress",
+  "contactNumber",
+
+  "ioNumber",
+  "nfsiNumber",
+
+  // ✅ ADD: NTC
+  "ntcNumber",
+
+  "fsicValidity",
+  "defects",
+
+  // ✅ ADD: TL + Inspectors
+  "teamLeader",
+  "teamLeaderSerial",
+
+  "inspector1",
+  "inspector1Serial",
+  "inspector2",
+  "inspector2Serial",
+  "inspector3",
+  "inspector3Serial",
+
+  "inspectors",
+  "occupancyType",
+  "buildingDesc",
+  "floorArea",
+  "buildingHeight",
+  "storeyCount",
+  "highRise",
+  "fsmr",
+  "remarks",
+  "orNumber",
+  "orAmount",
+  "chiefName",
+  "marshalName",
 ]);
 
-const DATE_KEYS = new Set(["dateInspected", "ioDate", "nfsiDate", "orDate"]);
+const DATE_KEYS = new Set([
+  "dateInspected",
+  "ioDate",
+  "nfsiDate",
+
+  // ✅ ADD: NTC DATE
+  "ntcDate",
+
+  "orDate",
+]);
 
 export default function RecordDetailsPanel({
   styles,
@@ -80,7 +140,6 @@ export default function RecordDetailsPanel({
 
     const init = {};
     FIELDS.forEach((f) => (init[f.key] = record?.[f.key] ?? ""));
-    init.teamLeader = record?.teamLeader ?? "";
     setForm(init);
 
     // ✅ load latest renewed (renewals/{entityKey})
