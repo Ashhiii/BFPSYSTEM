@@ -1,5 +1,7 @@
 // ✅ AddRecord.jsx (FULL) — NTC + Team Leader/Inspectors 1-3 + Serials
-// ✅ FIXED: Team Leader & Inspectors keep EXACT casing (small/caps) as typed
+// ✅ NEW: Auto-combine Inspector 1/2/3 -> "inspectors (combined)" field (readOnly)
+// ✅ FIXED: Team Leader & Inspectors keep EXACT casing as typed (not auto uppercase)
+
 import React, { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
@@ -77,7 +79,7 @@ const INITIAL_FORM = {
   inspector3: "",
   inspector3Serial: "",
 
-  // optional combined inspectors
+  // ✅ AUTO combined inspectors (from 1/2/3)
   inspectors: "",
 
   fsicValidity: "",
@@ -98,7 +100,7 @@ const INITIAL_FORM = {
 
 /**
  * ✅ ONLY THESE FIELDS WILL BE AUTO-UPPERCASED
- * Names (teamLeader/inspectors1-3) are intentionally NOT included.
+ * Names (teamLeader/inspector1-3) are intentionally NOT included.
  */
 const UPPER_KEYS = new Set([
   "FSIC_NUMBER",
@@ -124,8 +126,8 @@ const UPPER_KEYS = new Set([
   "fsmr",
   "remarks",
   "orNumber",
-  // optional combined inspectors (if you want it uppercase)
-  "inspectors",
+  // ✅ combined inspectors will be auto-generated (not typed), but ok if you want it uppercase
+  // We will NOT uppercase it here to preserve exact casing from names.
 ]);
 
 const FIELDS = [
@@ -163,8 +165,8 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3", placeholder: "Inspector 3", required: false, type: "text", span: 1 },
   { key: "inspector3Serial", label: "Inspector 3 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
-  // optional: combined inspectors field
-  { key: "inspectors", label: "Inspectors (combined)", placeholder: "Inspector names", required: false, type: "text", span: 2 },
+  // ✅ AUTO: combined inspectors field (readOnly)
+  { key: "inspectors", label: "Inspectors (combined)", placeholder: "Auto from Inspector 1/2/3", required: false, type: "text", span: 2 },
 
   { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
   { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
@@ -332,9 +334,19 @@ export default function AddRecord({ setRefresh }) {
     },
   };
 
+  // ✅ auto-combine inspector1/2/3 -> inspectors
+  const combineInspectors = (state) => {
+    const list = [state.inspector1, state.inspector2, state.inspector3]
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
+    return list;
+  };
+
   const onChange = (e) => {
     const { name, value } = e.target;
 
+    // FSIC validity auto-calc
     if (name === "dateInspected") {
       const untilYMD = addYearsYMD(value, 1);
       const validityText = untilYMD ? `${formatDateLong(untilYMD)}` : "";
@@ -349,7 +361,17 @@ export default function AddRecord({ setRefresh }) {
 
     // ✅ Only uppercase selected fields; others keep exact casing
     const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
-    setForm((p) => ({ ...p, [name]: v }));
+
+    setForm((prev) => {
+      const updated = { ...prev, [name]: v };
+
+      // ✅ AUTO: whenever inspector1/2/3 changes, update combined inspectors
+      if (name === "inspector1" || name === "inspector2" || name === "inspector3") {
+        updated.inspectors = combineInspectors(updated);
+      }
+
+      return updated;
+    });
   };
 
   const onBlur = (k) => setTouched((p) => ({ ...p, [k]: true }));
@@ -391,6 +413,7 @@ export default function AddRecord({ setRefresh }) {
           {FIELDS.map((f) => {
             const showError = f.required && touched[f.key] && missingRequired[f.key];
             const isValidity = f.key === "fsicValidity";
+            const isCombinedInspectors = f.key === "inspectors"; // ✅ auto field
 
             return (
               <div
@@ -415,12 +438,12 @@ export default function AddRecord({ setRefresh }) {
                   type={f.type || "text"}
                   placeholder={f.placeholder || ""}
                   autoComplete="off"
-                  readOnly={isValidity}
+                  readOnly={isValidity || isCombinedInspectors}
                   style={{
                     ...styles.input,
                     border: showError ? "1px solid #dc2626" : styles.input.border,
 
-                    // ✅ IMPORTANT: dates no transform; uppercase ONLY if in UPPER_KEYS
+                    // ✅ dates no transform; uppercase ONLY if in UPPER_KEYS
                     textTransform:
                       f.type === "date"
                         ? "none"
@@ -428,8 +451,11 @@ export default function AddRecord({ setRefresh }) {
                         ? "uppercase"
                         : "none",
 
-                    background: isValidity ? "#f8fafc" : styles.input.background,
-                    cursor: isValidity ? "not-allowed" : "text",
+                    background:
+                      isValidity || isCombinedInspectors
+                        ? "#f1f5f9"
+                        : styles.input.background,
+                    cursor: isValidity || isCombinedInspectors ? "not-allowed" : "text",
                   }}
                 />
               </div>
