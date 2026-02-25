@@ -3,9 +3,8 @@ import { db } from "../../firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 const FIELDS = [
-  { key: "no", label: "No" },
   { key: "fsicAppNo", label: "FSIC App No" },
-  { key: "natureOfInspection", label: "Inspection" },
+  { key: "natureOfInspection", label: "Nature Of Inspection" },
   { key: "ownerName", label: "Owner" },
   { key: "establishmentName", label: "Establishment" },
   { key: "businessAddress", label: "Address" },
@@ -31,7 +30,6 @@ const FIELDS = [
   { key: "inspector3Serial", label: "Inspector 3 Serial" },
 
   // (keep your old inspectors field if you still use it)
-  { key: "inspectors", label: "Inspectors (Combined)" },
   { key: "inspectors", label: "Inspectors" },
   { key: "occupancyType", label: "Occupancy" },
   { key: "buildingDesc", label: "Building Desc" },
@@ -40,6 +38,7 @@ const FIELDS = [
   { key: "storeyCount", label: "Storey" },
   { key: "highRise", label: "High Rise" },
   { key: "fsmr", label: "FSMR" },
+  { key: "fsicNumber", label: "FSIC Number" },
   { key: "remarks", label: "Remarks" },
   { key: "orNumber", label: "OR No" },
   { key: "orAmount", label: "OR Amount" },

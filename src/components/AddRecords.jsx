@@ -101,7 +101,7 @@ const INITIAL_FORM = {
  * Names (teamLeader/inspectors1-3) are intentionally NOT included.
  */
 const UPPER_KEYS = new Set([
-  "appno",
+  "FSIC_NUMBER",
   "fsicAppNo",
   "chiefName",
   "marshalName",
@@ -133,7 +133,7 @@ const FIELDS = [
   { key: "ownerName", label: "Owner", placeholder: "Owner name", required: true, type: "text", span: 1 },
   { key: "establishmentName", label: "Establishment", placeholder: "Establishment name", required: false, type: "text", span: 2 },
 
-  { key: "appno", label: "Application No.", placeholder: "App no", required: false, type: "text", span: 1 },
+  { key: "fsicNumber", label: "FSIC NO", placeholder: "FSIC NO", required: false, type: "text", span: 1 },
   { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "Annual / New / Re-inspection", required: false, type: "text", span: 1 },
 
   { key: "businessAddress", label: "Business Address", placeholder: "Full address", required: false, type: "text", span: 2 },
