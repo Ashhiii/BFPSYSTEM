@@ -272,7 +272,7 @@ export default function Dashboard() {
             C={C}
             loading={loadingRecent}
             list={visibleRecent} // ✅ ONLY 4 per page
-            onOpen={(id) => navigate("/app/records", { state: { openId: id } })}
+            onOpen={(id) => navigate("/app/records", { state: { activeId: id } })}            
             page={page}
             setPage={setPage}
             total={total}

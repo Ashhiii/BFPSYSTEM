@@ -42,6 +42,7 @@ export default function Records({ refresh, setRefresh }) {
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [closing, setClosing] = useState(false);
+  const [activeId, setActiveId] = useState(null);
 
   // ✅ FULLSCREEN
   const [showDetails, setShowDetails] = useState(false);
@@ -103,6 +104,9 @@ export default function Records({ refresh, setRefresh }) {
 
   const onSelectRow = (record) => {
     if (!record) return;
+
+    setActiveId(record.id); // ✅ highlight
+
     const fixed = {
       ...record,
       entityKey:
@@ -114,20 +118,15 @@ export default function Records({ refresh, setRefresh }) {
   };
 
   // ✅ AUTO-OPEN + HIGHLIGHT when navigated from Dashboard
-  useEffect(() => {
-    const openId = location.state?.openId;
+useEffect(() => {
+  const navActiveId = location.state?.activeId;
 
-    if (openId && (records || []).length) {
-      const found = (records || []).find(
-        (r) => String(r.id) === String(openId)
-      );
-      if (found) onSelectRow(found);
-
-      // clear history state (prevents reopen)
-      window.history.replaceState({}, document.title);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, records]);
+  if (navActiveId && (records || []).length) {
+    setActiveId(navActiveId); // ✅ highlight only (no details)
+    window.history.replaceState({}, document.title); // clear state
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [location.state, records]);
 
   // ✅ Close Month (archive all current -> archives/YYYY-MM/records then delete current)
   const doCloseMonth = async () => {
@@ -399,7 +398,7 @@ export default function Records({ refresh, setRefresh }) {
               records={filtered}
               onRowClick={onSelectRow}
               apiBase={API}
-              activeId={selectedRecord?.id}
+              activeId={activeId} // ✅ highlight-only supported
             />
           </div>
         </div>
