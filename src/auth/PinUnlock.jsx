@@ -13,6 +13,7 @@ export default function PinUnlock() {
   const [fireLoading, setFireLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -34,20 +35,17 @@ export default function PinUnlock() {
     try {
       setLoading(true);
 
-      // ✅ EXACTLY matches your Firestore location:
-      // pinunlock (collection) -> config (doc) -> pin (field)
       const snap = await getDoc(doc(db, "pinunlock", "config"));
       const savedPin = snap.exists() ? String(snap.data()?.pin || "").trim() : "";
 
       if (!savedPin) throw new Error("PIN not configured");
 
-      const ok = cleanPin === savedPin;
-      if (!ok) throw new Error("Invalid PIN");
+      if (cleanPin !== savedPin) throw new Error("Invalid PIN");
 
       sessionStorage.setItem("unlocked", "1");
       setFireLoading(true);
 
-      setTimeout(() => navigate("/app/dashboard"), 2200);
+      setTimeout(() => navigate("/app/dashboard"), 3200);
     } catch (err) {
       setMsg("❌ Incorrect PIN");
       setPin("");
@@ -78,7 +76,8 @@ export default function PinUnlock() {
   const overlay = {
     position: "absolute",
     inset: 0,
-    background: "radial-gradient(circle at 30% 20%, rgba(0,0,0,.35), rgba(0,0,0,.65))",
+    background:
+      "radial-gradient(circle at 30% 20%, rgba(0,0,0,.35), rgba(0,0,0,.65))",
     zIndex: 1,
   };
 
@@ -105,13 +104,16 @@ export default function PinUnlock() {
     transform: mounted ? "translateY(0px)" : "translateY(18px)",
     opacity: mounted ? 1 : 0,
     transition: "transform .55s ease, opacity .55s ease",
+    position: "relative",
   };
 
   const logoWrap = {
     position: "absolute",
     top: 0,
     left: "50%",
-    transform: active ? "translate(-50%, -70px) scale(0.92)" : "translate(-50%, -50px) scale(1)",
+    transform: active
+      ? "translate(-50%, -70px) scale(0.92)"
+      : "translate(-50%, -50px) scale(1)",
     transition: "transform .45s cubic-bezier(.2,.9,.2,1)",
     zIndex: 3,
     width: 130,
@@ -137,7 +139,9 @@ export default function PinUnlock() {
     width: "95%",
     padding: "12px 14px",
     borderRadius: 14,
-    border: msg ? "1px solid rgba(254,202,202,.75)" : "1px solid rgba(255,255,255,0.28)",
+    border: msg
+      ? "1px solid rgba(254,202,202,.75)"
+      : "1px solid rgba(255,255,255,0.28)",
     background: "rgba(255,255,255,0.18)",
     color: "#fff",
     outline: "none",
@@ -161,6 +165,31 @@ export default function PinUnlock() {
   };
 
   const msgStyle = { fontSize: 12, color: "#fecaca", fontWeight: 900, minHeight: 16 };
+
+  // ✅ MOVED: Forgot icon button now floats OUTSIDE the card (bottom-right of screen)
+  const forgotFloating = {
+    position: "absolute",
+    bottom: 25,
+    right: 30,
+    width: 52,
+    height: 52,
+    borderRadius: "50%",
+    border: "2px solid rgba(255,255,255,0.75)",
+    background: "rgba(255,255,255,0.15)",
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: 900,
+    display: "grid",
+    placeItems: "center",
+    cursor: loading || fireLoading ? "not-allowed" : "pointer",
+    opacity: loading || fireLoading ? 0.6 : 1,
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    boxShadow: "0 15px 35px rgba(0,0,0,0.45)",
+    zIndex: 7,
+    animation: "floatIcon 2.8s ease-in-out infinite, glowPulse 2.5s ease-in-out infinite",
+    transition: "transform .2s ease",
+  };
 
   const loadingOverlay = {
     position: "absolute",
@@ -199,19 +228,52 @@ export default function PinUnlock() {
       <video style={videoStyle} src={bgVideo} autoPlay loop muted playsInline />
       <div style={overlay} />
 
+      {/* ✅ HERE: Icon is now OUTSIDE the box/card */}
+      <button
+        style={forgotFloating}
+        disabled={loading || fireLoading}
+        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.12)")}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        onClick={() => navigate("/forgot-pin")}
+        title="Forgot PIN"
+        type="button"
+      >
+        ?
+      </button>
+
       {fireLoading && (
         <div style={loadingOverlay}>
           <div style={loadingCard}>
             <img
               src={logo}
               alt="BFP Logo Loading"
-              style={{ width: 90, height: 90, objectFit: "contain", filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))" }}
+              style={{
+                width: 90,
+                height: 90,
+                objectFit: "contain",
+                filter: "drop-shadow(0 10px 30px rgba(185,28,28,.6))",
+              }}
             />
             <div style={{ marginTop: 8, fontWeight: 950 }}>Securing system...</div>
             <div style={{ marginTop: 14 }}>
               <div style={spinner} />
             </div>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+            <style>{`
+              @keyframes spin { to { transform: rotate(360deg); } }
+
+              @keyframes floatIcon {
+                0% { transform: translateY(0px); }
+                50% { transform: translateY(-6px); }
+                100% { transform: translateY(0px); }
+              }
+
+              @keyframes glowPulse {
+                0% { box-shadow: 0 0 0px rgba(185,28,28,0.35); }
+                50% { box-shadow: 0 0 18px rgba(185,28,28,0.85); }
+                100% { box-shadow: 0 0 0px rgba(185,28,28,0.35); }
+              }
+            `}</style>
           </div>
         </div>
       )}
@@ -243,6 +305,7 @@ export default function PinUnlock() {
               {loading ? "Checking..." : fireLoading ? "Entering..." : "Unlock"}
             </button>
           </form>
+
         </div>
       </div>
     </div>

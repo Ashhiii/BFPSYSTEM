@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import PinUnlock from "./auth/PinUnlock.jsx";
+import ForgotPin from "./auth/ForgotPin.jsx"; // ✅ PUBLIC route
 import ProtectedRoute from "./auth/ProtectedRoute.jsx";
 
 import Records from "./pages/Records/Records";
@@ -13,15 +14,14 @@ import Sidebar from "./layout/Sidebar.jsx";
 import { layout, main } from "./layout/shellStyles.js";
 
 import ImportExcel from "./pages/ImportExcel/ImportExcel.jsx";
-
-import logo from "./assets/logo/bfp-logo.png";
-
 import Dashboard from "./pages/Home/Dashboard.jsx";
 import Archive from "./pages/Archive/Archive.jsx";
 
 import AddRecordPage from "./components/AddRecords.jsx";
 
-// App.jsx (Shell part only) — FULL return with onLock connected
+import logo from "./assets/logo/bfp-logo.png";
+
+/* ================= Shell ================= */
 function Shell() {
   const navigate = useNavigate();
   const [refresh, setRefresh] = useState(false);
@@ -39,7 +39,6 @@ function Shell() {
     importexcel: path.includes("/app/import"),
   };
 
-  // ✅ LOCK FUNCTION HERE
   const requestLock = () => {
     if (locking) return;
     setLocking(true);
@@ -58,11 +57,14 @@ function Shell() {
           setCollapsed={setCollapsed}
           active={active}
           navigate={navigate}
-          onLock={requestLock} // ✅ PASS IT DOWN
+          onLock={requestLock}
         />
 
         <main style={main}>
           <Routes>
+            {/* ✅ NOTE: this is /app/forgot-pin (not needed now, can remove) */}
+            {/* <Route path="forgot-pin" element={<ForgotPin />} /> */}
+
             <Route path="dashboard" element={<Dashboard setRefresh={setRefresh} />} />
             <Route path="records" element={<Records refresh={refresh} setRefresh={setRefresh} />} />
             <Route path="add-record" element={<AddRecordPage setRefresh={setRefresh} />} />
@@ -76,7 +78,6 @@ function Shell() {
         </main>
       </div>
 
-      {/* 🔥 FIRE LOCK OVERLAY OUTSIDE GRID (para di magbug) */}
       {locking && (
         <div
           style={{
@@ -117,10 +118,16 @@ function Shell() {
     </>
   );
 }
+
+/* ================= App Routes ================= */
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<PinUnlock />} />
+
+      {/* ✅ FIX: PUBLIC ROUTE */}
+      <Route path="/forgot-pin" element={<ForgotPin />} />
+
       <Route
         path="/app/*"
         element={
@@ -129,6 +136,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
