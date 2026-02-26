@@ -166,7 +166,7 @@ export default function Dashboard() {
         INSPECTORS: S(r.inspectors || r.INSPECTORS),
 
         "TYPE OF OCCUPANCY": S(r.occupancyType || r.OCCUPANCY_TYPE),
-        "BLDG DESCRIPTION / RETAILER": S(r.buildingDesc || r.BLDG_DESCRIPTION || r.BUILDING_DESC),
+        "BLDG DESCRIPTION": S(r.buildingDesc || r.BLDG_DESCRIPTION || r.BUILDING_DESC),
         "FLOOR AREA (SQM)": S(r.floorArea || r.FLOOR_AREA),
         "BUILDING HEIGHT": S(r.buildingHeight || r.BUILDING_HEIGHT),
         "NO OF STOREY": S(r.storeyCount || r.STOREY_COUNT),
