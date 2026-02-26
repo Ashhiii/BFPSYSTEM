@@ -1,7 +1,3 @@
-// DocumentDetailsPanel.jsx (FULL UPDATED)
-// ✅ edits Chief/Marshal + inspectors 1/2/3 + serial + TL serial + NTC fields
-// ✅ saves back to Firestore records/{id}
-
 import React, { useEffect, useMemo, useState } from "react";
 import { doc as fsDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -13,21 +9,17 @@ const FIELDS = [
   { key: "businessAddress", label: "Address" },
   { key: "contactNumber", label: "Contact Number" },
 
-  // IO / NFSI
   { key: "ioDate", label: "IO Date" },
   { key: "ioNumber", label: "IO Number" },
   { key: "nfsiNumber", label: "NFSI Number" },
   { key: "nfsiDate", label: "NFSI Date" },
 
-  // ✅ ADD: NTC
   { key: "ntcNumber", label: "NTC Number" },
   { key: "ntcDate", label: "NTC Date" },
 
-  // ✅ Team Leader + Serial
   { key: "teamLeader", label: "Team Leader" },
   { key: "teamLeaderSerial", label: "Team Leader Serial" },
 
-  // ✅ Inspectors 1/2/3 + Serial
   { key: "inspector1", label: "Inspector 1" },
   { key: "inspector1Serial", label: "Inspector 1 Serial" },
 
@@ -37,28 +29,29 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3" },
   { key: "inspector3Serial", label: "Inspector 3 Serial" },
 
-  // keep combined if you still use it
+  // ✅ combined auto
   { key: "inspectors", label: "Inspectors (Combined)" },
 
-  // Signatories
   { key: "chiefName", label: "Chief" },
   { key: "marshalName", label: "Marshal" },
 ];
 
+// ✅ ONLY fields you really want ALWAYS UPPERCASE
 const CAPS_KEYS = new Set([
   "fsicAppNo",
   "ownerName",
   "establishmentName",
   "businessAddress",
   "contactNumber",
-
   "ioNumber",
   "nfsiNumber",
-
-  // ✅ NTC
   "ntcNumber",
+  "chiefName",
+  "marshalName",
+]);
 
-  // ✅ TL / Inspectors
+// ✅ Keep EXACT casing as typed (no auto-caps) — same as Records
+const NO_CAPS_KEYS = new Set([
   "teamLeader",
   "teamLeaderSerial",
   "inspector1",
@@ -67,18 +60,10 @@ const CAPS_KEYS = new Set([
   "inspector2Serial",
   "inspector3",
   "inspector3Serial",
-  "inspectors",
-
-  "chiefName",
-  "marshalName",
+  "inspectors", // combined (auto)
 ]);
 
-const DATE_KEYS = new Set([
-  "ioDate",
-  "nfsiDate",
-  // ✅ NTC date
-  "ntcDate",
-]);
+const DATE_KEYS = new Set(["ioDate", "nfsiDate", "ntcDate"]);
 
 const C = {
   primary: "#b91c1c",
@@ -92,6 +77,42 @@ const C = {
   danger: "#dc2626",
 };
 
+/** ✅ Convert whatever value -> YYYY-MM-DD for <input type="date"> */
+const toInputDate = (v) => {
+  if (!v) return "";
+
+  // Firestore Timestamp
+  if (v?.toDate) {
+    const d = v.toDate();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  // already YYYY-MM-DD
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+
+  // ISO / parseable date string (includes "January 2, 2026")
+  if (typeof v === "string" && !Number.isNaN(Date.parse(v))) {
+    const d = new Date(v);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  return "";
+};
+
+// ✅ Combine inspector 1/2/3 -> string (auto)
+const combineInspectors = (a, b, c) => {
+  return [a, b, c]
+    .map((x) => String(x || "").trim())
+    .filter(Boolean)
+    .join(", ");
+};
+
 export default function DocumentDetailsPanel({ doc, onUpdated }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -102,8 +123,16 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     setSaving(false);
     if (!doc) return;
 
+    // ✅ init form (normalize dates + auto combine inspectors)
     const init = {};
-    FIELDS.forEach((f) => (init[f.key] = doc?.[f.key] ?? ""));
+    FIELDS.forEach((f) => {
+      const raw = doc?.[f.key] ?? "";
+      init[f.key] = DATE_KEYS.has(f.key) ? toInputDate(raw) : raw;
+    });
+
+    // ✅ auto compute inspectors combined
+    init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3);
+
     setForm(init);
   }, [doc]);
 
@@ -122,12 +151,27 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     background: "#fff",
     boxSizing: "border-box",
     fontWeight: 850,
-    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
+    textTransform: CAPS_KEYS.has(k) && !NO_CAPS_KEYS.has(k) ? "uppercase" : "none",
   });
 
+  // ✅ same behavior as Records:
+  // - TL/Inspectors keep exact casing
+  // - auto-combine inspectors when any inspector changes
   const setField = (k, v) => {
-    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
-    setForm((p) => ({ ...p, [k]: next }));
+    setForm((p) => {
+      const next = { ...p };
+
+      // keep exact casing for name fields
+      if (NO_CAPS_KEYS.has(k)) next[k] = String(v ?? "");
+      else next[k] = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : String(v ?? "");
+
+      // ✅ inspector changes -> auto combined inspectors
+      if (k === "inspector1" || k === "inspector2" || k === "inspector3") {
+        next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3);
+      }
+
+      return next;
+    });
   };
 
   const btn = (variant) => {
@@ -154,10 +198,17 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     try {
       setSaving(true);
 
-      const payload = {};
-      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
+      // ✅ ensure combined inspectors correct before saving
+      const ensured = { ...form };
+      ensured.inspectors = combineInspectors(
+        ensured.inspector1,
+        ensured.inspector2,
+        ensured.inspector3
+      );
 
-      // ✅ SAVE BACK TO records/{id}
+      const payload = {};
+      FIELDS.forEach((f) => (payload[f.key] = ensured[f.key] ?? ""));
+
       const ref = fsDoc(db, "records", String(doc.id));
       await setDoc(
         ref,
@@ -204,7 +255,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
   const body = { flex: 1, overflowY: "auto", padding: 12 };
 
   const baseTd = {
-    padding: "14px 12px",
+    padding: "12px 10px",
     borderBottom: `1px solid ${C.border}`,
     fontWeight: 850,
     fontSize: 13,
@@ -227,6 +278,13 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       </div>
     );
   }
+
+  // ✅ group fields into pairs: [ [f1,f2], [f3,f4], ... ]
+  const pairs = FIELDS.reduce((rows, f, idx) => {
+    if (idx % 2 === 0) rows.push([f]);
+    else rows[rows.length - 1].push(f);
+    return rows;
+  }, []);
 
   return (
     <div style={panel}>
@@ -259,24 +317,42 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       <div style={body}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
-            {FIELDS.map((f) => (
-              <tr key={f.key}>
-                <td style={labelTd}>{f.label}</td>
-                <td style={valueTd}>
-                  {editing ? (
-                    <input
-                      name={f.key}
-                      value={form[f.key] ?? ""}
-                      onChange={(e) => setField(f.key, e.target.value)}
-                      style={inputStyle(f.key)}
-                      autoComplete="off"
-                      placeholder={f.label}
-                      type={DATE_KEYS.has(f.key) ? "date" : "text"}
-                    />
-                  ) : (
-                    (doc?.[f.key] ?? "") || "-"
-                  )}
-                </td>
+            {pairs.map((pair, rowIndex) => (
+              <tr key={rowIndex}>
+                {pair.map((f) => (
+                  <React.Fragment key={f.key}>
+                    <td style={labelTd}>{f.label}</td>
+                    <td style={valueTd}>
+                      {editing ? (
+                        <input
+                          name={f.key}
+                          value={form[f.key] ?? ""}
+                          onChange={(e) => setField(f.key, e.target.value)}
+                          style={{
+                            ...inputStyle(f.key),
+                            ...(f.key === "inspectors"
+                              ? { background: "#f3f4f6", cursor: "not-allowed" }
+                              : null),
+                          }}
+                          autoComplete="off"
+                          placeholder={f.label}
+                          type={DATE_KEYS.has(f.key) ? "date" : "text"}
+                          readOnly={f.key === "inspectors"} // ✅ AUTO
+                        />
+                      ) : (
+                        (doc?.[f.key] ?? "") || "-"
+                      )}
+                    </td>
+                  </React.Fragment>
+                ))}
+
+                {/* ✅ if odd, fill empty cells */}
+                {pair.length === 1 && (
+                  <>
+                    <td style={labelTd}></td>
+                    <td style={valueTd}></td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>

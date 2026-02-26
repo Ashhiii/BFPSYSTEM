@@ -53,7 +53,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         background: "#fff",
         overflow: "hidden",
       },
-
       body: {
         flex: 1,
         padding: 18,
@@ -64,7 +63,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         background:
           "radial-gradient(circle at 15% 10%, rgba(185,28,28,.06), transparent 35%), radial-gradient(circle at 85% 30%, rgba(251,146,60,.10), transparent 40%), #fff",
       },
-
       wrap: {
         width: "min(1500px, 96vw)",
         display: "flex",
@@ -72,7 +70,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         gap: 14,
         minHeight: 0,
       },
-
       drop: {
         width: "100%",
         height: "calc(100vh - 70px - 36px)",
@@ -89,7 +86,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         transition: "0.15s",
         overflow: "hidden",
       },
-
       hero: {
         textAlign: "center",
         display: "grid",
@@ -97,7 +93,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         placeItems: "center",
         maxWidth: 620,
       },
-
       art: {
         width: 240,
         height: 132,
@@ -109,7 +104,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         placeItems: "center",
         marginBottom: 10,
       },
-
       folders: { display: "flex", gap: 12 },
       folder: (bg, borderColor, textColor) => ({
         width: 58,
@@ -124,11 +118,9 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         color: textColor,
         boxShadow: "0 10px 18px rgba(2,6,23,0.08)",
       }),
-
       main: { fontSize: 16, fontWeight: 950, color: C.text },
       link: { color: C.primary, cursor: "pointer", textDecoration: "underline" },
       sub: { fontSize: 12, fontWeight: 800, color: C.muted },
-
       hint: {
         marginTop: 10,
         fontSize: 12,
@@ -138,7 +130,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         gap: 8,
         alignItems: "center",
       },
-
       fileCard: {
         marginTop: 12,
         width: "min(720px, 100%)",
@@ -152,7 +143,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         background: "#fff",
         boxShadow: "0 12px 24px rgba(0,0,0,.05)",
       },
-
       fileLeft: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 },
       fIcon: {
         width: 46,
@@ -164,7 +154,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         placeItems: "center",
         color: C.primaryDark,
       },
-
       fName: {
         fontWeight: 950,
         fontSize: 13,
@@ -175,7 +164,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         maxWidth: 520,
       },
       fMeta: { marginTop: 3, fontWeight: 800, color: C.muted, fontSize: 12 },
-
       remove: {
         padding: "8px 10px",
         borderRadius: 12,
@@ -188,7 +176,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         alignItems: "center",
         color: "#9a3412",
       },
-
       msg: {
         marginTop: 12,
         width: "min(720px, 100%)",
@@ -202,7 +189,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         gap: 8,
         alignItems: "center",
       },
-
       barWrap: {
         marginTop: 10,
         width: "min(720px, 100%)",
@@ -219,7 +205,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
           ? "linear-gradient(90deg,#16a34a,#22c55e)"
           : `linear-gradient(90deg, ${C.primary}, ${C.primaryDark})`,
       },
-
       footer: {
         height: 80,
         flexShrink: 0,
@@ -231,7 +216,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         gap: 12,
         background: "#fff",
       },
-
       fInfo: {
         display: "flex",
         alignItems: "center",
@@ -240,9 +224,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         fontWeight: 800,
         fontSize: 12,
       },
-
       actions: { display: "flex", gap: 10, alignItems: "center" },
-
       btn: {
         padding: "10px 16px",
         borderRadius: 12,
@@ -252,7 +234,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         fontWeight: 950,
         minWidth: 110,
       },
-
       primary: {
         padding: "10px 16px",
         borderRadius: 12,
@@ -291,18 +272,24 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  /* ================== ROBUST EXCEL HELPERS ================== */
+  /* ================== FLEXIBLE HEADER + NORMALIZERS ================== */
 
   const normKey = (s) =>
     String(s ?? "")
       .toLowerCase()
+      .trim()
       .replace(/\s+/g, "")
       .replace(/[_-]/g, "")
-      .replace(/\./g, "");
+      .replace(/\./g, "")
+      .replace(/#/g, "");
+
+  const toText = (v) => (v == null ? "" : String(v).trim());
 
   const excelDateToISO = (v) => {
     if (v == null || v === "") return "";
     if (typeof v === "string") return v.trim();
+
+    // excel serial
     if (typeof v === "number") {
       const dt = new Date(Math.round((v - 25569) * 86400 * 1000));
       if (!isNaN(dt.getTime())) {
@@ -312,63 +299,144 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         return `${y}-${m}-${d}`;
       }
     }
+
+    // sometimes XLSX gives Date object
+    if (v instanceof Date && !isNaN(v.getTime())) {
+      const y = v.getFullYear();
+      const m = String(v.getMonth() + 1).padStart(2, "0");
+      const d = String(v.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
     return String(v).trim();
   };
 
-  const normalizeRow = (r) => {
-    const headerMap = {};
-    for (const k of Object.keys(r || {})) headerMap[normKey(k)] = r[k];
+  // 🔥 find header row even if naa pay title rows sa taas
+  const findHeaderRowIndex = (aoa, maxScan = 25) => {
+  const limit = Math.min(maxScan, aoa.length);
 
-    const get = (...variants) => {
-      for (const v of variants) {
-        const val = headerMap[normKey(v)];
-        if (val !== undefined && val !== null && String(val).trim() !== "")
-          return String(val).trim();
-      }
-      return "";
-    };
+  for (let i = 0; i < limit; i++) {
+    const row = aoa[i] || [];
 
+    // ✅ ANY header cell that contains "fsic" counts
+    const hit = row.some((cell) => normKey(cell).includes("fsic"));
+    if (hit) return i;
+  }
+
+  return -1;
+};
+
+  // build object row using detected headers
+  const aoaToObjects = (aoa) => {
+    const headerIdx = findHeaderRowIndex(aoa);
+    if (headerIdx === -1) {
+      // fallback: assume first row is header
+      const [h = [], ...rest] = aoa;
+      return { headerIdx: 0, headers: h, objects: rest.map((r) => mapRow(h, r)) };
+    }
+    const headers = aoa[headerIdx] || [];
+    const dataRows = aoa.slice(headerIdx + 1);
     return {
-      fsicAppNo: get(
-        "fsicappno",
-        "fsicapp#",
-        "fsicno",
-        "fsicnumber",
-        "fsic",
-        "fsic app no",
-        "fsic app no."
-      ),
-      ownerName: get("ownername", "owner", "ownersname", "taxpayer"),
-      establishmentName: get(
-        "establishmentname",
-        "establishment",
-        "tradename",
-        "nameofestablishment"
-      ),
-      businessAddress: get("businessaddress", "address", "business address", "bussinessaddress"),
-      contactNumber: get("contactnumber", "contact", "mobile", "contact no", "contact #"),
-      natureOfInspection: get("natureofinspection", "inspection", "nature"),
-      dateInspected: excelDateToISO(get("dateinspected", "date inspected", "date")),
-
-      ioNumber: get("ionumber", "io no", "io#", "io"),
-      ioDate: excelDateToISO(get("iodate", "io date")),
-
-      nfsiNumber: get("nfsinumber", "nfsi no", "nfsi#", "nfsi"),
-      nfsiDate: excelDateToISO(get("nfsidate", "nfsi date")),
-
-      inspectors: get("inspectors", "inspector"),
-      teamLeader: get("teamleader", "team leader"),
-
-      chiefName: get("chiefname", "chief"),
-      marshalName: get("marshalname", "marshal"),
-
-      remarks: get("remarks", "remark"),
-
-      orNumber: get("ornumber", "or no", "or#"),
-      orAmount: get("oramount", "or amount"),
-      orDate: excelDateToISO(get("ordate", "or date")),
+      headerIdx,
+      headers,
+      objects: dataRows.map((r) => mapRow(headers, r)),
     };
   };
+
+  const mapRow = (headers, row) => {
+    const o = {};
+    for (let c = 0; c < headers.length; c++) {
+      const key = headers[c];
+      const nk = normKey(key);
+      if (!nk) continue;
+      o[key] = row?.[c] ?? "";
+    }
+    return o;
+  };
+
+const normalizeRow = (r) => {
+  const headerMap = {};
+  for (const k of Object.keys(r || {})) headerMap[normKey(k)] = r[k];
+
+  const get = (...variants) => {
+    for (const v of variants) {
+      const val = headerMap[normKey(v)];
+      if (val !== undefined && val !== null && String(val).trim() !== "") {
+        return String(val).trim();
+      }
+    }
+    return "";
+  };
+
+  // ✅ NEW: find value by header key that "includes" keywords
+  const getByIncludes = (...needles) => {
+    const wants = needles.map(normKey).filter(Boolean);
+    const keys = Object.keys(headerMap);
+
+    for (const k of keys) {
+      const nk = normKey(k);
+      const ok = wants.every((w) => nk.includes(w));
+      if (!ok) continue;
+
+      const val = headerMap[k];
+      if (val !== undefined && val !== null && String(val).trim() !== "") {
+        return String(val).trim();
+      }
+    }
+    return "";
+  };
+
+  // ✅ FSIC can be many header styles
+  const fsicRaw =
+    get(
+      "fsicappno",
+      "fsicapp#",
+      "fsicno",
+      "fsicnumber",
+      "fsic",
+      "fsic app no",
+      "fsic app no.",
+      "fsic application no",
+      "fsic application no."
+    ) ||
+    // fallback includes matching
+    getByIncludes("fsic", "app") ||
+    getByIncludes("fsic", "no") ||
+    getByIncludes("fsic");
+
+  return {
+    fsicAppNo: toText(fsicRaw),
+    ownerName: get("ownername", "owner", "ownersname", "taxpayer"),
+    establishmentName: get(
+      "establishmentname",
+      "establishment",
+      "tradename",
+      "nameofestablishment"
+    ),
+    businessAddress: get("businessaddress", "address", "business address", "bussinessaddress"),
+    contactNumber: get("contactnumber", "contact", "mobile", "contact no", "contact #"),
+    natureOfInspection: get("natureofinspection", "inspection", "nature"),
+    dateInspected: excelDateToISO(get("dateinspected", "date inspected", "date")),
+
+    ioNumber: get("ionumber", "io no", "io#", "io"),
+    ioDate: excelDateToISO(get("iodate", "io date")),
+
+    nfsiNumber: get("nfsinumber", "nfsi no", "nfsi#", "nfsi"),
+    nfsiDate: excelDateToISO(get("nfsidate", "nfsi date")),
+
+    inspectors: get("inspectors", "inspector"),
+    teamLeader: get("teamleader", "team leader"),
+
+    chiefName: get("chiefname", "chief"),
+    marshalName: get("marshalname", "marshal"),
+
+    remarks: get("remarks", "remark"),
+
+    orNumber: get("ornumber", "or no", "or#"),
+    orAmount: get("oramount", "or amount"),
+    orDate: excelDateToISO(get("ordate", "or date")),
+  };
+};
 
   const looksLikeTrashRow = (data) => {
     const joined = [
@@ -387,7 +455,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       joined.includes("prepared by") ||
       joined.includes("signature") ||
       joined.includes("noted by") ||
-      joined.includes("total") ||
       joined.includes("grand total") ||
       joined.includes("summary")
     );
@@ -395,8 +462,8 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
 
   const isValidFsic = (v) => {
     const s = String(v || "").trim();
-    // adjust if needed (example: 2026-00123)
-    return /^\d{4}-\d{3,}$/i.test(s) || s.length >= 4;
+    // allow more flexible: if naa kay FSIC-like value, ok
+    return s.length >= 3;
   };
 
   /* ================== UPLOAD ================== */
@@ -405,17 +472,40 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     if (!file) return setMsg("❌ Choose an Excel file first.");
     setUploading(true);
     setMsg("");
+
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const name = wb.SheetNames?.[0];
       if (!name) throw new Error("No sheet found in Excel.");
 
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: "" });
-      if (!rows.length) throw new Error("Empty sheet (no rows).");
+      const ws = wb.Sheets[name];
+
+      // ✅ READ AS AOA so we can detect headers even if not first row
+      const aoa = XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        defval: "",
+        blankrows: false,
+      });
+
+      if (!aoa.length) throw new Error("Empty sheet (no rows).");
+
+      const { headerIdx, objects } = aoaToObjects(aoa);
+
+      if (!objects.length) {
+        throw new Error(
+          `No data rows found after header row (header row at line ${headerIdx + 1}).`
+        );
+      }
 
       let imported = 0,
         skipped = 0;
+
+      // optional: show reasons (for debugging)
+      let reasonNoFsic = 0,
+        reasonTrash = 0,
+        reasonEmpty = 0;
+
       let batch = writeBatch(db),
         ops = 0;
 
@@ -427,7 +517,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         }
       };
 
-      for (const r of rows) {
+      for (const r of objects) {
         const data = normalizeRow(r);
 
         // skip totally empty row
@@ -436,30 +526,27 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         );
         if (!anyValue) {
           skipped++;
+          reasonEmpty++;
           continue;
         }
 
         // skip footer/trash rows like EXIT/END/etc
         if (looksLikeTrashRow(data)) {
           skipped++;
+          reasonTrash++;
           continue;
         }
 
-        // required fields
-        if (!data.fsicAppNo || !data.ownerName || !data.establishmentName) {
+        // ✅ ONLY REQUIRE FSIC APP NO (para bisan kulang columns, mo-import gihapon)
+        if (!data.fsicAppNo || !isValidFsic(data.fsicAppNo)) {
           skipped++;
-          continue;
-        }
-
-        // optional FSIC validation
-        if (!isValidFsic(data.fsicAppNo)) {
-          skipped++;
+          reasonNoFsic++;
           continue;
         }
 
         const ref = fsDoc(collection(db, "records"));
         batch.set(ref, {
-          ...data,
+          ...data, // missing columns = "" (blank)
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           importSource: "excel",
@@ -473,7 +560,9 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
 
       if (ops) await batch.commit();
 
-      setMsg(`✅ Imported: ${imported} row(s). Skipped: ${skipped}.`);
+      setMsg(
+        `✅ Imported: ${imported} row(s). Skipped: ${skipped}. (No FSIC: ${reasonNoFsic}, Trash: ${reasonTrash}, Empty: ${reasonEmpty})`
+      );
       setRefresh?.((p) => !p);
     } catch (e) {
       console.error(e);
@@ -602,7 +691,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       <div style={S.footer}>
         <div style={S.fInfo}>
           <HiOutlineInformationCircle size={18} />
-          Duplicate detection depends on your Excel content (FSIC/AppNo).
+          Import is flexible: only FSIC/AppNo required. Missing columns become blank.
         </div>
 
         <div style={S.actions}>

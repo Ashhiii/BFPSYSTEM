@@ -1,14 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { db } from "../../firebase"; // ✅ adjust path
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase";
 
-import RenewedTable from "../Renewed/RenewedTable.jsx";
+import RenewedTable from "./RenewedTable.jsx";
 import RecordDetailsPanel from "../Records/RecordDetailsPanel.jsx";
+import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
 
 export default function Renewed({ refresh, setRefresh }) {
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+
   const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
+
+  // ✅ FULLSCREEN
+  const [showDetails, setShowDetails] = useState(false);
 
   /* 🔥 BFP COLORS */
   const C = {
@@ -24,6 +30,64 @@ export default function Renewed({ refresh, setRefresh }) {
     danger: "#dc2626",
   };
 
+  const loadRenewed = async () => {
+    try {
+      const snap = await getDocs(collection(db, "renewals"));
+
+      const list = snap.docs
+        .map((d) => {
+          const data = d.data() || {};
+          const rec = data.record || null;
+          if (!rec) return null;
+
+          return {
+            id: d.id, // entityKey
+            ...rec,
+            entityKey: rec.entityKey || d.id,
+            teamLeader: rec.teamLeader || "",
+            _sort:
+              data.updatedAt?.toMillis?.() ||
+              (rec.renewedAt ? Date.parse(rec.renewedAt) : 0),
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => (b._sort || 0) - (a._sort || 0));
+
+      setRecords(list);
+    } catch (e) {
+      console.error("loadRenewed error:", e);
+      setRecords([]);
+    }
+  };
+
+  useEffect(() => {
+    loadRenewed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return records;
+
+    return (records || []).filter((r) => {
+      return (
+        (r.fsicAppNo || "").toLowerCase().includes(q) ||
+        (r.ownerName || "").toLowerCase().includes(q) ||
+        (r.establishmentName || "").toLowerCase().includes(q) ||
+        (r.businessAddress || "").toLowerCase().includes(q) ||
+        (r.entityKey || "").toLowerCase().includes(q) ||
+        (r.teamLeader || "").toLowerCase().includes(q)
+      );
+    });
+  }, [records, search]);
+
+  const onSelectRow = (r) => {
+    if (!r) return;
+    setSelected(r);
+    setShowDetails(true); // ✅ open fullscreen
+  };
+
+  // UI
   const page = {
     height: "calc(100vh - 70px)",
     display: "flex",
@@ -32,28 +96,27 @@ export default function Renewed({ refresh, setRefresh }) {
     overflow: "hidden",
   };
 
-const header = {
-  borderRadius: 24,
-  padding: 20,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
+  const header = {
+    borderRadius: 24,
+    padding: 20,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    color: "#fff",
+    background: `
+      radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 40%),
+      linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #080404 100%)
+    `,
+    boxShadow: "0 20px 40px rgba(0,0,0,.25)",
+  };
 
-  color: "#fff",
-
-  background: `
-    radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 40%),
-    linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #080404 100%)
-  `,
-
-  boxShadow: "0 20px 40px rgba(0,0,0,.25)",
-};
   const hTitle = { fontSize: 18, fontWeight: 950, color: C.bg };
   const hSub = { fontSize: 12, fontWeight: 800, color: C.bg, marginTop: 6 };
 
   const input = {
+    width: "100%",
     padding: "10px 12px",
     borderRadius: 12,
     border: `1px solid ${C.border}`,
@@ -61,16 +124,22 @@ const header = {
     color: C.text,
     outline: "none",
     fontWeight: 850,
-    flex: 1,
-    minWidth: 260,
+  };
+
+  const searchCard = {
+    borderRadius: 16,
+    border: `1px solid ${C.border}`,
+    background: "#fff",
+    boxShadow: "0 10px 25px rgba(0,0,0,.06)",
+    padding: 12,
   };
 
   const contentWrap = {
     flex: 1,
     overflow: "hidden",
-    display: "grid",
-    gridTemplateColumns: "1.3fr .9fr",
-    gap: 12,
+    display: "flex",
+    flexDirection: "column",
+    minHeight: 0,
   };
 
   const card = {
@@ -96,7 +165,7 @@ const header = {
     flexWrap: "wrap",
   };
 
-  const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0 };
+  const scroll = { flex: 1, overflow: "hidden", minHeight: 0 };
 
   const panelStyles = {
     td: {
@@ -108,69 +177,8 @@ const header = {
     },
   };
 
-  const normalizeSnap = (docSnap) => {
-    const data = docSnap.data() || {};
-    return {
-      id: docSnap.id,
-      ...data,
-      entityKey: data.entityKey || (data.fsicAppNo ? `fsic:${data.fsicAppNo}` : ""),
-      teamLeader: data.teamLeader || "",
-      kind: data.kind || "renewed",
-    };
-  };
-
-const loadRenewed = async () => {
-  try {
-    const snap = await getDocs(collection(db, "renewals"));
-
-    const list = snap.docs
-      .map((d) => {
-        const data = d.data() || {};
-        const rec = data.record || null;
-        if (!rec) return null;
-
-        return {
-          id: d.id, // entityKey
-          ...rec,
-          entityKey: rec.entityKey || d.id,
-          teamLeader: rec.teamLeader || "",
-          // for sorting display (optional)
-          _sort:
-            data.updatedAt?.toMillis?.() ||
-            (rec.renewedAt ? Date.parse(rec.renewedAt) : 0),
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => (b._sort || 0) - (a._sort || 0));
-
-    setRecords(list);
-  } catch (e) {
-    console.error("loadRenewed error:", e);
-    setRecords([]);
-  }
-};
-
-
-  useEffect(() => {
-    loadRenewed();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refresh]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return records;
-
-    return records.filter((r) => {
-      return (
-        (r.fsicAppNo || "").toLowerCase().includes(q) ||
-        (r.ownerName || "").toLowerCase().includes(q) ||
-        (r.establishmentName || "").toLowerCase().includes(q) ||
-        (r.businessAddress || "").toLowerCase().includes(q) ||
-        (r.entityKey || "").toLowerCase().includes(q) ||
-        (r.teamLeader || "").toLowerCase().includes(q)
-      );
-    });
-  }, [records, search]);
+  const fullTitle =
+    selected?.establishmentName || selected?.fsicAppNo || "Renewed Record Details";
 
   return (
     <div style={page}>
@@ -181,21 +189,16 @@ const loadRenewed = async () => {
         </div>
       </div>
 
-      <div
-        style={{
-          borderRadius: 16,
-          border: `1px solid ${C.border}`,
-          background: "#fff",
-          boxShadow: "0 10px 25px rgba(0,0,0,.06)",
-          padding: 12,
-        }}
-      >
+      <div style={searchCard}>
         <input
           placeholder="🔍 Search renewed records..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={input}
         />
+        <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 8 }}>
+          Click a row → details opens full screen
+        </div>
       </div>
 
       <div style={contentWrap}>
@@ -206,19 +209,26 @@ const loadRenewed = async () => {
           </div>
 
           <div style={scroll}>
-            <RenewedTable records={filtered} onRowClick={(r) => setSelected(r)} />
+            <RenewedTable records={filtered} onRowClick={onSelectRow} apiBase={API} />
           </div>
         </div>
+      </div>
 
+      {/* ✅ FULL SCREEN DETAILS */}
+      <DetailsFullScreen
+        open={showDetails}
+        title={fullTitle}
+        onClose={() => setShowDetails(false)}
+      >
         <RecordDetailsPanel
           styles={panelStyles}
           record={selected}
           source="Renewed"
-          isArchive={true}
-          onRenewSaved={() => setRefresh((p) => !p)}
-          onUpdated={() => setRefresh((p) => !p)}
+          isArchive={true} // ✅ so Renew button shows
+          onRenewSaved={() => setRefresh?.((p) => !p)}
+          onUpdated={() => setRefresh?.((p) => !p)}
         />
-      </div>
+      </DetailsFullScreen>
     </div>
   );
 }

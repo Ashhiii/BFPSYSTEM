@@ -1,4 +1,9 @@
 // src/pages/Archive/Archive.jsx
+// ✅ Updates:
+// 1) Unclose uses ConfirmModal (glass) instead of window.confirm
+// 2) Success/Error uses your TopRightToast (same design)
+// 3) DetailsFullScreen stays as-is (modal already ok). If you want the same glass modal too, tell me.
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
@@ -7,13 +12,18 @@ import {
   query,
   doc,
   getDoc,
-  deleteDoc, // ✅ NEW
+  deleteDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 
 import RecordsTable from "../Records/RecordsTable.jsx";
 import injectTableStyles from "../Records/injectTableStyles.jsx";
 import RecordDetailsPanel from "../Records/RecordDetailsPanel.jsx";
+import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
+
+import ConfirmModal from "../../components/ConfirmModal.jsx"; // adjust if needed
+import TopRightToast from "../../components/TopRightToast.jsx"; // ✅ your toast
 
 export default function Archive() {
   const [months, setMonths] = useState([]);
@@ -23,8 +33,22 @@ export default function Archive() {
 
   const [selectedRecord, setSelectedRecord] = useState(null);
 
+  // ✅ FULLSCREEN DETAILS
+  const [showDetails, setShowDetails] = useState(false);
+
   // ✅ close info saved in Firestore (archives/{YYYY-MM})
   const [closeInfo, setCloseInfo] = useState(null);
+
+  // ✅ busy state for unclose
+  const [unclosing, setUnclosing] = useState(false);
+
+  // ✅ UN-CLOSE CONFIRM MODAL
+  const [showUncloseConfirm, setShowUncloseConfirm] = useState(false);
+
+  // ✅ TOAST
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastTitle, setToastTitle] = useState("Success");
+  const [toastMsg, setToastMsg] = useState("");
 
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -36,6 +60,14 @@ export default function Archive() {
     border: "#e5e7eb",
     text: "#111827",
     muted: "#6b7280",
+    danger: "#dc2626",
+    gold: "#f59e0b",
+  };
+
+  const showToast = (title, message) => {
+    setToastTitle(title);
+    setToastMsg(message);
+    setToastOpen(true);
   };
 
   useEffect(() => injectTableStyles(), []);
@@ -60,7 +92,7 @@ export default function Archive() {
   };
 
   /**
-   * ✅ NEW BEHAVIOR:
+   * ✅ Behavior:
    * - If month has 0 records => DELETE archives/{month} doc
    *   so closeDate disappears and you can Close Month again.
    */
@@ -71,6 +103,7 @@ export default function Archive() {
       setSelectedRecord(null);
       setSearch("");
       setCloseInfo(null);
+      setShowDetails(false);
       return;
     }
 
@@ -79,6 +112,7 @@ export default function Archive() {
     setSearch("");
     setRecords([]);
     setCloseInfo(null);
+    setShowDetails(false);
 
     // ✅ 1) fetch records first
     const snap = await getDocs(collection(db, "archives", m, "records"));
@@ -107,6 +141,7 @@ export default function Archive() {
       setSelectedRecord(null);
       setSearch("");
       setCloseInfo(null);
+      setShowDetails(false);
 
       // refresh month list
       fetchMonths().catch(() => {});
@@ -144,6 +179,117 @@ export default function Archive() {
 
   const hasData = (records || []).length > 0;
 
+  // ✅ on row click -> open fullscreen
+  const onSelectRow = (rec) => {
+    setSelectedRecord(rec);
+    setShowDetails(true);
+  };
+
+  // ✅ close date string
+  const closeDateText =
+    closeInfo?.closedAt?.toDate?.()
+      ? closeInfo.closedAt.toDate().toLocaleString()
+      : closeInfo?.closedAt || closeInfo?.closeDate || "";
+
+  // ✅ treat month as "closed" if closedAt exists
+  const isClosed = !!closeDateText;
+
+  /**
+   * ✅ UN-CLOSE core logic (no confirm here)
+   */
+  const doUncloseMonth = async () => {
+    try {
+      if (unclosing) return;
+      if (!selectedMonth) {
+        showToast("Select Month", "Select a month first.");
+        return;
+      }
+      if (!isClosed) {
+        showToast("Not Closed", "This month is not marked as closed.");
+        return;
+      }
+      if (!hasData) {
+        showToast("No Records", "No archived records to restore.");
+        return;
+      }
+
+      setUnclosing(true);
+
+      // 1) read all archived docs for this month
+      const arcSnap = await getDocs(collection(db, "archives", selectedMonth, "records"));
+      const arcDocs = arcSnap.docs;
+      if (!arcDocs.length) {
+        showToast("No Archived Docs", "No archived docs found.");
+        return;
+      }
+
+      // 2) build a set of existing current record IDs (to avoid overwriting)
+      const currentSnap = await getDocs(collection(db, "records"));
+      const existingIds = new Set(currentSnap.docs.map((d) => String(d.id)));
+
+      let restored = 0;
+      let skipped = 0;
+
+      // 3) batch restore + delete archive docs (chunked)
+      let i = 0;
+      while (i < arcDocs.length) {
+        const batch = writeBatch(db);
+        const slice = arcDocs.slice(i, i + 200); // 200 => safe (set+delete = 400 writes)
+
+        slice.forEach((d) => {
+          const data = d.data() || {};
+          const id = String(d.id);
+
+          if (existingIds.has(id)) {
+            skipped++;
+            return;
+          }
+
+          batch.set(doc(db, "records", id), {
+            ...data,
+            restoredFromArchiveMonth: selectedMonth,
+            restoredAt: new Date().toISOString(),
+          });
+
+          restored++;
+        });
+
+        // delete archive docs for ALL in slice (even if skipped restore)
+        slice.forEach((d) => {
+          batch.delete(doc(db, "archives", selectedMonth, "records", String(d.id)));
+        });
+
+        await batch.commit();
+        i += 200;
+      }
+
+      // 4) delete month doc itself (removes closedAt)
+      await deleteDoc(doc(db, "archives", selectedMonth));
+
+      // ✅ Success toast
+      showToast(
+        "Unclosed Successfully",
+        `✅ Restored: ${restored}\nSkipped: ${skipped}\nTotal: ${arcDocs.length}`
+      );
+
+      // 5) reset UI + refresh months
+      setSelectedMonth("");
+      setRecords([]);
+      setSelectedRecord(null);
+      setSearch("");
+      setCloseInfo(null);
+      setShowDetails(false);
+
+      fetchMonths().catch(() => {});
+    } catch (e) {
+      console.error("uncloseMonth error:", e);
+      showToast("Unclose Failed", `❌ ${e?.message || e}`);
+    } finally {
+      setUnclosing(false);
+      setShowUncloseConfirm(false);
+    }
+  };
+
   // ---------- styles ----------
   const page = {
     height: "calc(100vh - 70px)",
@@ -153,25 +299,21 @@ export default function Archive() {
     overflow: "hidden",
   };
 
-const header = {
-  borderRadius: 24,
-  padding: 20,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-
-  color: "#fff",
-
-  background: `
-    radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 40%),
-    linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #080404 100%)
-  `,
-
-  boxShadow: "0 20px 40px rgba(0,0,0,.25)",
-};
-
+  const header = {
+    borderRadius: 24,
+    padding: 20,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    color: "#fff",
+    background: `
+      radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 40%),
+      linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #080404 100%)
+    `,
+    boxShadow: "0 20px 40px rgba(0,0,0,.25)",
+  };
 
   const hTitle = { fontSize: 18, fontWeight: 950, color: C.bg };
   const hSub = { fontSize: 12, fontWeight: 800, color: C.bg, marginTop: 6 };
@@ -212,13 +354,23 @@ const header = {
     cursor: "pointer",
   };
 
-  const body = {
-    flex: 1,
-    overflow: "hidden",
-    display: "grid",
-    gridTemplateColumns: "1.65fr 1fr",
-    gap: 12,
-    alignItems: "stretch",
+  const btn = {
+    padding: "10px 12px",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 950,
+    border: `1px solid ${C.border}`,
+    background: "#fff",
+    color: C.text,
+    whiteSpace: "nowrap",
+  };
+
+  const btnDanger = {
+    ...btn,
+    border: `1px solid ${C.danger}`,
+    background: "#fff1f2",
+    color: C.danger,
+    opacity: unclosing ? 0.7 : 1,
   };
 
   const card = {
@@ -230,6 +382,7 @@ const header = {
     display: "flex",
     flexDirection: "column",
     minHeight: 0,
+    flex: 1,
   };
 
   const cardHead = {
@@ -242,17 +395,11 @@ const header = {
     gap: 10,
     flexWrap: "wrap",
     background: C.softBg,
+    alignItems: "center",
   };
 
   const scroll = { flex: 1, overflowY: "auto", overflowX: "hidden" };
-
   const emptyBox = { padding: 18, color: C.muted, fontWeight: 850 };
-
-  const responsiveCss = `
-    @media (max-width: 1050px){
-      .archiveBody{ grid-template-columns: 1fr !important; }
-    }
-  `;
 
   const panelTableStyles = useMemo(
     () => ({
@@ -267,20 +414,29 @@ const header = {
     [C.border]
   );
 
-  // ✅ show close date if exists (supports Timestamp or string)
-  const closeDateText =
-    closeInfo?.closedAt?.toDate?.()
-      ? closeInfo.closedAt.toDate().toLocaleString()
-      : closeInfo?.closedAt || closeInfo?.closeDate || "";
+  const modalTitle =
+    selectedRecord?.establishmentName ||
+    selectedRecord?.fsicAppNo ||
+    `Archive: ${selectedMonth || ""}`;
 
   return (
     <div style={page}>
-      <style>{responsiveCss}</style>
+      {/* ✅ TOAST (your design) */}
+      <TopRightToast
+        C={C}
+        open={toastOpen}
+        title={toastTitle}
+        message={toastMsg}
+        autoCloseMs={2200}
+        onClose={() => setToastOpen(false)}
+      />
 
       <div style={header}>
         <div>
           <div style={hTitle}>Archive Records</div>
-          <div style={hSub}>Select month → search → click row to view details / renew</div>
+          <div style={hSub}>
+            Select month → search → click row to view details / renew • (Unclose available if closed)
+          </div>
         </div>
       </div>
 
@@ -308,48 +464,61 @@ const header = {
           onChange={(e) => setSearch(e.target.value)}
           disabled={!selectedMonth || !hasData}
         />
+
+        {/* ✅ Unclose button shows ONLY if month closed */}
+        {selectedMonth && isClosed ? (
+          <button
+            style={btnDanger}
+            onClick={() => setShowUncloseConfirm(true)}
+            disabled={unclosing}
+          >
+            {unclosing ? "Unclosing..." : "Unclose Month"}
+          </button>
+        ) : null}
       </div>
 
-      <div style={body} className="archiveBody">
-        {/* LEFT: TABLE */}
-        <div style={card}>
-          <div style={cardHead}>
-            <div>
-              Month: {selectedMonth ? selectedMonth : "-"}
-              {selectedMonth && !hasData ? (
-                <span style={{ marginLeft: 10, color: C.muted }}>(No records)</span>
-              ) : null}
-            </div>
-
-            <div style={{ opacity: 0.85, color: C.muted }}>
-              Results: {filtered.length}
-              {closeDateText ? (
-                <span style={{ marginLeft: 12 }}>• Closed: {closeDateText}</span>
-              ) : null}
-            </div>
+      <div style={card}>
+        <div style={cardHead}>
+          <div>
+            Month: {selectedMonth ? selectedMonth : "-"}
+            {selectedMonth && !hasData ? (
+              <span style={{ marginLeft: 10, color: C.muted }}>(No records)</span>
+            ) : null}
           </div>
 
-          <div style={scroll}>
-            {!selectedMonth ? (
-              <div style={emptyBox}>Select a month to view archived records.</div>
-            ) : !hasData ? (
-              <div style={emptyBox}>
-                No archived records found for <b>{selectedMonth}</b>.
-                <div style={{ marginTop: 8 }}>
-                  (If month had no records, it auto-deletes the close date so you can close again.)
-                </div>
-              </div>
-            ) : (
-              <RecordsTable
-                records={filtered}
-                apiBase={API}
-                onRowClick={(rec) => setSelectedRecord(rec)}
-              />
-            )}
+          <div style={{ opacity: 0.85, color: C.muted }}>
+            Results: {filtered.length}
+            {closeDateText ? <span style={{ marginLeft: 12 }}>• Closed: {closeDateText}</span> : null}
           </div>
         </div>
 
-        {/* RIGHT: DETAILS PANEL */}
+        <div style={scroll}>
+          {!selectedMonth ? (
+            <div style={emptyBox}>Select a month to view archived records.</div>
+          ) : !hasData ? (
+            <div style={emptyBox}>
+              No archived records found for <b>{selectedMonth}</b>.
+              <div style={{ marginTop: 8 }}>
+                (If month had no records, it auto-deletes the close date so you can close again.)
+              </div>
+            </div>
+          ) : (
+            <RecordsTable
+              records={filtered}
+              apiBase={API}
+              onRowClick={(rec) => onSelectRow(rec)}
+              activeId={selectedRecord?.id}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ✅ FULL SCREEN DETAILS */}
+      <DetailsFullScreen
+        open={showDetails}
+        title={modalTitle}
+        onClose={() => setShowDetails(false)}
+      >
         <RecordDetailsPanel
           styles={panelTableStyles}
           record={selectedRecord}
@@ -357,17 +526,33 @@ const header = {
           isArchive={true}
           onRenewSaved={({ oldId, newRecord }) => {
             console.log("Renew saved:", oldId, newRecord);
+            showToast("Renew Saved", "✅ Renewed record saved successfully.");
           }}
           onUpdated={(updated) => {
             setRecords((prev) =>
               (prev || []).map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
             );
-            setSelectedRecord((prev) =>
-              prev?.id === updated.id ? { ...prev, ...updated } : prev
-            );
+            setSelectedRecord((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev));
+            showToast("Updated", "✅ Record updated successfully.");
           }}
         />
-      </div>
+      </DetailsFullScreen>
+
+      {/* ✅ UN-CLOSE CONFIRM MODAL (glass) */}
+      <ConfirmModal
+        C={C}
+        open={showUncloseConfirm}
+        title={`Unclose Month ${selectedMonth || ""}`}
+        message={
+          "This will restore archived records back to CURRENT records and remove the archive month.\n\nProceed?"
+        }
+        cancelText="Cancel"
+        confirmText="Yes, Unclose"
+        danger={true}
+        busy={unclosing}
+        onCancel={() => !unclosing && setShowUncloseConfirm(false)}
+        onConfirm={doUncloseMonth}
+      />
     </div>
   );
 }

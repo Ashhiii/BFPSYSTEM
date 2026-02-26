@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { db } from "../../firebase";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, collection, writeBatch } from "firebase/firestore";
 
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No" },
@@ -18,8 +18,10 @@ const FIELDS = [
   { key: "ntcDate", label: "NTC Date" },
   { key: "fsicValidity", label: "FSIC Validity" },
   { key: "defects", label: "Defects" },
+
   { key: "teamLeader", label: "Team Leader" },
   { key: "teamLeaderSerial", label: "Team Leader Serial" },
+
   { key: "inspector1", label: "Inspector 1" },
   { key: "inspector1Serial", label: "Inspector 1 Serial" },
 
@@ -29,8 +31,9 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3" },
   { key: "inspector3Serial", label: "Inspector 3 Serial" },
 
-  // (keep your old inspectors field if you still use it)
-  { key: "inspectors", label: "Inspectors" },
+  // ✅ combined auto
+  { key: "inspectors", label: "Inspectors (combined)" },
+
   { key: "occupancyType", label: "Occupancy" },
   { key: "buildingDesc", label: "Building Desc" },
   { key: "floorArea", label: "Floor Area" },
@@ -47,6 +50,7 @@ const FIELDS = [
   { key: "marshalName", label: "Marshal" },
 ];
 
+// ✅ ONLY fields you really want ALWAYS UPPERCASE
 const CAPS_KEYS = new Set([
   "fsicAppNo",
   "natureOfInspection",
@@ -57,25 +61,11 @@ const CAPS_KEYS = new Set([
 
   "ioNumber",
   "nfsiNumber",
-
-  // ✅ ADD: NTC
   "ntcNumber",
 
   "fsicValidity",
   "defects",
 
-  // ✅ ADD: TL + Inspectors
-  "teamLeader",
-  "teamLeaderSerial",
-
-  "inspector1",
-  "inspector1Serial",
-  "inspector2",
-  "inspector2Serial",
-  "inspector3",
-  "inspector3Serial",
-
-  "inspectors",
   "occupancyType",
   "buildingDesc",
   "floorArea",
@@ -90,16 +80,68 @@ const CAPS_KEYS = new Set([
   "marshalName",
 ]);
 
-const DATE_KEYS = new Set([
-  "dateInspected",
-  "ioDate",
-  "nfsiDate",
-
-  // ✅ ADD: NTC DATE
-  "ntcDate",
-
-  "orDate",
+// ✅ Keep EXACT casing as typed (no auto-caps)
+const NO_CAPS_KEYS = new Set([
+  "teamLeader",
+  "teamLeaderSerial",
+  "inspector1",
+  "inspector1Serial",
+  "inspector2",
+  "inspector2Serial",
+  "inspector3",
+  "inspector3Serial",
+  "inspectors", // combined (auto) but keep casing of names
 ]);
+
+const DATE_KEYS = new Set(["dateInspected", "ioDate", "nfsiDate", "ntcDate", "orDate"]);
+
+/** ✅ Convert whatever value -> YYYY-MM-DD for <input type="date"> */
+const toInputDate = (v) => {
+  if (!v) return "";
+
+  // Firestore Timestamp
+  if (v?.toDate) {
+    const d = v.toDate();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  // already YYYY-MM-DD
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+
+  // ISO / parseable date string (includes "January 2, 2026")
+  if (typeof v === "string" && !Number.isNaN(Date.parse(v))) {
+    const d = new Date(v);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  return "";
+};
+
+// ✅ Add 1 year to YYYY-MM-DD and return YYYY-MM-DD
+const addOneYear = (yyyy_mm_dd) => {
+  if (!yyyy_mm_dd) return "";
+  const d = new Date(`${yyyy_mm_dd}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  d.setFullYear(d.getFullYear() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+// ✅ Combine inspector 1/2/3 -> string
+const combineInspectors = (a, b, c) => {
+  return [a, b, c]
+    .map((x) => String(x || "").trim())
+    .filter(Boolean)
+    .join(", ");
+};
 
 export default function RecordDetailsPanel({
   styles,
@@ -137,14 +179,27 @@ export default function RecordDetailsPanel({
     setRenewedRecord(null);
     if (!record) return;
 
+    // ✅ init form (dates normalized for date inputs)
     const init = {};
-    FIELDS.forEach((f) => (init[f.key] = record?.[f.key] ?? ""));
+    FIELDS.forEach((f) => {
+      const raw = record?.[f.key] ?? "";
+      init[f.key] = DATE_KEYS.has(f.key) ? toInputDate(raw) : raw;
+    });
+
+    // ✅ auto compute validity from dateInspected
+    if (init.dateInspected) init.fsicValidity = addOneYear(init.dateInspected);
+
+    // ✅ auto compute inspectors combined
+    init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3);
+
     setForm(init);
 
     // ✅ load latest renewed (renewals/{entityKey})
     if (!entityKey) return;
     getDoc(doc(db, "renewals", entityKey))
-      .then((snap) => setRenewedRecord(snap.exists() ? snap.data()?.record || null : null))
+      .then((snap) =>
+        setRenewedRecord(snap.exists() ? snap.data()?.record || null : null)
+      )
       .catch(() => setRenewedRecord(null));
   }, [record, entityKey]);
 
@@ -159,12 +214,31 @@ export default function RecordDetailsPanel({
     background: "#fff",
     boxSizing: "border-box",
     fontWeight: 850,
-    textTransform: CAPS_KEYS.has(k) ? "uppercase" : "none",
+    textTransform: CAPS_KEYS.has(k) && !NO_CAPS_KEYS.has(k) ? "uppercase" : "none",
   });
 
+  // ✅ field setter (auto validity + combined inspectors)
   const setField = (k, v) => {
-    const next = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : v;
-    setForm((p) => ({ ...p, [k]: next }));
+    setForm((p) => {
+      const next = { ...p };
+
+      // keep exact casing for name fields
+      if (NO_CAPS_KEYS.has(k)) next[k] = String(v ?? "");
+      else next[k] = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : String(v ?? "");
+
+      // ✅ dateInspected changes -> auto fsicValidity (+1 year)
+      if (k === "dateInspected") {
+        const di = String(v ?? "");
+        next.fsicValidity = addOneYear(di);
+      }
+
+      // ✅ inspector changes -> auto combined inspectors
+      if (k === "inspector1" || k === "inspector2" || k === "inspector3") {
+        next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3);
+      }
+
+      return next;
+    });
   };
 
   const btn = (variant) => {
@@ -192,20 +266,21 @@ export default function RecordDetailsPanel({
     try {
       setSaving(true);
 
+      // ensure autos are correct before saving
+      const ensured = { ...form };
+      if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
+      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3);
+
       const payload = {};
-      FIELDS.forEach((f) => (payload[f.key] = form[f.key] ?? ""));
-      payload.teamLeader = form.teamLeader ?? "";
+      FIELDS.forEach((f) => (payload[f.key] = ensured[f.key] ?? ""));
       payload.updatedAt = serverTimestamp();
 
-      const targetCol = isArchive
+      const targetDocRef = isArchive
         ? doc(db, "archives", String(source || "").replace("Archive: ", ""), "records", record.id)
         : doc(db, "records", record.id);
 
-      // if source string is not clean, just fallback to archive month from record.month if you store it
-      // For safety, when archive mode, prefer passing month separately; but we'll keep it simple:
-      await setDoc(targetCol, payload, { merge: true });
+      await setDoc(targetDocRef, payload, { merge: true });
 
-      // return merged object for UI
       const merged = { ...record, ...payload };
       setEditing(false);
       onUpdated?.({ ...merged, id: record.id });
@@ -217,38 +292,85 @@ export default function RecordDetailsPanel({
   };
 
   // ✅ Save renew (writes renewals/{entityKey})
-  const saveRenew = async () => {
-    if (!record) return;
-    if (!entityKey) return alert("Missing entityKey");
+// ✅ Save renew (writes renewals/{entityKey} AND creates a new doc in records/)
+const saveRenew = async () => {
+  if (!record) return;
+  if (!entityKey) return alert("Missing entityKey");
 
-    try {
-      setSaving(true);
+  try {
+    setSaving(true);
 
-      const newRecord = {
-        ...record,
-        ...form,
-        entityKey,
-        source: source || "unknown",
-        renewedFromId: record?.id || "",
-        renewedAt: new Date().toISOString(),
-      };
+    // ✅ ensure auto fields are correct
+    const ensured = { ...form };
 
-      await setDoc(
-        doc(db, "renewals", entityKey),
-        { record: newRecord, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
+    // auto validity from dateInspected (if you have it in this panel)
+    if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
 
-      setRenewedRecord(newRecord);
-      setRenewing(false);
-      onRenewSaved?.({ oldId: record.id, newRecord });
-    } catch (e) {
-      alert(`❌ ${e.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
+    // auto inspectors combined
+    ensured.inspectors = combineInspectors(
+      ensured.inspector1,
+      ensured.inspector2,
+      ensured.inspector3
+    );
 
+    // ✅ Build renewed record object
+    const newRecord = {
+      ...record,
+      ...ensured,
+      entityKey,
+      source: source || "unknown",
+      renewedFromId: record?.id || "",
+      renewedAt: new Date().toISOString(),
+
+      // optional flags for UI filtering
+      status: "RENEWED",
+      isRenewedCopy: true,
+    };
+
+    // ✅ Create a NEW record doc in current records collection (auto id)
+    const newRecordRef = doc(collection(db, "records")); // generates new id
+    const renewalsRef = doc(db, "renewals", entityKey);
+
+    // ✅ Do both writes in one batch
+    const batch = writeBatch(db);
+
+    // 1) save to renewals/{entityKey}
+    batch.set(
+      renewalsRef,
+      { record: newRecord, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+
+    // 2) save to records/{newId} so it appears in Records list
+    batch.set(
+      newRecordRef,
+      {
+        ...newRecord,
+        // make sure records doc has its own id too (useful for UI)
+        id: newRecordRef.id,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    await batch.commit();
+
+    // update UI state
+    setRenewedRecord({ ...newRecord, id: newRecordRef.id });
+    setRenewing(false);
+
+    // pass back ids for parent refresh/highlight if you want
+    onRenewSaved?.({
+      oldId: record.id,
+      newRecord: { ...newRecord, id: newRecordRef.id },
+    });
+  } catch (e) {
+    alert(`❌ ${e.message}`);
+  } finally {
+    setSaving(false);
+  }
+};
   const panel = {
     overflow: "hidden",
     borderRadius: 16,
@@ -316,12 +438,17 @@ export default function RecordDetailsPanel({
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {mode === "view" && (
             <>
-              <button style={btn("primary")} onClick={() => setEditing(true)}>Edit</button>
+              <button style={btn("primary")} onClick={() => setEditing(true)}>
+                Edit
+              </button>
 
               {isArchive && (
                 <button
                   style={btn("gold")}
-                  onClick={() => { setRenewing(true); setEditing(false); }}
+                  onClick={() => {
+                    setRenewing(true);
+                    setEditing(false);
+                  }}
                 >
                   Renew
                 </button>
@@ -356,24 +483,48 @@ export default function RecordDetailsPanel({
       <div style={body}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
-            {FIELDS.map((f) => (
-              <tr key={f.key}>
-                <td style={labelTd}>{f.label}</td>
-                <td style={valueTd}>
-                  {mode === "edit" || mode === "renew" ? (
-                    <input
-                      name={f.key}
-                      value={form[f.key] ?? ""}
-                      onChange={(e) => setField(f.key, e.target.value)}
-                      style={inputStyle(f.key)}
-                      autoComplete="off"
-                      placeholder={f.label}
-                      type={DATE_KEYS.has(f.key) ? "date" : "text"}
-                    />
-                  ) : (
-                    (record?.[f.key] ?? "") || "-"
-                  )}
-                </td>
+            {FIELDS.reduce((rows, field, index) => {
+              if (index % 2 === 0) rows.push([field]);
+              else rows[rows.length - 1].push(field);
+              return rows;
+            }, []).map((pair, rowIndex) => (
+              <tr key={rowIndex}>
+                {pair.map((f) => (
+                  <React.Fragment key={f.key}>
+                    <td style={labelTd}>{f.label}</td>
+                    <td style={valueTd}>
+                      {mode === "edit" || mode === "renew" ? (
+                        <input
+                          name={f.key}
+                          value={form[f.key] ?? ""}
+                          onChange={(e) => setField(f.key, e.target.value)}
+                          style={{
+                            ...inputStyle(f.key),
+                            ...(f.key === "inspectors"
+                              ? { background: "#f3f4f6", cursor: "not-allowed" }
+                              : null),
+                            ...(f.key === "fsicValidity"
+                              ? { background: "#f3f4f6", cursor: "not-allowed" }
+                              : null),
+                          }}
+                          autoComplete="off"
+                          placeholder={f.label}
+                          type={DATE_KEYS.has(f.key) ? "date" : "text"}
+                          readOnly={f.key === "inspectors" || f.key === "fsicValidity"} // ✅ AUTO FIELDS
+                        />
+                      ) : (
+                        (record?.[f.key] ?? "") || "-"
+                      )}
+                    </td>
+                  </React.Fragment>
+                ))}
+
+                {pair.length === 1 && (
+                  <>
+                    <td style={{ ...labelTd, background: "#fff" }}></td>
+                    <td style={{ ...valueTd, background: "#fff" }}></td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>

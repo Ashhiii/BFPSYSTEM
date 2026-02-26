@@ -7,7 +7,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-import { db } from "../../firebase"; // ✅ adjust path
+import { db } from "../../firebase"; 
 import RenewRecordPanel from "./RenewRecordPanel.jsx";
 
 const FIELDS = [

@@ -4,6 +4,7 @@ import { db } from "../../firebase";
 
 import DocumentsTable from "./DocumentsTable.jsx";
 import DocumentDetailsPanel from "./DocumentDetailsPanel.jsx";
+import DetailsFullScreen from "../../components/DetailsFullScreen.jsx"; // ✅ reuse same component
 
 const C = {
   primary: "#b91c1c",
@@ -23,6 +24,9 @@ export default function Documents({ refresh, setRefresh }) {
   const [search, setSearch] = useState("");
   const [selectedDoc, setSelectedDoc] = useState(null);
 
+  // ✅ FULLSCREEN
+  const [showDetails, setShowDetails] = useState(false);
+
   const fetchDocs = async () => {
     try {
       const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
@@ -37,6 +41,7 @@ export default function Documents({ refresh, setRefresh }) {
 
   useEffect(() => {
     fetchDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
   const filtered = useMemo(() => {
@@ -55,6 +60,11 @@ export default function Documents({ refresh, setRefresh }) {
     });
   }, [docs, search]);
 
+  const onSelectRow = (d) => {
+    setSelectedDoc(d);
+    setShowDetails(true); // ✅ open fullscreen
+  };
+
   const page = {
     height: "calc(100vh - 70px)",
     display: "flex",
@@ -63,24 +73,21 @@ export default function Documents({ refresh, setRefresh }) {
     overflow: "hidden",
   };
 
-const header = {
-  borderRadius: 24,
-  padding: 20,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-
-  color: "#fff",
-
-  background: `
-    radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 40%),
-    linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #080404 100%)
-  `,
-
-  boxShadow: "0 20px 40px rgba(0,0,0,.25)",
-};
+  const header = {
+    borderRadius: 24,
+    padding: 20,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    color: "#fff",
+    background: `
+      radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 40%),
+      linear-gradient(135deg, #b91c1c 0%, #7f1d1d 50%, #080404 100%)
+    `,
+    boxShadow: "0 20px 40px rgba(0,0,0,.25)",
+  };
 
   const searchCard = {
     borderRadius: 16,
@@ -93,8 +100,8 @@ const header = {
   const content = {
     flex: 1,
     overflow: "hidden",
-    display: "grid",
-    gridTemplateColumns: "1fr 420px",
+    display: "flex",
+    flexDirection: "column",
     gap: 12,
     minHeight: 0,
   };
@@ -124,6 +131,9 @@ const header = {
 
   const scrollSlot = { flex: 1, overflow: "hidden", minHeight: 0 };
 
+  const fullTitle =
+    selectedDoc?.establishmentName || selectedDoc?.fsicAppNo || "Document Details";
+
   return (
     <div style={page}>
       <div style={header}>
@@ -132,7 +142,7 @@ const header = {
           <div style={{ fontSize: 12, fontWeight: 800, color: C.bg, marginTop: 6 }}>
             Auto-filled from Records • Edit Chief/Marshal here • Generate PDFs
           </div>
-        </div>  
+        </div>
       </div>
 
       <div style={searchCard}>
@@ -151,7 +161,7 @@ const header = {
           }}
         />
         <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 8 }}>
-          Click a row → details show on the right
+          Click a row → details opens full screen
         </div>
       </div>
 
@@ -159,14 +169,19 @@ const header = {
         <div style={card}>
           <div style={cardHead}>
             <div>Documents List</div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: C.muted }}>Results: {filtered.length}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: C.muted }}>
+              Results: {filtered.length}
+            </div>
           </div>
 
           <div style={scrollSlot}>
-            <DocumentsTable docs={filtered} onRowClick={(d) => setSelectedDoc(d)} apiBase={API} />
+            <DocumentsTable docs={filtered} onRowClick={onSelectRow} apiBase={API} />
           </div>
         </div>
+      </div>
 
+      {/* ✅ FULL SCREEN DETAILS */}
+      <DetailsFullScreen open={showDetails} title={fullTitle} onClose={() => setShowDetails(false)}>
         <DocumentDetailsPanel
           doc={selectedDoc}
           onUpdated={(updated) => {
@@ -180,7 +195,7 @@ const header = {
             setRefresh?.((p) => !p);
           }}
         />
-      </div>
+      </DetailsFullScreen>
     </div>
   );
 }

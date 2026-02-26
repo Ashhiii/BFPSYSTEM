@@ -151,7 +151,7 @@ export default function RecordsTable({
                   style={{
                     ...S.row,
                     background: isActive
-                      ? "#ffe4e6" // ✅ highlight
+                      ? "#ffe4e6"
                       : i % 2 === 0
                       ? "#fff"
                       : "#fafafa",
