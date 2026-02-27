@@ -16,8 +16,9 @@ const FIELDS = [
   { key: "natureOfInspection", label: "Nature Of Inspection" },
   { key: "ownerName", label: "Owner" },
   { key: "establishmentName", label: "Establishment" },
-  { key: "fsicNo", label: "FSIC No" },
   { key: "businessAddress", label: "Address" },
+  { key: "defects", label: "Defects" },
+
   { key: "contactNumber", label: "Contact" },
   { key: "dateInspected", label: "Date Inspected" },
 
@@ -30,8 +31,9 @@ const FIELDS = [
   { key: "ntcNumber", label: "NTC No" },
   { key: "ntcDate", label: "NTC Date" },
 
+  { key: "fsicNo", label: "FSIC No" },
   { key: "fsicValidity", label: "FSIC Validity" },
-  { key: "defects", label: "Defects" },
+  
 
   { key: "teamLeader", label: "Team Leader" },
   { key: "teamLeaderSerial", label: "Team Leader Serial" },
@@ -70,12 +72,12 @@ const CAPS_KEYS = new Set([
   "natureOfInspection",
   "ownerName",
   "establishmentName",
-  "fsicNo",
   "businessAddress",
   "contactNumber",
   "ioNumber",
   "nfsiNumber",
   "ntcNumber",
+  "fsicNo",
   "fsicValidity",
   "defects",
   "typeOfOccupancy",
