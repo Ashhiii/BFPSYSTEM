@@ -1,330 +1,279 @@
-import React, { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { db } from "../../firebase";
-import { useNavigate } from "react-router-dom";
+// ✅ RecentRecords.jsx — POLISHED DESIGN (glass + clean pagination + active highlight)
+// - 4 items per page (from Dashboard slice)
+// - Pagination top-right
+// - Active (clicked) row highlight
 
-import InsightCard from "./parts/InsightCard";
-import QuickActions from "./parts/QuickActions";
-import RecentRecords from "./parts/RecentRecords";
-import ExportConfirmModal from "./parts/ExportConfirmModal";
+import React from "react";
+import { HiOutlineChevronRight } from "react-icons/hi";
 
-export default function Dashboard() {
-  const navigate = useNavigate();
+export default function RecentRecords({
+  C,
+  loading,
+  list,
+  onOpen,
+  activeId, // ✅ IMPORTANT
+  page,
+  setPage,
+  total,
+  pageSize,
+}) {
+  const totalPages = Math.max(1, Math.ceil((total || 0) / (pageSize || 1)));
+  const canPaginate = !loading && (total || 0) > (pageSize || 1);
 
-  const [exporting, setExporting] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [renewedCount, setRenewedCount] = useState(0);
-
-  const [recent, setRecent] = useState([]);
-  const [loadingRecent, setLoadingRecent] = useState(false);
-
-  // ✅ pagination for RecentRecords
-  const [page, setPage] = useState(1);
-  const pageSize = 4;
-
-  const C = useMemo(
-    () => ({
-      primary: "#b91c1c",
-      primaryDark: "#7f1d1d",
-      softBg: "#fef2f2",
-      bg: "#f6f7fb",
-      border: "rgba(17,24,39,0.10)",
-      text: "#0f172a",
-      muted: "rgba(15,23,42,0.62)",
-      card: "rgba(255,255,255,0.86)",
-      cardSolid: "#ffffff",
-      shadow: "0 16px 42px rgba(2,6,23,0.10)",
-      shadowSoft: "0 10px 26px rgba(2,6,23,0.08)",
-      green: "#16a34a",
-    }),
-    []
-  );
-
-  const parseAnyDate = (x) => {
-    if (!x) return null;
-    if (typeof x === "object" && typeof x.toDate === "function") return x.toDate();
-    if (typeof x === "string") {
-      const d = new Date(x);
-      if (!Number.isNaN(d.getTime())) return d;
-    }
-    if (typeof x === "number") {
-      const d = new Date(x);
-      if (!Number.isNaN(d.getTime())) return d;
-    }
-    return null;
-  };
-
-  const fmtDate = (d) => {
-    if (!d) return "";
-    try {
-      return d.toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "2-digit",
-      });
-    } catch {
-      return "";
-    }
-  };
-
-  // ✅ string safe
-  const S = (v) => (v === undefined || v === null ? "" : String(v));
-
-  // ✅ date text safe (supports Firestore Timestamp / string)
-  const dateText = (v) => {
-    const d = parseAnyDate(v);
-    return d ? fmtDate(d) : S(v);
-  };
-
-  // ✅ read canonical + legacy fallback (IMPORT KEY vs OLD KEY)
-  const pick = (r, canon, legacy = []) => {
-    const direct = r?.[canon];
-    if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
-    for (const k of legacy) {
-      const v = r?.[k];
-      if (v !== undefined && v !== null && String(v).trim() !== "") return v;
-    }
-    return "";
-  };
-
-  useEffect(() => {
-    const load = async () => {
-      setLoadingRecent(true);
-      try {
-        const recSnap = await getDocs(collection(db, "records"));
-        setTotalRecords(recSnap.size);
-
-        const renSnap = await getDocs(collection(db, "renewals"));
-        setRenewedCount(renSnap.size);
-
-        const snap = await getDocs(collection(db, "records"));
-
-        const list = snap.docs
-          .map((d) => {
-            const data = d.data() || {};
-            const dt =
-              (data.createdAtMs ? new Date(data.createdAtMs) : null) ||
-              parseAnyDate(data.createdAt) ||
-              (data.updatedAtMs ? new Date(data.updatedAtMs) : null) ||
-              parseAnyDate(data.updatedAt) ||
-              null;           
-               return {
-              id: d.id,
-              fsicAppNo: data.fsicAppNo || "",
-              establishmentName: data.establishmentName || "",
-              ownerName: data.ownerName || "",
-              natureOfInspection: data.natureOfInspection || "",
-              _dt: dt ? dt.getTime() : 0,
-              dateText: dt ? fmtDate(dt) : "-",
-            };
-          })
-          .sort((a, b) => (b._dt || 0) - (a._dt || 0));
-
-        setRecent(list);
-        setPage(1);
-      } catch (e) {
-        console.error("Dashboard load error:", e);
-      } finally {
-        setLoadingRecent(false);
-      }
-    };
-
-    load();
-  }, []);
-
-  // ✅ slice list for current page (4 per page)
-  const total = recent.length;
-  const visibleRecent = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return recent.slice(start, start + pageSize);
-  }, [recent, page]);
-
-  // ✅ ✅ EXPORT (FSIC APP NO separate from FSIC NO + fixed new columns)
-  const exportCurrentExcel = async () => {
-    if (exporting) return;
-    setExporting(true);
-
-    try {
-      const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(qy);
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      if (!list.length) {
-        alert("No current records to export.");
-        return;
-      }
-
-      const arranged = list.map((r, idx) => {
-        // ✅ canonical + legacy fallback for new fields
-        const typeOcc = pick(r, "typeOfOccupancy", ["occupancyType", "OCCUPANCY_TYPE"]);
-        const bdesc = pick(r, "buildingDescription", ["buildingDesc", "BLDG_DESCRIPTION", "BUILDING_DESC"]);
-        const floor = pick(r, "floorAreaSqm", ["floorArea", "FLOOR_AREA", "FLOOR_AREA_SQM"]);
-        const storey = pick(r, "noOfStorey", ["storeyCount", "STOREY_COUNT", "NO_OF_STOREY"]);
-
-        return {
-          "NO.": idx + 1,
-
-          // ✅ DO NOT mix fsicNo into fsicAppNo
-          "FSIC APPLICATION NO.": S(r.fsicAppNo),
-
-          "NATURE OF INSPECTION": S(r.natureOfInspection || r.NATURE_OF_INSPECTION),
-          "NAME OF OWNER": S(r.ownerName || r.OWNERS_NAME || r.NAME_OF_OWNER),
-          "NAME OF ESTABLISHMENT": S(r.establishmentName || r.ESTABLISHMENT_NAME || r.NAME_OF_ESTABLISHMENT),
-          "BUSINESS ADDRESS": S(r.businessAddress || r.BUSSINESS_ADDRESS || r.ADDRESS),
-          "CONTACT #": S(r.contactNumber || r.CONTACT_NUMBER || r.CONTACT_),
-          "DATE INSPECTED": dateText(r.dateInspected || r.DATE_INSPECTED),
-
-          "I.O NUMBER": S(r.ioNumber || r.IO_NUMBER),
-          "I.O DATE": dateText(r.ioDate || r.IO_DATE),
-
-          "NFSI NUMBER": S(r.nfsiNumber || r.NFSI_NUMBER),
-          "NFSI DATE": dateText(r.nfsiDate || r.NFSI_DATE),
-
-          "NTC NUMBER": S(r.ntcNumber || r.NTC_NUMBER),
-          "NTC DATE": dateText(r.ntcDate || r.NTC_DATE),
-
-          // ✅ separate FSIC NO column
-          "FSIC NO": S(r.fsicNo || r.FSIC_NO),
-
-          "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
-          DEFECTS: S(r.defects || r.DEFECTS),
-          INSPECTORS: S(r.inspectors || r.INSPECTORS),
-
-          // ✅ fixed: uses canonical keys from ImportExcel (with legacy fallback)
-          "TYPE OF OCCUPANCY": S(typeOcc),
-          "BLDG DESCRIPTION": S(bdesc),
-          "FLOOR AREA (SQM)": S(floor),
-          "BUILDING HEIGHT": S(r.buildingHeight || r.BUILDING_HEIGHT),
-          "NO OF STOREY": S(storey),
-          "HIGH RISE (YES/NO)": S(r.highRise || r.HIGH_RISE),
-          "FSMR (YES/NO)": S(r.fsmr || r.FSMR),
-
-          REMARKS: S(r.remarks || r.REMARKS),
-
-          "O.R NUMBER": S(r.orNumber || r.OR_NUMBER),
-          "O.R AMOUNT": S(r.orAmount || r.OR_AMOUNT),
-
-          // ✅ last column
-          "O.R DATE": dateText(r.orDate || r.OR_DATE),
-        };
-      });
-
-      const worksheet = XLSX.utils.json_to_sheet(arranged);
-
-      worksheet["!cols"] = [
-        { wch: 6 },
-        { wch: 22 }, // FSIC APP
-        { wch: 22 },
-        { wch: 24 },
-        { wch: 28 },
-        { wch: 38 },
-        { wch: 16 },
-        { wch: 18 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 }, // FSIC NO
-        { wch: 18 },
-        { wch: 16 },
-        { wch: 26 },
-        { wch: 18 },
-        { wch: 30 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 14 },
-        { wch: 16 },
-        { wch: 14 },
-        { wch: 20 },
-        { wch: 16 },
-        { wch: 14 },
-        { wch: 16 },
-      ];
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "BFP Current Records");
-      XLSX.writeFile(workbook, "BFP_Current_Records.xlsx");
-    } catch (e) {
-      console.error(e);
-      alert("Export failed.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const pageWrap = {
-    padding: 22,
-    background: `radial-gradient(1200px 600px at 12% 0%, rgba(185,28,28,0.12), transparent 55%), ${C.bg}`,
-    maxHeight: "100%",
-    overflowY: "hidden",
-  };
-
-  const layout = {
+  const card = {
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    borderRadius: 24,
+    boxShadow: C.shadow,
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    padding: 16,
     display: "flex",
     flexDirection: "column",
-    gap: 18,
+    gap: 12,
   };
 
-  const leftCol = { display: "flex", flexDirection: "column", gap: 18 };
-  const rightCol = { display: "flex", flexDirection: "column", gap: 18 };
+  const headerRow = {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  };
 
-  const responsiveCss = `
-    @media (max-width: 980px){
-      .dashLayout{ grid-template-columns: 1fr !important; }
-      .twoCols{ grid-template-columns: 1fr !important; }
+  const headerTitle = {
+    fontSize: 14,
+    fontWeight: 950,
+    color: C.text,
+    letterSpacing: 0.2,
+  };
+  const headerSub = { fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 2 };
+
+  const pager = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  };
+
+  const pagePill = {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: `1px solid ${C.border}`,
+    background: "rgba(255,255,255,0.70)",
+    color: C.muted,
+    fontSize: 12,
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+  };
+
+  const btn = (disabled) => ({
+    padding: "7px 12px",
+    borderRadius: 14,
+    border: `1px solid ${C.border}`,
+    background: disabled ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.85)",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.55 : 1,
+    fontSize: 12,
+    fontWeight: 950,
+    color: C.text,
+    transition: "transform .12s ease, box-shadow .12s ease, background .12s ease",
+  });
+
+  const listWrap = { display: "flex", flexDirection: "column", gap: 10 };
+
+  const baseRow = {
+    padding: "12px 12px",
+    borderRadius: 18,
+    border: `1px solid ${C.border}`,
+    background: "rgba(255,255,255,0.78)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    cursor: "pointer",
+    transition: "transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease",
+  };
+
+  const leftInfo = { minWidth: 0, display: "flex", flexDirection: "column", gap: 4 };
+
+  const title = {
+    fontSize: 13,
+    fontWeight: 950,
+    color: C.text,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+
+  const sub = {
+    fontSize: 11,
+    fontWeight: 850,
+    color: C.muted,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+
+  const rightSide = { display: "flex", alignItems: "center", gap: 8 };
+
+  const chip = {
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "rgba(185,28,28,0.10)",
+    color: C.primaryDark,
+    fontSize: 11,
+    fontWeight: 980,
+    border: `1px solid ${C.border}`,
+    maxWidth: 140,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+
+  const chevron = {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    border: `1px solid ${C.border}`,
+    background: "rgba(255,255,255,0.70)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
+  const emptyBox = {
+    padding: 14,
+    borderRadius: 18,
+    border: `1px dashed ${C.border}`,
+    background: "rgba(255,255,255,0.55)",
+    color: C.muted,
+    fontSize: 12,
+    fontWeight: 850,
+  };
+
+  const skeleton = (i) => ({
+    height: 54,
+    borderRadius: 18,
+    border: `1px solid ${C.border}`,
+    background:
+      "linear-gradient(90deg, rgba(255,255,255,0.55), rgba(255,255,255,0.85), rgba(255,255,255,0.55))",
+    backgroundSize: "200% 100%",
+    animation: `shimmer 1.1s ease-in-out ${i * 0.08}s infinite`,
+  });
+
+  const css = `
+    @keyframes shimmer {
+      0% { background-position: 0% 0%; }
+      100% { background-position: -200% 0%; }
     }
   `;
 
   return (
-    <div style={pageWrap}>
-      <style>{responsiveCss}</style>
+    <div style={card}>
+      <style>{css}</style>
 
-      <div style={layout} className="dashLayout">
-        {/* LEFT */}
-        <div style={leftCol}>
-          <InsightCard C={C} totalRecords={totalRecords} renewedCount={renewedCount} />
-
-          <QuickActions
-            C={C}
-            exporting={exporting}
-            onAdd={() => navigate("/app/add-record")}
-            onImport={() => navigate("/app/import")}
-            onExport={() => setShowConfirm(true)}
-            onArchive={() => navigate("/app/archive")}
-          />
+      {/* Header + Pagination */}
+      <div style={headerRow}>
+        <div style={{ minWidth: 0 }}>
+          <div style={headerTitle}>Recent Records</div>
+          <div style={headerSub}>Latest added records (4 per page)</div>
         </div>
 
-        {/* RIGHT */}
-        <div style={rightCol}>
-          <RecentRecords
-            C={C}
-            loading={loadingRecent}
-            list={visibleRecent}
-            // ✅ IMPORTANT: use openId (para auto-open + highlight sa Records.jsx)
-            onOpen={(id) => navigate("/app/records", { state: { openId: id } })}
-            page={page}
-            setPage={setPage}
-            total={total}
-            pageSize={pageSize}
-          />
-        </div>
+        {canPaginate && (
+          <div style={pager}>
+            <button
+              style={btn(page === 1)}
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+            >
+              Prev
+            </button>
+
+            <div style={pagePill}>
+              Page {page} / {totalPages}
+            </div>
+
+            <button
+              style={btn(page >= totalPages)}
+              disabled={page >= totalPages}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
-      {showConfirm && (
-        <ExportConfirmModal
-          C={C}
-          exporting={exporting}
-          onCancel={() => setShowConfirm(false)}
-          onConfirm={async () => {
-            setShowConfirm(false);
-            await exportCurrentExcel();
-          }}
-        />
-      )}
+      {/* List */}
+      <div style={listWrap}>
+        {loading ? (
+          <>
+            <div style={skeleton(0)} />
+            <div style={skeleton(1)} />
+            <div style={skeleton(2)} />
+            <div style={skeleton(3)} />
+          </>
+        ) : list?.length ? (
+          list.map((r) => {
+            const isActive = String(activeId || "") === String(r.id || "");
+
+            const rowStyle = {
+              ...baseRow,
+              borderColor: isActive ? "rgba(185,28,28,0.55)" : C.border,
+              background: isActive ? "rgba(185,28,28,0.12)" : baseRow.background,
+              boxShadow: isActive ? "0 14px 26px rgba(185,28,28,0.14)" : "none",
+            };
+
+            return (
+              <div
+                key={r.id}
+                style={rowStyle}
+                onClick={() => onOpen?.(r.id)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = isActive
+                    ? "0 14px 26px rgba(185,28,28,0.16)"
+                    : "0 12px 24px rgba(2,6,23,0.10)";
+                  e.currentTarget.style.background = isActive
+                    ? "rgba(185,28,28,0.14)"
+                    : "rgba(255,255,255,0.92)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = isActive
+                    ? "0 14px 26px rgba(185,28,28,0.14)"
+                    : "none";
+                  e.currentTarget.style.background = isActive
+                    ? "rgba(185,28,28,0.12)"
+                    : "rgba(255,255,255,0.78)";
+                }}
+              >
+                <div style={leftInfo}>
+                  <div style={title}>{r.establishmentName || r.fsicAppNo || "Record"}</div>
+                  <div style={sub}>
+                    {r.ownerName ? `Owner: ${r.ownerName} • ` : ""}
+                    {r.natureOfInspection ? `${r.natureOfInspection} • ` : ""}
+                    {r.dateText || ""}
+                  </div>
+                </div>
+
+                <div style={rightSide}>
+                  <div style={chip} title={r.fsicAppNo || "FSIC"}>
+                    {r.fsicAppNo || "FSIC"}
+                  </div>
+
+                  <div style={chevron}>
+                    <HiOutlineChevronRight size={18} color="rgba(15,23,42,0.50)" />
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div style={emptyBox}>No recent records found.</div>
+        )}
+      </div>
     </div>
   );
 }
