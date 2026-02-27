@@ -272,35 +272,47 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  /* ================== FLEXIBLE HEADER + NORMALIZERS ================== */
+  /* ================== HEADER + NORMALIZERS (FIXED) ================== */
 
+  // ✅ STRONG: remove ALL symbols (owner’s, ( ), /, ., _, -, #, etc)
   const normKey = (s) =>
     String(s ?? "")
       .toLowerCase()
       .trim()
       .replace(/\s+/g, "")
-      .replace(/[_-]/g, "")
-      .replace(/\./g, "")
-      .replace(/#/g, "");
+      .replace(/[^a-z0-9]/g, "");
 
   const toText = (v) => (v == null ? "" : String(v).trim());
 
+  // ✅ FIXED date parser: Excel serial + Date object + string formats -> YYYY-MM-DD
   const excelDateToISO = (v) => {
     if (v == null || v === "") return "";
-    if (typeof v === "string") return v.trim();
 
-    // excel serial
-    if (typeof v === "number") {
+    // already ISO
+    const s0 = typeof v === "string" ? v.trim() : "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s0)) return s0;
+
+    // Excel serial
+    if (typeof v === "number" && Number.isFinite(v)) {
+      const d = XLSX.SSF?.parse_date_code?.(v);
+      if (d && d.y && d.m && d.d) {
+        const y = String(d.y).padStart(4, "0");
+        const m = String(d.m).padStart(2, "0");
+        const day = String(d.d).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      // fallback (UTC to avoid off-by-1)
       const dt = new Date(Math.round((v - 25569) * 86400 * 1000));
       if (!isNaN(dt.getTime())) {
-        const y = dt.getFullYear();
-        const m = String(dt.getMonth() + 1).padStart(2, "0");
-        const d = String(dt.getDate()).padStart(2, "0");
-        return `${y}-${m}-${d}`;
+        const y = dt.getUTCFullYear();
+        const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(dt.getUTCDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
       }
     }
 
-    // sometimes XLSX gives Date object
+    // Date object
     if (v instanceof Date && !isNaN(v.getTime())) {
       const y = v.getFullYear();
       const m = String(v.getMonth() + 1).padStart(2, "0");
@@ -308,39 +320,60 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       return `${y}-${m}-${d}`;
     }
 
-    return String(v).trim();
+    // String formats like 1/2/2026, 01-02-2026, etc.
+    const s = String(v).trim();
+    const m1 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+    if (m1) {
+      let a = Number(m1[1]);
+      let b = Number(m1[2]);
+      let y = Number(m1[3]);
+      if (y < 100) y = 2000 + y;
+
+      // heuristic: if first part > 12 => day-first
+      let month = a,
+        day = b;
+      if (a > 12) {
+        day = a;
+        month = b;
+      }
+
+      return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+
+    // last resort parse
+    const t = Date.parse(s);
+    if (Number.isFinite(t)) {
+      const dt = new Date(t);
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    return s;
   };
 
   // 🔥 find header row even if naa pay title rows sa taas
   const findHeaderRowIndex = (aoa, maxScan = 25) => {
-  const limit = Math.min(maxScan, aoa.length);
-
-  for (let i = 0; i < limit; i++) {
-    const row = aoa[i] || [];
-
-    // ✅ ANY header cell that contains "fsic" counts
-    const hit = row.some((cell) => normKey(cell).includes("fsic"));
-    if (hit) return i;
-  }
-
-  return -1;
-};
+    const limit = Math.min(maxScan, aoa.length);
+    for (let i = 0; i < limit; i++) {
+      const row = aoa[i] || [];
+      const hit = row.some((cell) => normKey(cell).includes("fsic"));
+      if (hit) return i;
+    }
+    return -1;
+  };
 
   // build object row using detected headers
   const aoaToObjects = (aoa) => {
     const headerIdx = findHeaderRowIndex(aoa);
     if (headerIdx === -1) {
-      // fallback: assume first row is header
       const [h = [], ...rest] = aoa;
       return { headerIdx: 0, headers: h, objects: rest.map((r) => mapRow(h, r)) };
     }
     const headers = aoa[headerIdx] || [];
     const dataRows = aoa.slice(headerIdx + 1);
-    return {
-      headerIdx,
-      headers,
-      objects: dataRows.map((r) => mapRow(headers, r)),
-    };
+    return { headerIdx, headers, objects: dataRows.map((r) => mapRow(headers, r)) };
   };
 
   const mapRow = (headers, row) => {
@@ -354,89 +387,156 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     return o;
   };
 
-const normalizeRow = (r) => {
-  const headerMap = {};
-  for (const k of Object.keys(r || {})) headerMap[normKey(k)] = r[k];
+  // ✅ Normalize row to MATCH BACKEND FIELD NAMES
+  const normalizeRow = (r) => {
+    // map headers by normalized key
+    const headerMap = {};
+    for (const k of Object.keys(r || {})) headerMap[normKey(k)] = r[k];
 
-  const get = (...variants) => {
-    for (const v of variants) {
-      const val = headerMap[normKey(v)];
-      if (val !== undefined && val !== null && String(val).trim() !== "") {
-        return String(val).trim();
+    const get = (...variants) => {
+      for (const v of variants) {
+        const val = headerMap[normKey(v)];
+        if (val !== undefined && val !== null && String(val).trim() !== "") {
+          return String(val).trim();
+        }
       }
-    }
-    return "";
-  };
+      return "";
+    };
 
-  // ✅ NEW: find value by header key that "includes" keywords
-  const getByIncludes = (...needles) => {
-    const wants = needles.map(normKey).filter(Boolean);
-    const keys = Object.keys(headerMap);
+    // find key that includes some words (useful for weird headers)
+    const getByIncludes = (...needles) => {
+      const wants = needles.map(normKey).filter(Boolean);
+      const keys = Object.keys(headerMap);
 
-    for (const k of keys) {
-      const nk = normKey(k);
-      const ok = wants.every((w) => nk.includes(w));
-      if (!ok) continue;
+      for (const k of keys) {
+        const nk = normKey(k);
+        const ok = wants.every((w) => nk.includes(w));
+        if (!ok) continue;
 
-      const val = headerMap[k];
-      if (val !== undefined && val !== null && String(val).trim() !== "") {
-        return String(val).trim();
+        const val = headerMap[k];
+        if (val !== undefined && val !== null && String(val).trim() !== "") {
+          return String(val).trim();
+        }
       }
-    }
-    return "";
+      return "";
+    };
+
+    // ✅ FSIC (backend uses fsicAppNo)
+    const fsicRaw =
+      get(
+        "fsicappno",
+        "fsicapp#",
+        "fsicno",
+        "fsicnumber",
+        "fsic",
+        "fsic app no",
+        "fsic application no",
+        "fsic_application_no",
+        "fsic_app_no",
+        "fsic_number",
+        "fsic no."
+      ) ||
+      getByIncludes("fsic", "app") ||
+      getByIncludes("fsic", "no") ||
+      getByIncludes("fsic");
+
+    // ✅ Owner / Establishment / Address (match your server pickAllowed fields too)
+    const ownerRaw =
+      get(
+        "ownername",
+        "ownersname",
+        "owner",
+        "taxpayer",
+        "nameoftaxpayer",
+        "nameoftheowner",
+        "owners name",
+        "owner's name",
+        "name of owner"
+      ) || getByIncludes("owner");
+
+    const estabRaw =
+      get(
+        "establishmentname",
+        "nameofestablishment",
+        "establishment",
+        "tradename",
+        "trade name",
+        "businessname",
+        "name of establishment",
+        "establishment_name"
+      ) || getByIncludes("establishment");
+
+    const addrRaw =
+      get(
+        "businessaddress",
+        "business address",
+        "bussinessaddress",
+        "address",
+        "completeaddress",
+        "addresscomplete",
+        "location",
+        "business_address",
+        "bussiness_address"
+      ) || getByIncludes("address");
+
+    // ✅ Inspectors / Team (backend has teamLeader + inspector1..3 + serials)
+    const inspectorsCombined =
+      get("inspectors", "inspector", "inspectorscombined", "inspector(s)") ||
+      getByIncludes("inspector");
+
+    return {
+      // core
+      fsicAppNo: toText(fsicRaw),
+      ownerName: toText(ownerRaw),
+      establishmentName: toText(estabRaw),
+      businessAddress: toText(addrRaw),
+
+      appno: get("appno", "applicationno", "application#", "application number"),
+      contactNumber: get("contactnumber", "contact", "mobile", "contact no", "contact #"),
+      natureOfInspection: get("natureofinspection", "inspection", "nature"),
+      dateInspected: excelDateToISO(get("dateinspected", "date inspected", "date", "date_inspected")),
+
+      // IO
+      ioNumber: get("ionumber", "io no", "io#", "io", "io_number"),
+      ioDate: excelDateToISO(get("iodate", "io date", "io_date")),
+
+      // NFSI
+      nfsiNumber: get("nfsinumber", "nfsi no", "nfsi#", "nfsi", "nfsi_number"),
+      nfsiDate: excelDateToISO(get("nfsidate", "nfsi date", "nfsi_date")),
+
+      // NTC (backend expects ntcNumber/ntcDate)
+      ntcNumber: get("ntcnumber", "ntc no", "ntc#", "ntc", "ntc_number"),
+      ntcDate: excelDateToISO(get("ntcdate", "ntc date", "ntc_date")),
+
+      // FSIC validity (backend uses fsicValidity)
+      fsicValidity: excelDateToISO(get("fsicvalidity", "validity", "fsic validity", "fsic_validity")),
+
+      defects: get("defects", "violations", "defect"),
+      remarks: get("remarks", "remark"),
+
+      // OR
+      orNumber: get("ornumber", "or no", "or#", "or_number"),
+      orAmount: get("oramount", "or amount", "or_amount"),
+      orDate: excelDateToISO(get("ordate", "or date", "or_date")),
+
+      // team/inspectors (for documents templates)
+      inspectors: toText(inspectorsCombined),
+      teamLeader: get("teamleader", "team leader", "team_leader"),
+      teamLeaderSerial: get("teamleaderserial", "team leader serial", "team_leader_serial"),
+
+      inspector1: get("inspector1", "inspector 1", "inspector_1"),
+      inspector1Serial: get("inspector1serial", "inspector 1 serial", "inspector_1_serial"),
+
+      inspector2: get("inspector2", "inspector 2", "inspector_2"),
+      inspector2Serial: get("inspector2serial", "inspector 2 serial", "inspector_2_serial"),
+
+      inspector3: get("inspector3", "inspector 3", "inspector_3"),
+      inspector3Serial: get("inspector3serial", "inspector 3 serial", "inspector_3_serial"),
+
+      chiefName: get("chiefname", "chief"),
+      marshalName: get("marshalname", "marshal"),
+    };
   };
-
-  // ✅ FSIC can be many header styles
-  const fsicRaw =
-    get(
-      "fsicappno",
-      "fsicapp#",
-      "fsicno",
-      "fsicnumber",
-      "fsic",
-      "fsic app no",
-      "fsic app no.",
-      "fsic application no",
-      "fsic application no."
-    ) ||
-    // fallback includes matching
-    getByIncludes("fsic", "app") ||
-    getByIncludes("fsic", "no") ||
-    getByIncludes("fsic");
-
-  return {
-    fsicAppNo: toText(fsicRaw),
-    ownerName: get("ownername", "owner", "ownersname", "taxpayer"),
-    establishmentName: get(
-      "establishmentname",
-      "establishment",
-      "tradename",
-      "nameofestablishment"
-    ),
-    businessAddress: get("businessaddress", "address", "business address", "bussinessaddress"),
-    contactNumber: get("contactnumber", "contact", "mobile", "contact no", "contact #"),
-    natureOfInspection: get("natureofinspection", "inspection", "nature"),
-    dateInspected: excelDateToISO(get("dateinspected", "date inspected", "date")),
-
-    ioNumber: get("ionumber", "io no", "io#", "io"),
-    ioDate: excelDateToISO(get("iodate", "io date")),
-
-    nfsiNumber: get("nfsinumber", "nfsi no", "nfsi#", "nfsi"),
-    nfsiDate: excelDateToISO(get("nfsidate", "nfsi date")),
-
-    inspectors: get("inspectors", "inspector"),
-    teamLeader: get("teamleader", "team leader"),
-
-    chiefName: get("chiefname", "chief"),
-    marshalName: get("marshalname", "marshal"),
-
-    remarks: get("remarks", "remark"),
-
-    orNumber: get("ornumber", "or no", "or#"),
-    orAmount: get("oramount", "or amount"),
-    orDate: excelDateToISO(get("ordate", "or date")),
-  };
-};
 
   const looksLikeTrashRow = (data) => {
     const joined = [
@@ -462,7 +562,6 @@ const normalizeRow = (r) => {
 
   const isValidFsic = (v) => {
     const s = String(v || "").trim();
-    // allow more flexible: if naa kay FSIC-like value, ok
     return s.length >= 3;
   };
 
@@ -481,7 +580,7 @@ const normalizeRow = (r) => {
 
       const ws = wb.Sheets[name];
 
-      // ✅ READ AS AOA so we can detect headers even if not first row
+      // ✅ AOA so header row can be found
       const aoa = XLSX.utils.sheet_to_json(ws, {
         header: 1,
         defval: "",
@@ -501,7 +600,6 @@ const normalizeRow = (r) => {
       let imported = 0,
         skipped = 0;
 
-      // optional: show reasons (for debugging)
       let reasonNoFsic = 0,
         reasonTrash = 0,
         reasonEmpty = 0;
@@ -518,35 +616,42 @@ const normalizeRow = (r) => {
       };
 
       for (const r of objects) {
-        const data = normalizeRow(r);
+        const data0 = normalizeRow(r);
 
         // skip totally empty row
-        const anyValue = Object.values(data).some(
-          (x) => String(x ?? "").trim() !== ""
-        );
+        const anyValue = Object.values(data0).some((x) => String(x ?? "").trim() !== "");
         if (!anyValue) {
           skipped++;
           reasonEmpty++;
           continue;
         }
 
-        // skip footer/trash rows like EXIT/END/etc
-        if (looksLikeTrashRow(data)) {
+        // skip footer/trash rows
+        if (looksLikeTrashRow(data0)) {
           skipped++;
           reasonTrash++;
           continue;
         }
 
-        // ✅ ONLY REQUIRE FSIC APP NO (para bisan kulang columns, mo-import gihapon)
-        if (!data.fsicAppNo || !isValidFsic(data.fsicAppNo)) {
+        // require FSIC
+        if (!data0.fsicAppNo || !isValidFsic(data0.fsicAppNo)) {
           skipped++;
           reasonNoFsic++;
           continue;
         }
 
-        const ref = fsDoc(collection(db, "records"));
+        // ✅ OPTIONAL: match server behavior (uppercase main text fields)
+        const data = {
+          ...data0,
+          fsicAppNo: String(data0.fsicAppNo || "").toUpperCase().trim(),
+          ownerName: String(data0.ownerName || "").toUpperCase().trim(),
+          establishmentName: String(data0.establishmentName || "").toUpperCase().trim(),
+          businessAddress: String(data0.businessAddress || "").toUpperCase().trim(),
+        };
+
+        const ref = fsDoc(collection(db, "records")); // ✅ matches backend current collection
         batch.set(ref, {
-          ...data, // missing columns = "" (blank)
+          ...data,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           importSource: "excel",
@@ -596,12 +701,8 @@ const normalizeRow = (r) => {
             <div style={S.hero}>
               <div style={S.art}>
                 <div style={S.folders}>
-                  <div style={S.folder(C.bfpBg, C.primary, C.primaryDark)}>
-                    FILE
-                  </div>
-                  <div style={S.folder(C.ownerBg, C.ownerBorder, "#9a3412")}>
-                    XLSX
-                  </div>
+                  <div style={S.folder(C.bfpBg, C.primary, C.primaryDark)}>FILE</div>
+                  <div style={S.folder(C.ownerBg, C.ownerBorder, "#9a3412")}>XLSX</div>
                 </div>
               </div>
 
@@ -622,8 +723,7 @@ const normalizeRow = (r) => {
               <div style={S.sub}>Supported formats: .xlsx, .xls (Excel)</div>
 
               <div style={S.hint}>
-                <HiOutlineCloudUpload size={18} /> Import will go to Firestore:{" "}
-                <b>records</b>
+                <HiOutlineCloudUpload size={18} /> Import will go to Firestore: <b>records</b>
               </div>
 
               <input
@@ -644,8 +744,7 @@ const normalizeRow = (r) => {
                       <div style={{ minWidth: 0 }}>
                         <div style={S.fName}>{file.name}</div>
                         <div style={S.fMeta}>
-                          Size: {(file.size / 1024 / 1024).toFixed(2)} MB •
-                          Ready
+                          Size: {(file.size / 1024 / 1024).toFixed(2)} MB • Ready
                         </div>
                       </div>
                     </div>
@@ -664,11 +763,7 @@ const normalizeRow = (r) => {
 
                   {msg ? (
                     <div style={S.msg}>
-                      {ok ? (
-                        <HiOutlineCheckCircle size={18} />
-                      ) : (
-                        <HiOutlineExclamationCircle size={18} />
-                      )}
+                      {ok ? <HiOutlineCheckCircle size={18} /> : <HiOutlineExclamationCircle size={18} />}
                       <span>{msg}</span>
                     </div>
                   ) : null}
@@ -691,7 +786,7 @@ const normalizeRow = (r) => {
       <div style={S.footer}>
         <div style={S.fInfo}>
           <HiOutlineInformationCircle size={18} />
-          Import is flexible: only FSIC/AppNo required. Missing columns become blank.
+          Import matches backend fields (FSIC/Owner/Address + Dates like NTC/IO/NFSI/OR).
         </div>
 
         <div style={S.actions}>
@@ -705,11 +800,7 @@ const normalizeRow = (r) => {
           >
             Cancel
           </button>
-          <button
-            style={S.primary}
-            onClick={uploadExcel}
-            disabled={uploading || !file}
-          >
+          <button style={S.primary} onClick={uploadExcel} disabled={uploading || !file}>
             {uploading ? "Importing..." : "Import"}
           </button>
         </div>

@@ -1,5 +1,13 @@
+// src/pages/RecordsManager.jsx (FULL) — Row-click toggle + Select All Filtered + Bulk Delete
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, doc, orderBy, query, deleteDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  doc,
+  orderBy,
+  query,
+  deleteDoc,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 
 import ConfirmModal from "../FileManagement/deleteConfirmModal";
@@ -22,9 +30,16 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   const [deleting, setDeleting] = useState(false);
   const [targetRow, setTargetRow] = useState(null);
 
+  // ✅ Bulk targets for confirm (selection delete)
+  const [bulkTargets, setBulkTargets] = useState([]);
+
   // ✅ Toast
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("Deleted successfully.");
+
+  // ✅ Selection mode
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState(() => new Set()); // store row keys
 
   /* ================= HELPERS ================= */
 
@@ -40,10 +55,13 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   };
 
   const getMonthKey = (data) => {
-    const cm = String(data?.closeMonth || data?.closedMonth || data?.monthKey || "").trim();
+    const cm = String(
+      data?.closeMonth || data?.closedMonth || data?.monthKey || ""
+    ).trim();
     if (/^\d{4}-\d{2}$/.test(cm)) return cm;
 
-    const ms = toMillisSafe(data?.createdAt) || toMillisSafe(data?.dateInspected) || 0;
+    const ms =
+      toMillisSafe(data?.createdAt) || toMillisSafe(data?.dateInspected) || 0;
     if (!ms) return "UNKNOWN";
 
     const d = new Date(ms);
@@ -51,6 +69,47 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
     const m = String(d.getMonth() + 1).padStart(2, "0");
     return `${y}-${m}`;
   };
+
+  // unique key per row (source + docId)
+  const rowKey = (r) =>
+    `${String(r?._source || "")}::${String(r?._docId || r?.id || "")}`;
+
+  const isSelected = (r) => selected.has(rowKey(r));
+
+  const toggleRow = (r) => {
+    const k = rowKey(r);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Set());
+
+  const selectAllPage = (pageRows) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      (pageRows || []).forEach((r) => next.add(rowKey(r)));
+      return next;
+    });
+  };
+
+  const unselectAllPage = (pageRows) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      (pageRows || []).forEach((r) => next.delete(rowKey(r)));
+      return next;
+    });
+  };
+
+  const selectAllFiltered = (filtered) => {
+    setSelected(() => new Set((filtered || []).map((r) => rowKey(r))));
+  };
+
+  const unselectAllFiltered = () => clearSelection();
+
+  const selectedCount = selected.size;
 
   /* ================= LOAD ALL RECORDS (records + archive) ================= */
 
@@ -71,7 +130,10 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
 
       // B1) records_archive
       try {
-        const qyA = query(collection(db, "records_archive"), orderBy("createdAt", "desc"));
+        const qyA = query(
+          collection(db, "records_archive"),
+          orderBy("createdAt", "desc")
+        );
         const snapA = await getDocs(qyA);
         snapA.docs.forEach((d) => {
           const data = d.data() || {};
@@ -85,14 +147,17 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
         for (const mDoc of monthsSnap.docs) {
           const monthId = mDoc.id;
           try {
-            const recSnap = await getDocs(collection(db, "archives", monthId, "records"));
+            const recSnap = await getDocs(
+              collection(db, "archives", monthId, "records")
+            );
             recSnap.docs.forEach((d) => {
               const data = d.data() || {};
               all.push({
                 id: d.id,
                 _docId: d.id,
                 _source: `archives/${monthId}/records`,
-                closeMonth: data.closeMonth || data.closedMonth || data.monthKey || monthId,
+                closeMonth:
+                  data.closeMonth || data.closedMonth || data.monthKey || monthId,
                 ...data,
               });
             });
@@ -127,7 +192,11 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   const monthOptions = useMemo(() => {
     const set = new Set(
       (rows || [])
-        .filter((r) => r._source === "records_archive" || String(r._source || "").startsWith("archives/"))
+        .filter(
+          (r) =>
+            r._source === "records_archive" ||
+            String(r._source || "").startsWith("archives/")
+        )
         .map((r) => r._month || "UNKNOWN")
     );
 
@@ -172,7 +241,10 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   const startIndex = (safePage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
 
-  const pageRows = useMemo(() => filtered.slice(startIndex, endIndex), [filtered, startIndex, endIndex]);
+  const pageRows = useMemo(
+    () => filtered.slice(startIndex, endIndex),
+    [filtered, startIndex, endIndex]
+  );
 
   const canPrev = safePage > 1;
   const canNext = safePage < totalPages;
@@ -182,42 +254,61 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
   /* ================= DELETE via MODAL ================= */
 
   const requestDelete = (r) => {
+    if (selectMode) {
+      toggleRow(r);
+      return;
+    }
     setTargetRow(r);
+    setBulkTargets([]);
+    setConfirmOpen(true);
+  };
+
+  const requestDeleteSelected = () => {
+    const picked = (rows || []).filter((r) => selected.has(rowKey(r)));
+    if (picked.length === 0) {
+      setToastMsg("No selected items.");
+      setToastOpen(true);
+      return;
+    }
+    setBulkTargets(picked);
+    setTargetRow(null);
     setConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (!targetRow) return;
+    const list = bulkTargets?.length ? bulkTargets : targetRow ? [targetRow] : [];
+    if (list.length === 0) return;
+
     setDeleting(true);
 
     try {
-      const r = targetRow;
-
-      if (r._source === "records") {
-        await deleteDoc(doc(db, "records", String(r._docId || r.id)));
-      } else if (r._source === "records_archive") {
-        await deleteDoc(doc(db, "records_archive", String(r._docId || r.id)));
-      } else if (String(r._source || "").startsWith("archives/")) {
-        const parts = String(r._source).split("/");
-        const monthId = parts[1];
-        await deleteDoc(doc(db, "archives", monthId, "records", String(r._docId || r.id)));
+      for (const r of list) {
+        if (r._source === "records") {
+          await deleteDoc(doc(db, "records", String(r._docId || r.id)));
+        } else if (r._source === "records_archive") {
+          await deleteDoc(doc(db, "records_archive", String(r._docId || r.id)));
+        } else if (String(r._source || "").startsWith("archives/")) {
+          const parts = String(r._source).split("/");
+          const monthId = parts[1];
+          await deleteDoc(
+            doc(db, "archives", monthId, "records", String(r._docId || r.id))
+          );
+        }
       }
 
-      setRows((prev) =>
-        (prev || []).filter(
-          (x) =>
-            !(
-              String(x._docId || x.id) === String(r._docId || r.id) &&
-              String(x._source) === String(r._source)
-            )
-        )
-      );
+      const delKeys = new Set(list.map((r) => rowKey(r)));
 
-      // ✅ close modal + show toast
+      setRows((prev) => (prev || []).filter((x) => !delKeys.has(rowKey(x))));
+
+      // ✅ close modal + reset
       setConfirmOpen(false);
       setTargetRow(null);
+      setBulkTargets([]);
 
-      setToastMsg("Deleted successfully.");
+      // ✅ selection reset
+      clearSelection();
+
+      setToastMsg(list.length > 1 ? `Deleted ${list.length} items.` : "Deleted successfully.");
       setToastOpen(true);
 
       setRefresh?.((p) => !p);
@@ -227,6 +318,13 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const closeConfirm = () => {
+    if (deleting) return;
+    setConfirmOpen(false);
+    setTargetRow(null);
+    setBulkTargets([]);
   };
 
   /* ================= STYLES (same) ================= */
@@ -293,6 +391,7 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
     boxShadow: "0 6px 14px rgba(0,0,0,0.04)",
     transition: "0.15s ease",
     opacity: disabled ? 0.6 : 1,
+    whiteSpace: "nowrap",
   });
 
   const pagerPageBox = {
@@ -379,31 +478,27 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
       <ConfirmModal
         C={C}
         open={confirmOpen}
-        title="Delete Record"
-        subtitle="Permanent delete"
+        title={bulkTargets?.length ? "Delete Selected" : "Delete Record"}
+        subtitle={bulkTargets?.length ? "Permanent delete (bulk)" : "Permanent delete"}
         message={
-          targetRow
-            ? `Delete permanently this record?\n\nFSIC: ${targetRow.fsicAppNo || "-"}\nOwner: ${
-                targetRow.ownerName || "-"
-              }`
+          bulkTargets?.length
+            ? `Delete permanently ${bulkTargets.length} selected record(s)?`
+            : targetRow
+            ? `Delete permanently this record?\n\nFSIC: ${targetRow.fsicAppNo || "-"}\nOwner: ${targetRow.ownerName || "-"}`
             : "Delete this item?"
         }
         danger
         busy={deleting}
         cancelText="Cancel"
         confirmText={deleting ? "Deleting..." : "Yes, Delete"}
-        onCancel={() => {
-          if (deleting) return;
-          setConfirmOpen(false);
-          setTargetRow(null);
-        }}
+        onCancel={closeConfirm}
         onConfirm={confirmDelete}
       />
 
       <TopRightToast
         C={{ border: "rgba(226,232,240,1)", text: "#0f172a", muted: "#64748b" }}
         open={toastOpen}
-        title="Deleted"
+        title={bulkTargets?.length ? "Deleted Selected" : "Deleted"}
         message={toastMsg}
         autoCloseMs={1400}
         onClose={() => setToastOpen(false)}
@@ -411,9 +506,19 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
 
       <div style={toolRow}>
         <div style={toolLeft}>
-          <input placeholder="🔍 Search records..." value={search} onChange={(e) => setSearch(e.target.value)} style={input} />
+          <input
+            placeholder="🔍 Search records..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={input}
+          />
 
-          <select value={month} onChange={(e) => setMonth(e.target.value)} style={select} title="Month">
+          <select
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            style={select}
+            title="Month"
+          >
             {monthOptions.map((m) => (
               <option key={m} value={m}>
                 {m === "all" ? "All months" : m === "current" ? "Current" : m}
@@ -421,7 +526,12 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
             ))}
           </select>
 
-          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={select} title="Rows per page">
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            style={select}
+            title="Rows per page"
+          >
             <option value={5}>5 / page</option>
             <option value={10}>10 / page</option>
             <option value={20}>20 / page</option>
@@ -430,10 +540,53 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
         </div>
 
         <div style={toolRight}>
+          {/* ✅ Selection controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <button
+              style={pagerBtnBox(false)}
+              onClick={() => {
+                setSelectMode((v) => !v);
+                clearSelection();
+              }}
+            >
+              {selectMode ? "Cancel Selection" : "Delete Selection"}
+            </button>
+
+            {selectMode && (
+              <>
+                <button style={pagerBtnBox(false)} onClick={() => selectAllPage(pageRows)}>
+                  Select page
+                </button>
+                <button style={pagerBtnBox(false)} onClick={() => unselectAllPage(pageRows)}>
+                  Unselect page
+                </button>
+
+                <button style={pagerBtnBox(false)} onClick={() => selectAllFiltered(filtered)}>
+                  Select all filtered ({filtered.length})
+                </button>
+                <button style={pagerBtnBox(false)} onClick={unselectAllFiltered}>
+                  Clear all
+                </button>
+
+                <button
+                  style={{
+                    ...pagerBtnBox(selectedCount === 0),
+                    border: "1px solid rgba(220,38,38,0.5)",
+                    color: selectedCount === 0 ? C.muted : C.danger,
+                  }}
+                  disabled={selectedCount === 0}
+                  onClick={requestDeleteSelected}
+                >
+                  🗑 Delete Selected ({selectedCount})
+                </button>
+              </>
+            )}
+          </div>
+
           <div style={statPill}>{loading ? "Loading..." : `${total} item(s)`}</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <button style={pagerBtnBox(!canPrev)} onClick={() => canPrev && setPage((p) => Math.max(1, p - 1))} disabled={!canPrev}>
+            <button style={pagerBtnBox(!canPrev)} onClick={goPrev} disabled={!canPrev}>
               Prev
             </button>
 
@@ -441,7 +594,7 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
               Page {safePage} / {totalPages}
             </div>
 
-            <button style={pagerBtnBox(!canNext)} onClick={() => canNext && setPage((p) => Math.min(totalPages, p + 1))} disabled={!canNext}>
+            <button style={pagerBtnBox(!canNext)} onClick={goNext} disabled={!canNext}>
               Next
             </button>
           </div>
@@ -452,6 +605,7 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
+              {selectMode && <th style={{ ...th, width: 46, textAlign: "center" }}>✓</th>}
               <th style={th}>FSIC</th>
               <th style={th}>Owner</th>
               <th style={th}>Establishment</th>
@@ -464,31 +618,76 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
           <tbody>
             {pageRows.length === 0 ? (
               <tr>
-                <td style={{ ...td, textAlign: "center", color: C.muted, padding: 22 }} colSpan={6}>
+                <td
+                  style={{ ...td, textAlign: "center", color: C.muted, padding: 22 }}
+                  colSpan={selectMode ? 7 : 6}
+                >
                   {loading ? "Loading..." : "No data found."}
                 </td>
               </tr>
             ) : (
-              pageRows.map((r, idx) => (
-                <tr
-                  key={(r._source || "") + ":" + (r._docId || r.id) + ":" + idx}
-                  style={{ ...rowHover, background: idx % 2 === 0 ? "#fff" : "rgba(249,250,251,0.8)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(254,242,242,0.6)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "rgba(249,250,251,0.8)")}
-                >
-                  <td style={td}>{r.fsicAppNo || "-"}</td>
-                  <td style={td}>{r.ownerName || r.title || "-"}</td>
-                  <td style={td}>{r.establishmentName || "-"}</td>
-                  <td style={td}>{r.businessAddress || "-"}</td>
-                  <td style={td}>{r._month || "UNKNOWN"}</td>
+              pageRows.map((r, idx) => {
+                const checked = isSelected(r);
+                return (
+                  <tr
+                    key={(r._source || "") + ":" + (r._docId || r.id) + ":" + idx}
+                    style={{
+                      ...rowHover,
+                      background: checked
+                        ? "rgba(254,226,226,0.55)"
+                        : idx % 2 === 0
+                        ? "#fff"
+                        : "rgba(249,250,251,0.8)",
+                      cursor: selectMode ? "pointer" : "default",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (checked) return;
+                      e.currentTarget.style.background = "rgba(254,242,242,0.6)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = checked
+                        ? "rgba(254,226,226,0.55)"
+                        : idx % 2 === 0
+                        ? "#fff"
+                        : "rgba(249,250,251,0.8)";
+                    }}
+                    // ✅ Row click toggles selection ONLY in selectMode
+                    onClick={() => {
+                      if (!selectMode) return;
+                      toggleRow(r);
+                    }}
+                  >
+                    {selectMode && (
+                      <td style={{ ...td, textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleRow(r)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                    )}
 
-                  <td style={{ ...td, textAlign: "center" }}>
-                    <button onClick={() => requestDelete(r)} style={delBtn}>
-                      🗑 Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    <td style={td}>{r.fsicAppNo || "-"}</td>
+                    <td style={td}>{r.ownerName || r.title || "-"}</td>
+                    <td style={td}>{r.establishmentName || "-"}</td>
+                    <td style={td}>{r.businessAddress || "-"}</td>
+                    <td style={td}>{r._month || "UNKNOWN"}</td>
+
+                    <td style={{ ...td, textAlign: "center" }}>
+                      {!selectMode ? (
+                        <button onClick={() => requestDelete(r)} style={delBtn}>
+                          🗑 Delete
+                        </button>
+                      ) : (
+                        <span style={{ fontWeight: 900, color: C.muted, fontSize: 12 }}>
+                          click row to select
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -500,6 +699,12 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
               {total === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, total)}
             </span>{" "}
             of <span style={{ color: C.text }}>{total}</span>
+            {selectMode && (
+              <>
+                {" "}
+                • Selected: <span style={{ color: C.text }}>{selectedCount}</span>
+              </>
+            )}
           </div>
           <div />
         </div>
