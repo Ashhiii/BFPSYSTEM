@@ -30,7 +30,7 @@ export default function PinUnlock() {
     setMsg("");
 
     const cleanPin = String(pin || "").trim();
-    if (!/^\d{1,6}$/.test(cleanPin)) return setMsg("Enter PIN (numbers only).");
+    if (!/^\d{1,7}$/.test(cleanPin)) return setMsg("Enter PIN (numbers only).");
 
     try {
       setLoading(true);
