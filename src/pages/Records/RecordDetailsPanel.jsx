@@ -1,21 +1,36 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { db } from "../../firebase";
-import { doc, getDoc, setDoc, serverTimestamp, collection, writeBatch } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  writeBatch,
+} from "firebase/firestore";
 
+/** ✅ FIELD DEFS: canonical key + aliases (old keys) */
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No" },
+  { key: "primaryId", label: "Primary ID" }, // ✅ NEW (from import)
+  { key: "primaryIdSource", label: "Primary ID Source" }, // ✅ NEW
+
   { key: "natureOfInspection", label: "Nature Of Inspection" },
   { key: "ownerName", label: "Owner" },
   { key: "establishmentName", label: "Establishment" },
   { key: "businessAddress", label: "Address" },
   { key: "contactNumber", label: "Contact" },
   { key: "dateInspected", label: "Date Inspected" },
+
   { key: "ioNumber", label: "IO No" },
   { key: "ioDate", label: "IO Date" },
+
   { key: "nfsiNumber", label: "NFSI No" },
   { key: "nfsiDate", label: "NFSI Date" },
+
   { key: "ntcNumber", label: "NTC No" },
   { key: "ntcDate", label: "NTC Date" },
+
   { key: "fsicValidity", label: "FSIC Validity" },
   { key: "defects", label: "Defects" },
 
@@ -31,17 +46,17 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3" },
   { key: "inspector3Serial", label: "Inspector 3 Serial" },
 
-  // ✅ combined auto
   { key: "inspectors", label: "Inspectors (combined)" },
 
-  { key: "occupancyType", label: "Occupancy" },
-  { key: "buildingDesc", label: "Building Desc" },
-  { key: "floorArea", label: "Floor Area" },
+  // ✅ CANONICAL IMPORT KEYS + OLD KEY ALIASES
+  { key: "typeOfOccupancy", label: "Type of Occupancy", aliases: ["occupancyType"] },
+  { key: "buildingDescription", label: "Building Description", aliases: ["buildingDesc"] },
+  { key: "floorAreaSqm", label: "Floor Area (SQM)", aliases: ["floorArea"] },
   { key: "buildingHeight", label: "Height" },
-  { key: "storeyCount", label: "Storey" },
+  { key: "noOfStorey", label: "No. of Storey", aliases: ["storeyCount"] },
   { key: "highRise", label: "High Rise" },
   { key: "fsmr", label: "FSMR" },
-  { key: "fsicNumber", label: "FSIC Number" },
+
   { key: "remarks", label: "Remarks" },
   { key: "orNumber", label: "OR No" },
   { key: "orAmount", label: "OR Amount" },
@@ -50,7 +65,7 @@ const FIELDS = [
   { key: "marshalName", label: "Marshal" },
 ];
 
-// ✅ ONLY fields you really want ALWAYS UPPERCASE
+// ✅ ONLY fields you want ALWAYS UPPERCASE
 const CAPS_KEYS = new Set([
   "fsicAppNo",
   "natureOfInspection",
@@ -58,19 +73,16 @@ const CAPS_KEYS = new Set([
   "establishmentName",
   "businessAddress",
   "contactNumber",
-
   "ioNumber",
   "nfsiNumber",
   "ntcNumber",
-
   "fsicValidity",
   "defects",
-
-  "occupancyType",
-  "buildingDesc",
-  "floorArea",
+  "typeOfOccupancy",
+  "buildingDescription",
+  "floorAreaSqm",
   "buildingHeight",
-  "storeyCount",
+  "noOfStorey",
   "highRise",
   "fsmr",
   "remarks",
@@ -80,7 +92,7 @@ const CAPS_KEYS = new Set([
   "marshalName",
 ]);
 
-// ✅ Keep EXACT casing as typed (no auto-caps)
+// ✅ Keep EXACT casing as typed
 const NO_CAPS_KEYS = new Set([
   "teamLeader",
   "teamLeaderSerial",
@@ -90,16 +102,14 @@ const NO_CAPS_KEYS = new Set([
   "inspector2Serial",
   "inspector3",
   "inspector3Serial",
-  "inspectors", // combined (auto) but keep casing of names
+  "inspectors",
 ]);
 
 const DATE_KEYS = new Set(["dateInspected", "ioDate", "nfsiDate", "ntcDate", "orDate"]);
 
-/** ✅ Convert whatever value -> YYYY-MM-DD for <input type="date"> */
+/** ✅ Convert value -> YYYY-MM-DD for <input type="date"> */
 const toInputDate = (v) => {
   if (!v) return "";
-
-  // Firestore Timestamp
   if (v?.toDate) {
     const d = v.toDate();
     const y = d.getFullYear();
@@ -107,11 +117,7 @@ const toInputDate = (v) => {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   }
-
-  // already YYYY-MM-DD
   if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-
-  // ISO / parseable date string (includes "January 2, 2026")
   if (typeof v === "string" && !Number.isNaN(Date.parse(v))) {
     const d = new Date(v);
     const y = d.getFullYear();
@@ -119,11 +125,9 @@ const toInputDate = (v) => {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   }
-
   return "";
 };
 
-// ✅ Add 1 year to YYYY-MM-DD and return YYYY-MM-DD
 const addOneYear = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return "";
   const d = new Date(`${yyyy_mm_dd}T00:00:00`);
@@ -135,12 +139,18 @@ const addOneYear = (yyyy_mm_dd) => {
   return `${y}-${m}-${day}`;
 };
 
-// ✅ Combine inspector 1/2/3 -> string
-const combineInspectors = (a, b, c) => {
-  return [a, b, c]
-    .map((x) => String(x || "").trim())
-    .filter(Boolean)
-    .join(", ");
+const combineInspectors = (a, b, c) =>
+  [a, b, c].map((x) => String(x || "").trim()).filter(Boolean).join(", ");
+
+/** ✅ read record value using canonical key + aliases */
+const readField = (record, key, aliases = []) => {
+  const direct = record?.[key];
+  if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
+  for (const a of aliases) {
+    const v = record?.[a];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return record?.[key] ?? "";
 };
 
 export default function RecordDetailsPanel({
@@ -179,27 +189,20 @@ export default function RecordDetailsPanel({
     setRenewedRecord(null);
     if (!record) return;
 
-    // ✅ init form (dates normalized for date inputs)
     const init = {};
     FIELDS.forEach((f) => {
-      const raw = record?.[f.key] ?? "";
+      const raw = readField(record, f.key, f.aliases || []);
       init[f.key] = DATE_KEYS.has(f.key) ? toInputDate(raw) : raw;
     });
 
-    // ✅ auto compute validity from dateInspected
     if (init.dateInspected) init.fsicValidity = addOneYear(init.dateInspected);
-
-    // ✅ auto compute inspectors combined
     init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3);
 
     setForm(init);
 
-    // ✅ load latest renewed (renewals/{entityKey})
     if (!entityKey) return;
     getDoc(doc(db, "renewals", entityKey))
-      .then((snap) =>
-        setRenewedRecord(snap.exists() ? snap.data()?.record || null : null)
-      )
+      .then((snap) => setRenewedRecord(snap.exists() ? snap.data()?.record || null : null))
       .catch(() => setRenewedRecord(null));
   }, [record, entityKey]);
 
@@ -217,26 +220,16 @@ export default function RecordDetailsPanel({
     textTransform: CAPS_KEYS.has(k) && !NO_CAPS_KEYS.has(k) ? "uppercase" : "none",
   });
 
-  // ✅ field setter (auto validity + combined inspectors)
   const setField = (k, v) => {
     setForm((p) => {
       const next = { ...p };
-
-      // keep exact casing for name fields
       if (NO_CAPS_KEYS.has(k)) next[k] = String(v ?? "");
       else next[k] = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : String(v ?? "");
 
-      // ✅ dateInspected changes -> auto fsicValidity (+1 year)
-      if (k === "dateInspected") {
-        const di = String(v ?? "");
-        next.fsicValidity = addOneYear(di);
-      }
-
-      // ✅ inspector changes -> auto combined inspectors
+      if (k === "dateInspected") next.fsicValidity = addOneYear(String(v ?? ""));
       if (k === "inspector1" || k === "inspector2" || k === "inspector3") {
         next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3);
       }
-
       return next;
     });
   };
@@ -259,21 +252,25 @@ export default function RecordDetailsPanel({
     return common;
   };
 
-  // ✅ Save edit
   const saveEdit = async () => {
     if (!record?.id) return alert("Missing record.id (cannot save).");
-
     try {
       setSaving(true);
 
-      // ensure autos are correct before saving
       const ensured = { ...form };
       if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
       ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3);
 
+      // ✅ payload canonical
       const payload = {};
       FIELDS.forEach((f) => (payload[f.key] = ensured[f.key] ?? ""));
       payload.updatedAt = serverTimestamp();
+
+      // ✅ ALSO write legacy keys so other UI parts still work
+      payload.occupancyType = payload.typeOfOccupancy;
+      payload.buildingDesc = payload.buildingDescription;
+      payload.floorArea = payload.floorAreaSqm;
+      payload.storeyCount = payload.noOfStorey;
 
       const targetDocRef = isArchive
         ? doc(db, "archives", String(source || "").replace("Archive: ", ""), "records", record.id)
@@ -281,9 +278,8 @@ export default function RecordDetailsPanel({
 
       await setDoc(targetDocRef, payload, { merge: true });
 
-      const merged = { ...record, ...payload };
       setEditing(false);
-      onUpdated?.({ ...merged, id: record.id });
+      onUpdated?.({ ...record, ...payload, id: record.id });
     } catch (e) {
       alert(`❌ SAVE ERROR: ${e.message}`);
     } finally {
@@ -291,86 +287,68 @@ export default function RecordDetailsPanel({
     }
   };
 
-  // ✅ Save renew (writes renewals/{entityKey})
-// ✅ Save renew (writes renewals/{entityKey} AND creates a new doc in records/)
-const saveRenew = async () => {
-  if (!record) return;
-  if (!entityKey) return alert("Missing entityKey");
+  const saveRenew = async () => {
+    if (!record) return;
+    if (!entityKey) return alert("Missing entityKey");
 
-  try {
-    setSaving(true);
+    try {
+      setSaving(true);
 
-    // ✅ ensure auto fields are correct
-    const ensured = { ...form };
+      const ensured = { ...form };
+      if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
+      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3);
 
-    // auto validity from dateInspected (if you have it in this panel)
-    if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
+      const newRecord = {
+        ...record,
+        ...ensured,
+        entityKey,
+        source: source || "unknown",
+        renewedFromId: record?.id || "",
+        renewedAt: new Date().toISOString(),
+        status: "RENEWED",
+        isRenewedCopy: true,
 
-    // auto inspectors combined
-    ensured.inspectors = combineInspectors(
-      ensured.inspector1,
-      ensured.inspector2,
-      ensured.inspector3
-    );
+        // ✅ legacy mirror
+        occupancyType: ensured.typeOfOccupancy,
+        buildingDesc: ensured.buildingDescription,
+        floorArea: ensured.floorAreaSqm,
+        storeyCount: ensured.noOfStorey,
+      };
 
-    // ✅ Build renewed record object
-    const newRecord = {
-      ...record,
-      ...ensured,
-      entityKey,
-      source: source || "unknown",
-      renewedFromId: record?.id || "",
-      renewedAt: new Date().toISOString(),
+      const newRecordRef = doc(collection(db, "records"));
+      const renewalsRef = doc(db, "renewals", entityKey);
 
-      // optional flags for UI filtering
-      status: "RENEWED",
-      isRenewedCopy: true,
-    };
+      const batch = writeBatch(db);
 
-    // ✅ Create a NEW record doc in current records collection (auto id)
-    const newRecordRef = doc(collection(db, "records")); // generates new id
-    const renewalsRef = doc(db, "renewals", entityKey);
+      batch.set(renewalsRef, { record: newRecord, updatedAt: serverTimestamp() }, { merge: true });
 
-    // ✅ Do both writes in one batch
-    const batch = writeBatch(db);
+      batch.set(
+        newRecordRef,
+        {
+          ...newRecord,
+          id: newRecordRef.id,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
 
-    // 1) save to renewals/{entityKey}
-    batch.set(
-      renewalsRef,
-      { record: newRecord, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
+      await batch.commit();
 
-    // 2) save to records/{newId} so it appears in Records list
-    batch.set(
-      newRecordRef,
-      {
-        ...newRecord,
-        // make sure records doc has its own id too (useful for UI)
-        id: newRecordRef.id,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+      setRenewedRecord({ ...newRecord, id: newRecordRef.id });
+      setRenewing(false);
 
-    await batch.commit();
+      onRenewSaved?.({
+        oldId: record.id,
+        newRecord: { ...newRecord, id: newRecordRef.id },
+      });
+    } catch (e) {
+      alert(`❌ ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    // update UI state
-    setRenewedRecord({ ...newRecord, id: newRecordRef.id });
-    setRenewing(false);
-
-    // pass back ids for parent refresh/highlight if you want
-    onRenewSaved?.({
-      oldId: record.id,
-      newRecord: { ...newRecord, id: newRecordRef.id },
-    });
-  } catch (e) {
-    alert(`❌ ${e.message}`);
-  } finally {
-    setSaving(false);
-  }
-};
   const panel = {
     overflow: "hidden",
     borderRadius: 16,
@@ -422,7 +400,7 @@ const saveRenew = async () => {
     );
   }
 
-  const title = record.establishmentName || record.fsicAppNo || "Record";
+  const title = record.establishmentName || record.fsicAppNo || record.primaryId || "Record";
   const mode = editing ? "edit" : renewing ? "renew" : "view";
 
   return (
@@ -510,10 +488,10 @@ const saveRenew = async () => {
                           autoComplete="off"
                           placeholder={f.label}
                           type={DATE_KEYS.has(f.key) ? "date" : "text"}
-                          readOnly={f.key === "inspectors" || f.key === "fsicValidity"} // ✅ AUTO FIELDS
+                          readOnly={f.key === "inspectors" || f.key === "fsicValidity"}
                         />
                       ) : (
-                        (record?.[f.key] ?? "") || "-"
+                        (readField(record, f.key, f.aliases || []) ?? "") || "-"
                       )}
                     </td>
                   </React.Fragment>
