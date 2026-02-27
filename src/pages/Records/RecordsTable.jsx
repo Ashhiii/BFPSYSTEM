@@ -180,6 +180,9 @@ export default function RecordsTable({
                   <td style={S.td}>
                     <div style={wrap}>{r.establishmentName || "-"}</div>
                   </td>
+                  <td style={S.td}>
+                    <div style={wrap}>{r.fsicNo || "-"}</div>
+                  </td>
                    <td style={S.td}>
                     <div style={wrap}>{<r className="fsicno"></r> || "-"}</div>
                   </td>
