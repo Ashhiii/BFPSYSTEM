@@ -1,16 +1,15 @@
-// ✅ AddRecord.jsx (FULL) — NTC + Team Leader/Inspectors 1-3 + Serials
-// ✅ NEW: Auto-combine Inspector 1/2/3 -> "inspectors (combined)" field (readOnly)
-// ✅ FIXED: Team Leader & Inspectors keep EXACT casing as typed (not auto uppercase)
+// ✅ AddRecord.jsx (FULL) — INPUT HISTORY via <datalist> (no buttons, no select)
+// ✅ Nature Of Inspection remains INPUT but has suggestions (ANNUAL/RENEW/RE-INSPECTION)
+// ✅ Team Leader/Inspectors keep EXACT casing
+// ✅ Auto-combine Inspector 1/2/3 -> "inspectors (combined)" readOnly
 
 import React, { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 
-import TopRightToast from "../components/TopRightToast"; // adjust path
+import TopRightToast from "../components/TopRightToast";
 
-/**
- * ✅ Format "YYYY-MM-DD" => "January 2, 2026"  
- */
+/** ✅ Format "YYYY-MM-DD" => "January 2, 2026" */
 const formatDateLong = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return "";
   const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
@@ -23,9 +22,7 @@ const formatDateLong = (yyyy_mm_dd) => {
   return `${months[m - 1]} ${d}, ${y}`;
 };
 
-/**
- * ✅ add 1 year to "YYYY-MM-DD" (handles leap year)
- */
+/** ✅ add 1 year to "YYYY-MM-DD" (handles leap year) */
 const addYearsYMD = (yyyy_mm_dd, years = 1) => {
   if (!yyyy_mm_dd) return "";
   const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
@@ -49,9 +46,13 @@ const addYearsYMD = (yyyy_mm_dd, years = 1) => {
 const INITIAL_FORM = {
   appno: "",
   fsicAppNo: "",
+  fsicNo: "",
+
   chiefName: "",
   marshalName: "",
+
   natureOfInspection: "",
+
   ownerName: "",
   establishmentName: "",
   businessAddress: "",
@@ -61,14 +62,12 @@ const INITIAL_FORM = {
   ioNumber: "",
   ioDate: "",
 
-  // ✅ NTC
   ntcNumber: "",
   ntcDate: "",
 
   nfsiNumber: "",
   nfsiDate: "",
 
-  // ✅ REINSPECTION TO: Team Leader + Inspectors 1/2/3 + serials
   teamLeader: "",
   teamLeaderSerial: "",
 
@@ -79,11 +78,11 @@ const INITIAL_FORM = {
   inspector3: "",
   inspector3Serial: "",
 
-  // ✅ AUTO combined inspectors (from 1/2/3)
   inspectors: "",
 
   fsicValidity: "",
   defects: "",
+
   occupancyType: "",
   buildingDesc: "",
   floorArea: "",
@@ -98,13 +97,10 @@ const INITIAL_FORM = {
   orDate: "",
 };
 
-/**
- * ✅ ONLY THESE FIELDS WILL BE AUTO-UPPERCASED
- * Names (teamLeader/inspector1-3) are intentionally NOT included.
- */
+/** ✅ ONLY THESE FIELDS WILL BE AUTO-UPPERCASED */
 const UPPER_KEYS = new Set([
-  "FSIC_NUMBER",
   "fsicAppNo",
+  "fsicNo",
   "chiefName",
   "marshalName",
   "natureOfInspection",
@@ -126,17 +122,21 @@ const UPPER_KEYS = new Set([
   "fsmr",
   "remarks",
   "orNumber",
-  // ✅ combined inspectors will be auto-generated (not typed), but ok if you want it uppercase
-  // We will NOT uppercase it here to preserve exact casing from names.
+  "orAmount",
 ]);
+
+// ✅ input-only (no select) but with suggested values
+const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "RE-INSPECTION"];
 
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No", placeholder: "2026-00123", required: true, type: "text", span: 1 },
   { key: "ownerName", label: "Owner", placeholder: "Owner name", required: true, type: "text", span: 1 },
   { key: "establishmentName", label: "Establishment", placeholder: "Establishment name", required: false, type: "text", span: 2 },
 
-  { key: "fsicNumber", label: "FSIC NO", placeholder: "FSIC NO", required: false, type: "text", span: 1 },
-  { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "Annual / New / Re-inspection", required: false, type: "text", span: 1 },
+  { key: "fsicNo", label: "FSIC NO", placeholder: "FSIC NO", required: false, type: "text", span: 1 },
+
+  // ✅ still input
+  { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "ANNUAL / RENEW / RE-INSPECTION", required: false, type: "text", span: 1 },
 
   { key: "businessAddress", label: "Business Address", placeholder: "Full address", required: false, type: "text", span: 2 },
 
@@ -152,7 +152,6 @@ const FIELDS = [
   { key: "nfsiNumber", label: "NFSI Number", placeholder: "NFSI no", required: false, type: "text", span: 1 },
   { key: "nfsiDate", label: "NFSI Date", placeholder: "", required: false, type: "date", span: 1 },
 
-  // ✅ Reinspection "TO"
   { key: "teamLeader", label: "Team Leader", placeholder: "Team leader", required: false, type: "text", span: 1 },
   { key: "teamLeaderSerial", label: "Team Leader Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
@@ -165,7 +164,6 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3", placeholder: "Inspector 3", required: false, type: "text", span: 1 },
   { key: "inspector3Serial", label: "Inspector 3 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
-  // ✅ AUTO: combined inspectors field (readOnly)
   { key: "inspectors", label: "Inspectors (combined)", placeholder: "Auto from Inspector 1/2/3", required: false, type: "text", span: 2 },
 
   { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
@@ -197,6 +195,14 @@ export default function AddRecord({ setRefresh }) {
   const [touched, setTouched] = useState({});
   const [toastOpen, setToastOpen] = useState(false);
 
+  // ✅ HISTORY per field (recent typed values)
+  const [history, setHistory] = useState(() => {
+    // initial nature suggestions
+    return {
+      natureOfInspection: [...NATURE_SUGGESTIONS],
+    };
+  });
+
   const requiredKeys = useMemo(
     () => FIELDS.filter((f) => f.required).map((f) => f.key),
     []
@@ -211,19 +217,11 @@ export default function AddRecord({ setRefresh }) {
     return miss;
   }, [form, requiredKeys]);
 
-  const buildPayload = () => {
-    const payload = { ...form };
-
-    // ✅ Store long dates for PDF/template
-    payload.dateInspected = formatDateLong(form.dateInspected);
-    payload.ioDate = formatDateLong(form.ioDate);
-    payload.nfsiDate = formatDateLong(form.nfsiDate);
-    payload.orDate = formatDateLong(form.orDate);
-    payload.ntcDate = formatDateLong(form.ntcDate);
-
-    payload.createdAt = serverTimestamp();
-    payload.updatedAt = serverTimestamp();
-    return payload;
+  const combineInspectors = (state) => {
+    return [state.inspector1, state.inspector2, state.inspector3]
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
   };
 
   const styles = {
@@ -244,24 +242,6 @@ export default function AddRecord({ setRefresh }) {
     },
     title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
     sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 },
-
-    btn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: "1px solid #e5e7eb",
-      background: "#fff",
-      cursor: "pointer",
-      fontWeight: 950,
-    },
-    primary: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: "1px solid #2563eb",
-      background: "#2563eb",
-      color: "#fff",
-      cursor: "pointer",
-      fontWeight: 950,
-    },
 
     grid: {
       marginTop: 14,
@@ -302,7 +282,6 @@ export default function AddRecord({ setRefresh }) {
       textTransform: "uppercase",
     },
 
-    // ✅ IMPORTANT: default is NOT uppercase anymore
     input: {
       width: "100%",
       padding: "10px 12px",
@@ -332,15 +311,54 @@ export default function AddRecord({ setRefresh }) {
       fontWeight: 800,
       color: "#64748b",
     },
+
+    btn: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 950,
+    },
+    primary: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #2563eb",
+      background: "#2563eb",
+      color: "#fff",
+      cursor: "pointer",
+      fontWeight: 950,
+    },
   };
 
-  // ✅ auto-combine inspector1/2/3 -> inspectors
-  const combineInspectors = (state) => {
-    const list = [state.inspector1, state.inspector2, state.inspector3]
-      .map((x) => String(x ?? "").trim())
-      .filter(Boolean)
-      .join(", ");
-    return list;
+  // ✅ update history list per field (unique, recent-first, max 10)
+  const pushHistory = (fieldKey, rawValue) => {
+    const v = String(rawValue ?? "").trim();
+    if (!v) return;
+
+    // skip auto fields
+    if (fieldKey === "inspectors" || fieldKey === "fsicValidity") return;
+
+    setHistory((prev) => {
+      const cur = Array.isArray(prev[fieldKey]) ? prev[fieldKey] : [];
+      const next = [v, ...cur.filter((x) => String(x) !== v)].slice(0, 10);
+
+      // keep nature suggestions always included
+      if (fieldKey === "natureOfInspection") {
+        const merged = [...NATURE_SUGGESTIONS, ...next].filter(
+          (x, i, arr) => arr.indexOf(x) === i
+        );
+        return { ...prev, [fieldKey]: merged.slice(0, 10) };
+      }
+
+      return { ...prev, [fieldKey]: next };
+    });
+  };
+
+  const onBlur = (k) => {
+    setTouched((p) => ({ ...p, [k]: true }));
+    // ✅ when leaving input, save typed value into history
+    pushHistory(k, form[k]);
   };
 
   const onChange = (e) => {
@@ -365,22 +383,37 @@ export default function AddRecord({ setRefresh }) {
     setForm((prev) => {
       const updated = { ...prev, [name]: v };
 
-      // ✅ AUTO: whenever inspector1/2/3 changes, update combined inspectors
+      // ✅ AUTO combine inspectors
       if (name === "inspector1" || name === "inspector2" || name === "inspector3") {
         updated.inspectors = combineInspectors(updated);
       }
-
       return updated;
     });
   };
 
-  const onBlur = (k) => setTouched((p) => ({ ...p, [k]: true }));
+  const buildPayload = () => {
+    const payload = { ...form };
+
+    // ✅ Store long dates for PDF/template
+    payload.dateInspected = formatDateLong(form.dateInspected);
+    payload.ioDate = formatDateLong(form.ioDate);
+    payload.nfsiDate = formatDateLong(form.nfsiDate);
+    payload.orDate = formatDateLong(form.orDate);
+    payload.ntcDate = formatDateLong(form.ntcDate);
+
+    payload.createdAt = serverTimestamp();
+    payload.updatedAt = serverTimestamp();
+    return payload;
+  };
 
   const submit = async () => {
     if (!form.fsicAppNo?.trim() || !form.ownerName?.trim()) {
       setTouched((p) => ({ ...p, fsicAppNo: true, ownerName: true }));
       return;
     }
+
+    // ✅ push all values to history before save (para mo-suggest next time)
+    Object.keys(form).forEach((k) => pushHistory(k, form[k]));
 
     setSaving(true);
     try {
@@ -405,7 +438,7 @@ export default function AddRecord({ setRefresh }) {
         <div style={styles.headerRow}>
           <div>
             <div style={styles.title}>Add Record</div>
-            <div style={styles.sub}>Fill up the fields then save.</div>
+            <div style={styles.sub}>Type normally—suggestions will appear from your recent inputs.</div>
           </div>
         </div>
 
@@ -413,7 +446,11 @@ export default function AddRecord({ setRefresh }) {
           {FIELDS.map((f) => {
             const showError = f.required && touched[f.key] && missingRequired[f.key];
             const isValidity = f.key === "fsicValidity";
-            const isCombinedInspectors = f.key === "inspectors"; // ✅ auto field
+            const isCombinedInspectors = f.key === "inspectors";
+
+            const dlId = `dl_${f.key}`;
+            const hasDatalist =
+              f.type !== "date" && f.type !== "file" && f.key !== "inspectors" && f.key !== "fsicValidity";
 
             return (
               <div
@@ -422,7 +459,6 @@ export default function AddRecord({ setRefresh }) {
                   ...styles.card,
                   gridColumn: f.span === 2 ? "1 / -1" : "auto",
                   border: showError ? "1px solid #fecdd3" : styles.card.border,
-                  opacity: isValidity ? 0.98 : 1,
                 }}
               >
                 <div style={styles.cardTop}>
@@ -439,25 +475,29 @@ export default function AddRecord({ setRefresh }) {
                   placeholder={f.placeholder || ""}
                   autoComplete="off"
                   readOnly={isValidity || isCombinedInspectors}
+                  list={hasDatalist ? dlId : undefined}
                   style={{
                     ...styles.input,
                     border: showError ? "1px solid #dc2626" : styles.input.border,
-
-                    // ✅ dates no transform; uppercase ONLY if in UPPER_KEYS
                     textTransform:
                       f.type === "date"
                         ? "none"
                         : UPPER_KEYS.has(f.key)
                         ? "uppercase"
                         : "none",
-
-                    background:
-                      isValidity || isCombinedInspectors
-                        ? "#f1f5f9"
-                        : styles.input.background,
+                    background: isValidity || isCombinedInspectors ? "#f1f5f9" : styles.input.background,
                     cursor: isValidity || isCombinedInspectors ? "not-allowed" : "text",
                   }}
                 />
+
+                {/* ✅ datalist suggestions (history) */}
+                {hasDatalist && (
+                  <datalist id={dlId}>
+                    {(history[f.key] || []).map((opt) => (
+                      <option key={`${f.key}-${opt}`} value={opt} />
+                    ))}
+                  </datalist>
+                )}
               </div>
             );
           })}

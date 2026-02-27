@@ -100,14 +100,18 @@ export default function Dashboard() {
         const renSnap = await getDocs(collection(db, "renewals"));
         setRenewedCount(renSnap.size);
 
-        // ✅ RECENT: fetch all then sort by createdAt/updatedAt (newest first)
         const snap = await getDocs(collection(db, "records"));
 
         const list = snap.docs
           .map((d) => {
             const data = d.data() || {};
-            const dt = parseAnyDate(data.createdAt) || parseAnyDate(data.updatedAt) || null;
-            return {
+            const dt =
+              (data.createdAtMs ? new Date(data.createdAtMs) : null) ||
+              parseAnyDate(data.createdAt) ||
+              (data.updatedAtMs ? new Date(data.updatedAtMs) : null) ||
+              parseAnyDate(data.updatedAt) ||
+              null;           
+               return {
               id: d.id,
               fsicAppNo: data.fsicAppNo || "",
               establishmentName: data.establishmentName || "",
