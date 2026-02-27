@@ -127,6 +127,7 @@ export default function RecordsTable({
             <th style={{ ...S.th, width: "15%" }}>Nature</th>
             <th style={{ ...S.th, width: "15%" }}>Owner</th>
             <th style={{ ...S.th, width: "15%" }}>Establishment</th>
+            <th style={{ ...S.th, width: "15%" }}>FSIC NO</th>
             <th style={{ ...S.th, width: "23%" }}>Address</th>
             <th style={{ ...S.th, width: "10%" }}>Date</th>
             <th style={{ ...S.th, width: "30%" }}>Generate</th>
@@ -178,6 +179,9 @@ export default function RecordsTable({
                   </td>
                   <td style={S.td}>
                     <div style={wrap}>{r.establishmentName || "-"}</div>
+                  </td>
+                   <td style={S.td}>
+                    <div style={wrap}>{<r className="fsicno"></r> || "-"}</div>
                   </td>
                   <td style={S.td}>
                     <div style={wrap}>{r.businessAddress || "-"}</div>
