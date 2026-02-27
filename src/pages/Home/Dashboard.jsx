@@ -79,6 +79,17 @@ export default function Dashboard() {
     return d ? fmtDate(d) : S(v);
   };
 
+  // ✅ read canonical + legacy fallback (IMPORT KEY vs OLD KEY)
+  const pick = (r, canon, legacy = []) => {
+    const direct = r?.[canon];
+    if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
+    for (const k of legacy) {
+      const v = r?.[k];
+      if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+    }
+    return "";
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoadingRecent(true);
@@ -89,7 +100,7 @@ export default function Dashboard() {
         const renSnap = await getDocs(collection(db, "renewals"));
         setRenewedCount(renSnap.size);
 
-        // ✅ RECENT: fetch all then sort by createdAt/updatedAt
+        // ✅ RECENT: fetch all then sort by createdAt/updatedAt (newest first)
         const snap = await getDocs(collection(db, "records"));
 
         const list = snap.docs
@@ -109,7 +120,7 @@ export default function Dashboard() {
           .sort((a, b) => (b._dt || 0) - (a._dt || 0));
 
         setRecent(list);
-        setPage(1); // ✅ reset to page 1 every reload
+        setPage(1);
       } catch (e) {
         console.error("Dashboard load error:", e);
       } finally {
@@ -127,7 +138,7 @@ export default function Dashboard() {
     return recent.slice(start, start + pageSize);
   }, [recent, page]);
 
-  // ✅ ✅ EXPORT FIXED ORDER (NO. first, O.R DATE last)
+  // ✅ ✅ EXPORT (FSIC APP NO separate from FSIC NO + fixed new columns)
   const exportCurrentExcel = async () => {
     if (exporting) return;
     setExporting(true);
@@ -142,75 +153,92 @@ export default function Dashboard() {
         return;
       }
 
-      // ✅ IMPORTANT: Object key order = Excel column order
-      const arranged = list.map((r, idx) => ({
-        "NO.": idx + 1,
-        "FSIC APPLICATION NO.": S(r.fsicAppNo || r.FSIC_APP_NO || r.FSIC_NUMBER),
-        "NATURE OF INSPECTION": S(r.natureOfInspection || r.NATURE_OF_INSPECTION),
-        "NAME OF OWNER": S(r.ownerName || r.OWNERS_NAME || r.NAME_OF_OWNER),
-        "NAME OF ESTABLISHMENT": S(
-          r.establishmentName || r.ESTABLISHMENT_NAME || r.NAME_OF_ESTABLISHMENT
-        ),
-        "BUSINESS ADDRESS": S(r.businessAddress || r.BUSSINESS_ADDRESS || r.ADDRESS),
-        "CONTACT #": S(r.contactNumber || r.CONTACT_NUMBER || r.CONTACT_),
-        "DATE INSPECTED": dateText(r.dateInspected || r.DATE_INSPECTED),
+      const arranged = list.map((r, idx) => {
+        // ✅ canonical + legacy fallback for new fields
+        const typeOcc = pick(r, "typeOfOccupancy", ["occupancyType", "OCCUPANCY_TYPE"]);
+        const bdesc = pick(r, "buildingDescription", ["buildingDesc", "BLDG_DESCRIPTION", "BUILDING_DESC"]);
+        const floor = pick(r, "floorAreaSqm", ["floorArea", "FLOOR_AREA", "FLOOR_AREA_SQM"]);
+        const storey = pick(r, "noOfStorey", ["storeyCount", "STOREY_COUNT", "NO_OF_STOREY"]);
 
-        "I.O NUMBER": S(r.ioNumber || r.IO_NUMBER),
-        "I.O DATE": dateText(r.ioDate || r.IO_DATE),
+        return {
+          "NO.": idx + 1,
 
-        "NFSI NUMBER": S(r.nfsiNumber || r.NFSI_NUMBER),
-        "NFSI DATE": dateText(r.nfsiDate || r.NFSI_DATE),
+          // ✅ DO NOT mix fsicNo into fsicAppNo
+          "FSIC APPLICATION NO.": S(r.fsicAppNo),
 
-        "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
-        DEFECTS: S(r.defects || r.DEFECTS),
-        INSPECTORS: S(r.inspectors || r.INSPECTORS),
+          "NATURE OF INSPECTION": S(r.natureOfInspection || r.NATURE_OF_INSPECTION),
+          "NAME OF OWNER": S(r.ownerName || r.OWNERS_NAME || r.NAME_OF_OWNER),
+          "NAME OF ESTABLISHMENT": S(r.establishmentName || r.ESTABLISHMENT_NAME || r.NAME_OF_ESTABLISHMENT),
+          "BUSINESS ADDRESS": S(r.businessAddress || r.BUSSINESS_ADDRESS || r.ADDRESS),
+          "CONTACT #": S(r.contactNumber || r.CONTACT_NUMBER || r.CONTACT_),
+          "DATE INSPECTED": dateText(r.dateInspected || r.DATE_INSPECTED),
 
-        "TYPE OF OCCUPANCY": S(r.occupancyType || r.OCCUPANCY_TYPE),
-        "BLDG DESCRIPTION": S(r.buildingDesc || r.BLDG_DESCRIPTION || r.BUILDING_DESC),
-        "FLOOR AREA (SQM)": S(r.floorArea || r.FLOOR_AREA),
-        "BUILDING HEIGHT": S(r.buildingHeight || r.BUILDING_HEIGHT),
-        "NO OF STOREY": S(r.storeyCount || r.STOREY_COUNT),
-        "HIGH RISE (YES/NO)": S(r.highRise || r.HIGH_RISE),
-        "FSMR (YES/NO)": S(r.fsmr || r.FSMR),
-        REMARKS: S(r.remarks || r.REMARKS),
+          "I.O NUMBER": S(r.ioNumber || r.IO_NUMBER),
+          "I.O DATE": dateText(r.ioDate || r.IO_DATE),
 
-        "O.R NUMBER": S(r.orNumber || r.OR_NUMBER),
-        "O.R AMOUNT": S(r.orAmount || r.OR_AMOUNT),
+          "NFSI NUMBER": S(r.nfsiNumber || r.NFSI_NUMBER),
+          "NFSI DATE": dateText(r.nfsiDate || r.NFSI_DATE),
 
-        // ✅ LAST COLUMN (imong giingon)
-        "O.R DATE": dateText(r.orDate || r.OR_DATE),
-      }));
+          "NTC NUMBER": S(r.ntcNumber || r.NTC_NUMBER),
+          "NTC DATE": dateText(r.ntcDate || r.NTC_DATE),
+
+          // ✅ separate FSIC NO column
+          "FSIC NO": S(r.fsicNo || r.FSIC_NO),
+
+          "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
+          DEFECTS: S(r.defects || r.DEFECTS),
+          INSPECTORS: S(r.inspectors || r.INSPECTORS),
+
+          // ✅ fixed: uses canonical keys from ImportExcel (with legacy fallback)
+          "TYPE OF OCCUPANCY": S(typeOcc),
+          "BLDG DESCRIPTION": S(bdesc),
+          "FLOOR AREA (SQM)": S(floor),
+          "BUILDING HEIGHT": S(r.buildingHeight || r.BUILDING_HEIGHT),
+          "NO OF STOREY": S(storey),
+          "HIGH RISE (YES/NO)": S(r.highRise || r.HIGH_RISE),
+          "FSMR (YES/NO)": S(r.fsmr || r.FSMR),
+
+          REMARKS: S(r.remarks || r.REMARKS),
+
+          "O.R NUMBER": S(r.orNumber || r.OR_NUMBER),
+          "O.R AMOUNT": S(r.orAmount || r.OR_AMOUNT),
+
+          // ✅ last column
+          "O.R DATE": dateText(r.orDate || r.OR_DATE),
+        };
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(arranged);
 
-      // ✅ optional column widths (para di mag-sikip)
       worksheet["!cols"] = [
-        { wch: 6 },  // NO.
-        { wch: 20 }, // FSIC
-        { wch: 22 }, // NATURE
-        { wch: 24 }, // OWNER
-        { wch: 28 }, // ESTABLISHMENT
-        { wch: 38 }, // ADDRESS
-        { wch: 18 }, // CONTACT
-        { wch: 18 }, // DATE INSPECTED
-        { wch: 16 }, // IO #
-        { wch: 16 }, // IO DATE
-        { wch: 16 }, // NFSI #
-        { wch: 16 }, // NFSI DATE
-        { wch: 18 }, // FSIC validity
-        { wch: 16 }, // defects
-        { wch: 24 }, // inspectors
-        { wch: 18 }, // occupancy
-        { wch: 30 }, // bldg desc
-        { wch: 16 }, // floor area
-        { wch: 16 }, // height
-        { wch: 14 }, // storey
-        { wch: 16 }, // high rise
-        { wch: 14 }, // fsmr
-        { wch: 18 }, // remarks
-        { wch: 16 }, // OR #
-        { wch: 14 }, // OR amt
-        { wch: 16 }, // OR date
+        { wch: 6 },
+        { wch: 22 }, // FSIC APP
+        { wch: 22 },
+        { wch: 24 },
+        { wch: 28 },
+        { wch: 38 },
+        { wch: 16 },
+        { wch: 18 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 16 }, // FSIC NO
+        { wch: 18 },
+        { wch: 16 },
+        { wch: 26 },
+        { wch: 18 },
+        { wch: 30 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 20 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 16 },
       ];
 
       const workbook = XLSX.utils.book_new();
@@ -271,8 +299,9 @@ export default function Dashboard() {
           <RecentRecords
             C={C}
             loading={loadingRecent}
-            list={visibleRecent} // ✅ ONLY 4 per page
-            onOpen={(id) => navigate("/app/records", { state: { activeId: id } })}            
+            list={visibleRecent}
+            // ✅ IMPORTANT: use openId (para auto-open + highlight sa Records.jsx)
+            onOpen={(id) => navigate("/app/records", { state: { openId: id } })}
             page={page}
             setPage={setPage}
             total={total}

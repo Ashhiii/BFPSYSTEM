@@ -408,7 +408,7 @@ export default function RecordsManager({ C, refresh, setRefresh }) {
 
   const tableWrap = {
     overflow: "auto",
-    maxHeight: 440,
+    maxHeight: 700,
     borderRadius: 16,
     border: `1px solid ${C.border}`,
     background: "#fff",

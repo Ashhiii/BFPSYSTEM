@@ -9,7 +9,6 @@ import {
   writeBatch,
 } from "firebase/firestore";
 
-/** ✅ FIELD DEFS: canonical key + aliases (old keys) */
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No" },
 
