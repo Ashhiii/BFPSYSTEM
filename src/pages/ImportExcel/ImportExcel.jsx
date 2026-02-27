@@ -723,7 +723,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
               <div style={S.sub}>Supported formats: .xlsx, .xls (Excel)</div>
 
               <div style={S.hint}>
-                <HiOutlineCloudUpload size={18} /> Import will go to Firestore: <b>records</b>
+                <HiOutlineCloudUpload size={18} /> Import will go to: <b>records</b>
               </div>
 
               <input
