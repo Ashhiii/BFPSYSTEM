@@ -1,11 +1,8 @@
-// src/pages/ImportExcel/ImportExcel.jsx  ✅ FULL FIXED (header detection + date year + strict mapping + FSIC fallback)
-//
-// Fixes:
-// ✅ Strong header row detection (avoids title rows -> wrong assignment)
-// ✅ Date parser: only converts REAL excel serial dates + supports YYYYMMDD + string formats
-// ✅ “Awaton” gyud ang cell values; if empty in file -> empty in Firestore
-// ✅ NEW: if FSIC APPLICATION NO is empty, fallback to IO Number / App No so rows won’t all be skipped
-// ✅ Still same UI/design
+// src/pages/ImportExcel/ImportExcel.jsx ✅ FULL FIXED
+// ✅ header detection + date parser + strict mapping
+// ✅ NO FAKE FSIC: fsicAppNo stays what’s in Excel (blank stays blank)
+// ✅ Uses primaryId for import (FSIC || IO Number || App No) so rows won’t be skipped
+// ✅ Adds missing columns: typeOfOccupancy, buildingDescription, floorAreaSqm, buildingHeight, noOfStorey, highRise, fsmr
 
 import React, { useMemo, useRef, useState } from "react";
 import {
@@ -280,7 +277,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  /* ================== NORMALIZERS (AWATON gyud) ================== */
+  /* ================== NORMALIZERS ================== */
 
   const normKey = (s) =>
     String(s ?? "")
@@ -291,7 +288,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
 
   const toText = (v) => (v == null ? "" : String(v).trim());
 
-  // ✅ DATE: strict conversion (prevents wrong year)
   const excelDateToISO = (v) => {
     if (v == null || v === "") return "";
 
@@ -337,30 +333,20 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     }
 
     if (typeof v === "number" && Number.isFinite(v)) {
-      // YYYYMMDD
       if (v >= 19000101 && v <= 21001231) {
         const s = String(Math.trunc(v));
         const y = s.slice(0, 4);
         const m = s.slice(4, 6);
         const d = s.slice(6, 8);
-        if (
-          Number(m) >= 1 &&
-          Number(m) <= 12 &&
-          Number(d) >= 1 &&
-          Number(d) <= 31
-        ) {
+        if (Number(m) >= 1 && Number(m) <= 12 && Number(d) >= 1 && Number(d) <= 31) {
           return `${y}-${m}-${d}`;
         }
       }
 
-      // Excel serial
       if (v >= 20000 && v <= 60000) {
         const d = XLSX.SSF?.parse_date_code?.(v);
         if (d && d.y && d.m && d.d) {
-          return `${String(d.y).padStart(4, "0")}-${String(d.m).padStart(
-            2,
-            "0"
-          )}-${String(d.d).padStart(2, "0")}`;
+          return `${String(d.y).padStart(4, "0")}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
         }
       }
 
@@ -382,16 +368,11 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       const nonEmptyCount = normalized.filter(Boolean).length;
 
       const hasFsic = normalized.some((x) => x.includes("fsic"));
-      const hasOwner = normalized.some(
-        (x) => x.includes("owner") || x.includes("taxpayer")
-      );
-      const hasEstab = normalized.some(
-        (x) => x.includes("establishment") || x.includes("tradename")
-      );
+      const hasOwner = normalized.some((x) => x.includes("owner") || x.includes("taxpayer"));
+      const hasEstab = normalized.some((x) => x.includes("establishment") || x.includes("tradename"));
       const hasAddress = normalized.some((x) => x.includes("address"));
 
-      const looksHeader =
-        hasFsic && nonEmptyCount >= 4 && (hasOwner || hasEstab || hasAddress);
+      const looksHeader = hasFsic && nonEmptyCount >= 4 && (hasOwner || hasEstab || hasAddress);
       if (looksHeader) return i;
     }
 
@@ -413,22 +394,14 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     const headerIdx = findHeaderRowIndex(aoa);
     if (headerIdx === -1) {
       const [h = [], ...rest] = aoa;
-      return {
-        headerIdx: 0,
-        headers: h,
-        objects: rest.map((r) => mapRow(h, r)),
-      };
+      return { headerIdx: 0, headers: h, objects: rest.map((r) => mapRow(h, r)) };
     }
     const headers = aoa[headerIdx] || [];
     const dataRows = aoa.slice(headerIdx + 1);
-    return {
-      headerIdx,
-      headers,
-      objects: dataRows.map((r) => mapRow(headers, r)),
-    };
+    return { headerIdx, headers, objects: dataRows.map((r) => mapRow(headers, r)) };
   };
 
-  /* ================== STRICT normalizeRow ================== */
+  /* ================== normalizeRow ================== */
 
   const normalizeRow = (r) => {
     const headerMap = {};
@@ -438,9 +411,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       for (const v of variants) {
         const key = normKey(v);
         const val = headerMap[key];
-        if (val !== undefined && val !== null && String(val).trim() !== "") {
-          return val; // raw
-        }
+        if (val !== undefined && val !== null && String(val).trim() !== "") return val; // raw
       }
       return "";
     };
@@ -453,8 +424,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         const nk = normKey(k);
         if (nk.includes(a) && nk.includes(b)) {
           const val = headerMap[k];
-          if (val !== undefined && val !== null && String(val).trim() !== "")
-            return val;
+          if (val !== undefined && val !== null && String(val).trim() !== "") return val;
         }
       }
       return "";
@@ -476,108 +446,62 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       getByIncludes("fsic", "app") ||
       getByIncludes("fsic", "no");
 
-    const ownerRaw =
-      get(
-        "ownername",
-        "ownersname",
-        "owner",
-        "taxpayer",
-        "nameoftaxpayer",
-        "nameoftheowner",
-        "owners name",
-        "owner's name",
-        "name of owner"
-      ) || "";
-
-    const estabRaw =
-      get(
-        "establishmentname",
-        "nameofestablishment",
-        "establishment",
-        "tradename",
-        "trade name",
-        "businessname",
-        "name of establishment",
-        "establishment_name"
-      ) || "";
-
-    const addrRaw =
-      get(
-        "businessaddress",
-        "business address",
-        "bussinessaddress",
-        "address",
-        "completeaddress",
-        "addresscomplete",
-        "location",
-        "business_address",
-        "bussiness_address"
-      ) || "";
-
-    const dateInspectedRaw = get(
-      "dateinspected",
-      "date inspected",
-      "date",
-      "date_inspected"
-    );
-    const ioDateRaw = get("iodate", "io date", "io_date");
-    const nfsiDateRaw = get("nfsidate", "nfsi date", "nfsi_date");
-    const ntcDateRaw = get("ntcdate", "ntc date", "ntc_date");
-    const orDateRaw = get("ordate", "or date", "or_date");
-    const fsicValidityRaw = get(
-      "fsicvalidity",
-      "validity",
-      "fsic validity",
-      "fsic_validity"
-    );
-
     return {
-      fsicAppNo: toText(fsicRaw),
-      ownerName: toText(ownerRaw),
-      establishmentName: toText(estabRaw),
-      businessAddress: toText(addrRaw),
+      // core
+      fsicAppNo: toText(fsicRaw), // ✅ stays blank if blank in file
+      ownerName: toText(get("name of owner", "ownername", "ownersname", "owner", "taxpayer", "nameoftaxpayer", "nameoftheowner", "owner's name")),
+      establishmentName: toText(get("name of establishment", "nameofestablishment", "establishmentname", "establishment", "tradename", "trade name", "businessname", "establishment_name")),
+      businessAddress: toText(get("business address", "businessaddress", "bussinessaddress", "address", "completeaddress", "addresscomplete", "location", "business_address", "bussiness_address")),
+      contactNumber: toText(get("contact #", "contact#", "contactnumber", "contact", "mobile", "contact no")),
 
-      appno: toText(get("appno", "applicationno", "application#", "application number")),
-      contactNumber: toText(get("contactnumber", "contact", "mobile", "contact no", "contact #")),
-      natureOfInspection: toText(get("natureofinspection", "inspection", "nature")),
-      dateInspected: excelDateToISO(dateInspectedRaw),
+      natureOfInspection: toText(get("nature of inspection", "natureofinspection", "inspection", "nature")),
 
-      ioNumber: toText(get("ionumber", "io no", "io#", "io", "io_number")),
-      ioDate: excelDateToISO(ioDateRaw),
+      dateInspected: excelDateToISO(get("date inspected", "dateinspected", "date", "date_inspected")),
 
-      nfsiNumber: toText(get("nfsinumber", "nfsi no", "nfsi#", "nfsi", "nfsi_number")),
-      nfsiDate: excelDateToISO(nfsiDateRaw),
+      ioNumber: toText(get("i.o number", "io number", "ionumber", "io no", "io#", "io", "io_number")),
+      ioDate: excelDateToISO(get("i.o date", "io date", "iodate", "io_date")),
 
-      ntcNumber: toText(get("ntcnumber", "ntc no", "ntc#", "ntc", "ntc_number")),
-      ntcDate: excelDateToISO(ntcDateRaw),
+      nfsiNumber: toText(get("nfsi number", "nfsinumber", "nfsi no", "nfsi#", "nfsi", "nfsi_number")),
+      nfsiDate: excelDateToISO(get("nfsi date", "nfsidate", "nfsi_date")),
 
-      fsicValidity: excelDateToISO(fsicValidityRaw),
+      ntcNumber: toText(get("ntc number", "ntcnumber", "ntc no", "ntc#", "ntc", "ntc_number")),
+      ntcDate: excelDateToISO(get("ntc date", "ntcdate", "ntc_date")),
+
+      fsicValidity: excelDateToISO(get("fsic validity", "fsicvalidity", "validity", "fsic_validity")),
+
       defects: toText(get("defects", "violations", "defect")),
       remarks: toText(get("remarks", "remark")),
 
-      orNumber: toText(get("ornumber", "or no", "or#", "or_number")),
-      orAmount: toText(get("oramount", "or amount", "or_amount")),
-      orDate: excelDateToISO(orDateRaw),
-
       inspectors: toText(get("inspectors", "inspector", "inspectorscombined", "inspector(s)")),
-      teamLeader: toText(get("teamleader", "team leader", "team_leader")),
-      teamLeaderSerial: toText(get("teamleaderserial", "team leader serial", "team_leader_serial")),
+      teamLeader: toText(get("team leader", "teamleader", "team_leader")),
 
+      orNumber: toText(get("o.r number", "or number", "ornumber", "or no", "or#", "or_number")),
+      orAmount: toText(get("o.r amount", "or amount", "oramount", "or_amount")),
+      orDate: excelDateToISO(get("o.r date", "or date", "ordate", "or_date")),
+
+      // ✅ NEW (from your LOGBOOK headers)
+      typeOfOccupancy: toText(get("type of occupancy", "typeofoccupancy", "occupancy")),
+      buildingDescription: toText(get("bldg description / retailer", "bldg description", "building description", "retailer", "bldgdescription", "buildingdescription")),
+      floorAreaSqm: toText(get("floor area (sqm)", "floor area", "floorareasqm", "floor_area_sqm")),
+      buildingHeight: toText(get("building height", "buildingheight")),
+      noOfStorey: toText(get("no of storey", "no of storeys", "noofstorey", "noofstoreys", "storey", "storeys")),
+      highRise: toText(get("high rise (yes/no)", "high rise", "highrise")),
+      fsmr: toText(get("fsmr (yes/no)", "fsmr")),
+
+      // optional extras if ever present
+      appno: toText(get("appno", "applicationno", "application#", "application number")),
+      teamLeaderSerial: toText(get("team leader serial", "teamleaderserial", "team_leader_serial")),
       inspector1: toText(get("inspector1", "inspector 1", "inspector_1")),
-      inspector1Serial: toText(get("inspector1serial", "inspector 1 serial", "inspector_1_serial")),
-
+      inspector1Serial: toText(get("inspector 1 serial", "inspector1serial", "inspector_1_serial")),
       inspector2: toText(get("inspector2", "inspector 2", "inspector_2")),
-      inspector2Serial: toText(get("inspector2serial", "inspector 2 serial", "inspector_2_serial")),
-
+      inspector2Serial: toText(get("inspector 2 serial", "inspector2serial", "inspector_2_serial")),
       inspector3: toText(get("inspector3", "inspector 3", "inspector_3")),
-      inspector3Serial: toText(get("inspector3serial", "inspector 3 serial", "inspector_3_serial")),
-
+      inspector3Serial: toText(get("inspector 3 serial", "inspector3serial", "inspector_3_serial")),
       chiefName: toText(get("chiefname", "chief")),
       marshalName: toText(get("marshalname", "marshal")),
     };
   };
 
-  // ✅ safer trash checker (no "mendoza" -> "end" false positive)
   const looksLikeTrashRow = (data) => {
     const txt = [data.remarks, data.ownerName, data.establishmentName]
       .join(" ")
@@ -592,7 +516,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     return false;
   };
 
-  // ✅ allow short ids (IO/appno) but still reject empty
   const isValidId = (v) => String(v || "").trim().length >= 2;
 
   /* ================== UPLOAD ================== */
@@ -605,7 +528,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-
       const name = wb.SheetNames?.[0];
       if (!name) throw new Error("No sheet found in Excel.");
 
@@ -624,11 +546,6 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       if (!objects.length) {
         throw new Error(`No data rows found after header row (line ${headerIdx + 1}).`);
       }
-
-      console.log("HEADER ROW LINE:", headerIdx + 1);
-      console.log("HEADERS:", headers);
-      console.log("SAMPLE RAW OBJ:", objects[0]);
-      console.log("SAMPLE NORMALIZED:", normalizeRow(objects[0]));
 
       let imported = 0,
         skipped = 0;
@@ -651,38 +568,35 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       for (const r of objects) {
         const data = normalizeRow(r);
 
-        // skip totally empty row
-        const anyValue = Object.values(data).some(
-          (x) => String(x ?? "").trim() !== ""
-        );
+        const anyValue = Object.values(data).some((x) => String(x ?? "").trim() !== "");
         if (!anyValue) {
           skipped++;
           reasonEmpty++;
           continue;
         }
 
-        // skip footer rows
         if (looksLikeTrashRow(data)) {
           skipped++;
           reasonTrash++;
           continue;
         }
 
-        // ✅ NEW: FSIC fallback if blank (PER DAY INSPECTION LOGBOOK usually has no FSIC)
-        if (!data.fsicAppNo || !isValidId(data.fsicAppNo)) {
-          const fallback = data.ioNumber || data.appno;
-          if (fallback && isValidId(fallback)) {
-            data.fsicAppNo = String(fallback).trim();
-            data.importIdSource = data.ioNumber ? "ioNumber" : "appno";
-          } else {
-            data.importIdSource = "missing";
-          }
-        } else {
-          data.importIdSource = "fsicAppNo";
+        // ✅ primaryId (used for import validity) — DOES NOT overwrite fsicAppNo
+        let primaryId = "";
+        let primaryIdSource = "missing";
+
+        if (isValidId(data.fsicAppNo)) {
+          primaryId = data.fsicAppNo;
+          primaryIdSource = "fsicAppNo";
+        } else if (isValidId(data.ioNumber)) {
+          primaryId = data.ioNumber;
+          primaryIdSource = "ioNumber";
+        } else if (isValidId(data.appno)) {
+          primaryId = data.appno;
+          primaryIdSource = "appno";
         }
 
-        // ✅ require at least one identifier (FSIC or fallback)
-        if (!data.fsicAppNo || !isValidId(data.fsicAppNo)) {
+        if (!isValidId(primaryId)) {
           skipped++;
           reasonNoId++;
           continue;
@@ -691,6 +605,8 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
         const ref = fsDoc(collection(db, "records"));
         batch.set(ref, {
           ...data,
+          primaryId,          // ✅ use this to track the record if FSIC is blank
+          primaryIdSource,    // ✅ tells you if it came from FSIC / IO / AppNo
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           importSource: "excel",
@@ -763,8 +679,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
               <div style={S.sub}>Supported formats: .xlsx, .xls (Excel)</div>
 
               <div style={S.hint}>
-                <HiOutlineCloudUpload size={18} /> Import will go to Firestore:{" "}
-                <b>records</b>
+                <HiOutlineCloudUpload size={18} /> Import will go to Firestore: <b>records</b>
               </div>
 
               <input
@@ -804,11 +719,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
 
                   {msg ? (
                     <div style={S.msg}>
-                      {ok ? (
-                        <HiOutlineCheckCircle size={18} />
-                      ) : (
-                        <HiOutlineExclamationCircle size={18} />
-                      )}
+                      {ok ? <HiOutlineCheckCircle size={18} /> : <HiOutlineExclamationCircle size={18} />}
                       <span>{msg}</span>
                     </div>
                   ) : null}
@@ -831,8 +742,8 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       <div style={S.footer}>
         <div style={S.fInfo}>
           <HiOutlineInformationCircle size={18} />
-          Import is strict: it reads only what exists in Excel cells. Empty cells
-          stay empty. (If FSIC is blank, it falls back to IO/App No.)
+          Import is strict: it reads only what exists in Excel cells. Empty cells stay empty.
+          (If FSIC is blank, it uses IO/AppNo as primaryId but FSIC stays blank.)
         </div>
 
         <div style={S.actions}>
@@ -846,11 +757,7 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
           >
             Cancel
           </button>
-          <button
-            style={S.primary}
-            onClick={uploadExcel}
-            disabled={uploading || !file}
-          >
+          <button style={S.primary} onClick={uploadExcel} disabled={uploading || !file}>
             {uploading ? "Importing..." : "Import"}
           </button>
         </div>
