@@ -12,8 +12,6 @@ import {
 /** ✅ FIELD DEFS: canonical key + aliases (old keys) */
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No" },
-  { key: "primaryId", label: "Primary ID" }, // ✅ NEW (from import)
-  { key: "primaryIdSource", label: "Primary ID Source" }, // ✅ NEW
 
   { key: "natureOfInspection", label: "Nature Of Inspection" },
   { key: "ownerName", label: "Owner" },
