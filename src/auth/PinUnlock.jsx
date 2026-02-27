@@ -30,7 +30,7 @@ export default function PinUnlock() {
     setMsg("");
 
     const cleanPin = String(pin || "").trim();
-    if (!/^\d{1,7}$/.test(cleanPin)) return setMsg("Enter PIN (numbers only).");
+    if (!/^\d{7}$/.test(cleanPin)) return setMsg("Enter PIN (numbers only).");
 
     try {
       setLoading(true);
@@ -147,7 +147,7 @@ export default function PinUnlock() {
     outline: "none",
     fontSize: 16,
     fontWeight: 950,
-    letterSpacing: 10,
+    letterSpacing: 8,
     textAlign: "center",
   };
 
@@ -290,7 +290,7 @@ export default function PinUnlock() {
           <form onSubmit={submit} style={inputWrap}>
             <input
               type="password"
-              maxLength={6}
+              maxLength={7}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
               placeholder="••••"
