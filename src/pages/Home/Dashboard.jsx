@@ -1,3 +1,5 @@
+// src/pages/Dashboard/Dashboard.jsx (FULL) — Export Choice (All vs Selected) + Recent active highlight FIXED
+
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
@@ -7,13 +9,13 @@ import { useNavigate } from "react-router-dom";
 import InsightCard from "./parts/InsightCard";
 import QuickActions from "./parts/QuickActions";
 import RecentRecords from "./parts/RecentRecords";
-import ExportConfirmModal from "./parts/ExportConfirmModal";
+import ExportChoiceModal from "../../components/ExportChoiceModal"; // ✅ NEW
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
   const [exporting, setExporting] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [showExport, setShowExport] = useState(false); // ✅ NEW
 
   const [totalRecords, setTotalRecords] = useState(0);
   const [renewedCount, setRenewedCount] = useState(0);
@@ -44,6 +46,8 @@ export default function Dashboard() {
     []
   );
 
+  /* ================= HELPERS ================= */
+
   const parseAnyDate = (x) => {
     if (!x) return null;
     if (typeof x === "object" && typeof x.toDate === "function") return x.toDate();
@@ -61,20 +65,14 @@ export default function Dashboard() {
   const fmtDate = (d) => {
     if (!d) return "";
     try {
-      return d.toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "2-digit",
-      });
+      return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "2-digit" });
     } catch {
       return "";
     }
   };
 
-  // ✅ string safe
   const S = (v) => (v === undefined || v === null ? "" : String(v));
 
-  // ✅ date text safe (supports Firestore Timestamp / string)
   const dateText = (v) => {
     const d = parseAnyDate(v);
     return d ? fmtDate(d) : S(v);
@@ -90,6 +88,8 @@ export default function Dashboard() {
     }
     return "";
   };
+
+  /* ================= LOAD DASHBOARD ================= */
 
   useEffect(() => {
     const load = async () => {
@@ -111,8 +111,9 @@ export default function Dashboard() {
               parseAnyDate(data.createdAt) ||
               (data.updatedAtMs ? new Date(data.updatedAtMs) : null) ||
               parseAnyDate(data.updatedAt) ||
-              null;           
-               return {
+              null;
+
+            return {
               id: d.id,
               fsicAppNo: data.fsicAppNo || "",
               establishmentName: data.establishmentName || "",
@@ -143,119 +144,144 @@ export default function Dashboard() {
     return recent.slice(start, start + pageSize);
   }, [recent, page]);
 
-  // ✅ ✅ EXPORT (FSIC APP NO separate from FSIC NO + fixed new columns)
-  const exportCurrentExcel = async () => {
+  /* ================= EXPORT (REUSE YOUR MAPPING) ================= */
+
+  // ✅ Exports GIVEN LIST (so we can export all OR selected)
+  const exportToExcel = async (list) => {
+    if (!list?.length) {
+      alert("No records to export.");
+      return;
+    }
+
+    const arranged = list.map((r, idx) => {
+      const typeOcc = pick(r, "typeOfOccupancy", ["occupancyType", "OCCUPANCY_TYPE"]);
+      const bdesc = pick(r, "buildingDescription", ["buildingDesc", "BLDG_DESCRIPTION", "BUILDING_DESC"]);
+      const floor = pick(r, "floorAreaSqm", ["floorArea", "FLOOR_AREA", "FLOOR_AREA_SQM"]);
+      const storey = pick(r, "noOfStorey", ["storeyCount", "STOREY_COUNT", "NO_OF_STOREY"]);
+
+      return {
+        "NO.": idx + 1,
+
+        // ✅ DO NOT mix fsicNo into fsicAppNo
+        "FSIC APPLICATION NO.": S(r.fsicAppNo),
+
+        "NATURE OF INSPECTION": S(r.natureOfInspection || r.NATURE_OF_INSPECTION),
+        "NAME OF OWNER": S(r.ownerName || r.OWNERS_NAME || r.NAME_OF_OWNER),
+        "NAME OF ESTABLISHMENT": S(r.establishmentName || r.ESTABLISHMENT_NAME || r.NAME_OF_ESTABLISHMENT),
+        "BUSINESS ADDRESS": S(r.businessAddress || r.BUSSINESS_ADDRESS || r.ADDRESS),
+        "CONTACT #": S(r.contactNumber || r.CONTACT_NUMBER || r.CONTACT_),
+        "DATE INSPECTED": dateText(r.dateInspected || r.DATE_INSPECTED),
+
+        "I.O NUMBER": S(r.ioNumber || r.IO_NUMBER),
+        "I.O DATE": dateText(r.ioDate || r.IO_DATE),
+
+        "NFSI NUMBER": S(r.nfsiNumber || r.NFSI_NUMBER),
+        "NFSI DATE": dateText(r.nfsiDate || r.NFSI_DATE),
+
+        "NTC NUMBER": S(r.ntcNumber || r.NTC_NUMBER),
+        "NTC DATE": dateText(r.ntcDate || r.NTC_DATE),
+
+        // ✅ separate FSIC NO column
+        "FSIC NO": S(r.fsicNo || r.FSIC_NO),
+
+        "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
+        DEFECTS: S(r.defects || r.DEFECTS),
+        INSPECTORS: S(r.inspectors || r.INSPECTORS),
+
+        "TYPE OF OCCUPANCY": S(typeOcc),
+        "BLDG DESCRIPTION": S(bdesc),
+        "FLOOR AREA (SQM)": S(floor),
+        "BUILDING HEIGHT": S(r.buildingHeight || r.BUILDING_HEIGHT),
+        "NO OF STOREY": S(storey),
+        "HIGH RISE (YES/NO)": S(r.highRise || r.HIGH_RISE),
+        "FSMR (YES/NO)": S(r.fsmr || r.FSMR),
+
+        REMARKS: S(r.remarks || r.REMARKS),
+
+        "O.R NUMBER": S(r.orNumber || r.OR_NUMBER),
+        "O.R AMOUNT": S(r.orAmount || r.OR_AMOUNT),
+        "O.R DATE": dateText(r.orDate || r.OR_DATE),
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(arranged);
+
+    worksheet["!cols"] = [
+      { wch: 6 },
+      { wch: 22 }, // FSIC APP
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 38 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 }, // FSIC NO
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 26 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 16 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "BFP Current Records");
+    XLSX.writeFile(workbook, "BFP_Current_Records.xlsx");
+  };
+
+  // ✅ Export ALL (fetch full docs so complete fields are included)
+  const exportAll = async () => {
     if (exporting) return;
     setExporting(true);
-
     try {
       const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qy);
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      if (!list.length) {
-        alert("No current records to export.");
-        return;
-      }
-
-      const arranged = list.map((r, idx) => {
-        // ✅ canonical + legacy fallback for new fields
-        const typeOcc = pick(r, "typeOfOccupancy", ["occupancyType", "OCCUPANCY_TYPE"]);
-        const bdesc = pick(r, "buildingDescription", ["buildingDesc", "BLDG_DESCRIPTION", "BUILDING_DESC"]);
-        const floor = pick(r, "floorAreaSqm", ["floorArea", "FLOOR_AREA", "FLOOR_AREA_SQM"]);
-        const storey = pick(r, "noOfStorey", ["storeyCount", "STOREY_COUNT", "NO_OF_STOREY"]);
-
-        return {
-          "NO.": idx + 1,
-
-          // ✅ DO NOT mix fsicNo into fsicAppNo
-          "FSIC APPLICATION NO.": S(r.fsicAppNo),
-
-          "NATURE OF INSPECTION": S(r.natureOfInspection || r.NATURE_OF_INSPECTION),
-          "NAME OF OWNER": S(r.ownerName || r.OWNERS_NAME || r.NAME_OF_OWNER),
-          "NAME OF ESTABLISHMENT": S(r.establishmentName || r.ESTABLISHMENT_NAME || r.NAME_OF_ESTABLISHMENT),
-          "BUSINESS ADDRESS": S(r.businessAddress || r.BUSSINESS_ADDRESS || r.ADDRESS),
-          "CONTACT #": S(r.contactNumber || r.CONTACT_NUMBER || r.CONTACT_),
-          "DATE INSPECTED": dateText(r.dateInspected || r.DATE_INSPECTED),
-
-          "I.O NUMBER": S(r.ioNumber || r.IO_NUMBER),
-          "I.O DATE": dateText(r.ioDate || r.IO_DATE),
-
-          "NFSI NUMBER": S(r.nfsiNumber || r.NFSI_NUMBER),
-          "NFSI DATE": dateText(r.nfsiDate || r.NFSI_DATE),
-
-          "NTC NUMBER": S(r.ntcNumber || r.NTC_NUMBER),
-          "NTC DATE": dateText(r.ntcDate || r.NTC_DATE),
-
-          // ✅ separate FSIC NO column
-          "FSIC NO": S(r.fsicNo || r.FSIC_NO),
-
-          "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
-          DEFECTS: S(r.defects || r.DEFECTS),
-          INSPECTORS: S(r.inspectors || r.INSPECTORS),
-
-          // ✅ fixed: uses canonical keys from ImportExcel (with legacy fallback)
-          "TYPE OF OCCUPANCY": S(typeOcc),
-          "BLDG DESCRIPTION": S(bdesc),
-          "FLOOR AREA (SQM)": S(floor),
-          "BUILDING HEIGHT": S(r.buildingHeight || r.BUILDING_HEIGHT),
-          "NO OF STOREY": S(storey),
-          "HIGH RISE (YES/NO)": S(r.highRise || r.HIGH_RISE),
-          "FSMR (YES/NO)": S(r.fsmr || r.FSMR),
-
-          REMARKS: S(r.remarks || r.REMARKS),
-
-          "O.R NUMBER": S(r.orNumber || r.OR_NUMBER),
-          "O.R AMOUNT": S(r.orAmount || r.OR_AMOUNT),
-
-          // ✅ last column
-          "O.R DATE": dateText(r.orDate || r.OR_DATE),
-        };
-      });
-
-      const worksheet = XLSX.utils.json_to_sheet(arranged);
-
-      worksheet["!cols"] = [
-        { wch: 6 },
-        { wch: 22 }, // FSIC APP
-        { wch: 22 },
-        { wch: 24 },
-        { wch: 28 },
-        { wch: 38 },
-        { wch: 16 },
-        { wch: 18 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 }, // FSIC NO
-        { wch: 18 },
-        { wch: 16 },
-        { wch: 26 },
-        { wch: 18 },
-        { wch: 30 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 14 },
-        { wch: 16 },
-        { wch: 14 },
-        { wch: 20 },
-        { wch: 16 },
-        { wch: 14 },
-        { wch: 16 },
-      ];
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "BFP Current Records");
-      XLSX.writeFile(workbook, "BFP_Current_Records.xlsx");
+      await exportToExcel(list);
     } catch (e) {
       console.error(e);
       alert("Export failed.");
     } finally {
       setExporting(false);
+      setShowExport(false);
     }
   };
+
+  // ✅ Export SELECTED IDs (fetch full docs then filter)
+  const exportSelected = async (ids) => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(qy);
+      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      const selected = all.filter((r) => ids.includes(String(r.id)));
+      await exportToExcel(selected);
+    } catch (e) {
+      console.error(e);
+      alert("Export failed.");
+    } finally {
+      setExporting(false);
+      setShowExport(false);
+    }
+  };
+
+  /* ================= UI STYLES ================= */
 
   const pageWrap = {
     padding: 22,
@@ -294,38 +320,40 @@ export default function Dashboard() {
             exporting={exporting}
             onAdd={() => navigate("/app/add-record")}
             onImport={() => navigate("/app/import")}
-            onExport={() => setShowConfirm(true)}
+            onExport={() => setShowExport(true)} // ✅ OPEN CHOICE MODAL
             onArchive={() => navigate("/app/archive")}
           />
         </div>
 
         {/* RIGHT */}
-       <div style={rightCol}>
-        <RecentRecords
-          C={C}
-          loading={loadingRecent}
-          list={visibleRecent}
-          activeId={setActiveId} // ✅ PASS THIS
-          onOpen={(id) => navigate("/app/records", { state: { activeId: id } })}
-          page={page}
-          setPage={setPage}
-          total={total}
-          pageSize={pageSize}
-        />
-      </div>
+        <div style={rightCol}>
+          <RecentRecords
+            C={C}
+            loading={loadingRecent}
+            list={visibleRecent}
+            activeId={activeId} // ✅ FIXED (was setActiveId)
+            onOpen={(id) => {
+              setActiveId(id); // ✅ highlight clicked
+              navigate("/app/records", { state: { activeId: id } });
+            }}
+            page={page}
+            setPage={setPage}
+            total={total}
+            pageSize={pageSize}
+          />
+        </div>
       </div>
 
-      {showConfirm && (
-        <ExportConfirmModal
-          C={C}
-          exporting={exporting}
-          onCancel={() => setShowConfirm(false)}
-          onConfirm={async () => {
-            setShowConfirm(false);
-            await exportCurrentExcel();
-          }}
-        />
-      )}
+      {/* ✅ Export choice modal (All vs Select) */}
+      <ExportChoiceModal
+        open={showExport}
+        onClose={() => !exporting && setShowExport(false)}
+        onExportAll={exportAll}
+        onExportSelected={exportSelected}
+        rows={recent} // ✅ list shown in selector (fast). Change to full list if you want.
+        busy={exporting}
+        C={C}
+      />
     </div>
   );
 }
