@@ -1,21 +1,11 @@
 // src/pages/Records/Records.jsx
-// ✅ Close Month uses ConfirmModal (glass) instead of window.confirm
+// ✅ Close Month separated into CloseMonthControl (still connected via props)
 // ✅ Success/Error uses your TopRightToast (open/title/message)
 
 import React, { useEffect, useMemo, useState } from "react";
 
 import { db } from "../../firebase";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  query,
-  orderBy,
-  writeBatch,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 
 import { useLocation } from "react-router-dom";
 
@@ -24,31 +14,17 @@ import RecordDetailsPanel from "./RecordDetailsPanel.jsx";
 import injectTableStyles from "./injectTableStyles.jsx";
 import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
 
-import ConfirmModal from "../../components/ConfirmModal.jsx"; // adjust path if needed
-import TopRightToast from "../../components/TopRightToast.jsx"; // ✅ your toast
-
-/** ✅ Month key in PH timezone */
-const monthKeyNow = () => {
-  const now = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-};
+import TopRightToast from "../../components/TopRightToast.jsx";
+import CloseMonthControl from "./CloseMonthControl.jsx"; // ✅ NEW
 
 export default function Records({ refresh, setRefresh }) {
   const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [closing, setClosing] = useState(false);
   const [activeId, setActiveId] = useState(null);
 
   // ✅ FULLSCREEN
   const [showDetails, setShowDetails] = useState(false);
-
-  // ✅ Confirm modal for close month
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   // ✅ Toast state (matches TopRightToast props)
   const [toastOpen, setToastOpen] = useState(false);
@@ -118,86 +94,15 @@ export default function Records({ refresh, setRefresh }) {
   };
 
   // ✅ AUTO-OPEN + HIGHLIGHT when navigated from Dashboard
-useEffect(() => {
-  const navActiveId = location.state?.activeId;
+  useEffect(() => {
+    const navActiveId = location.state?.activeId;
 
-  if (navActiveId && (records || []).length) {
-    setActiveId(navActiveId); // ✅ highlight only (no details)
-    window.history.replaceState({}, document.title); // clear state
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [location.state, records]);
-
-  // ✅ Close Month (archive all current -> archives/YYYY-MM/records then delete current)
-  const doCloseMonth = async () => {
-    try {
-      if (closing) return;
-
-      setClosing(true);
-
-      const month = monthKeyNow();
-      const monthDocRef = doc(db, "archives", month);
-
-      const monthDoc = await getDoc(monthDocRef);
-      if (monthDoc.exists() && monthDoc.data()?.closedAt) {
-        showToast("Already Closed", `Month ${month} is already closed.`);
-        return;
-      }
-
-      const currentSnap = await getDocs(collection(db, "records"));
-      if (currentSnap.empty) {
-        showToast("No Records", "No records to archive.");
-        return;
-      }
-
-      // ✅ server time for closedAt
-      await setDoc(
-        monthDocRef,
-        { month, closedAt: serverTimestamp() },
-        { merge: true }
-      );
-
-      const docsArr = currentSnap.docs;
-      let i = 0;
-
-      // batch: 200 records -> 400 writes (set+delete) safe
-      while (i < docsArr.length) {
-        const batch = writeBatch(db);
-        const slice = docsArr.slice(i, i + 200);
-
-        slice.forEach((d) => {
-          const data = d.data();
-          batch.set(doc(db, "archives", month, "records", d.id), {
-            ...data,
-            archivedAt: new Date().toISOString(),
-          });
-          batch.delete(doc(db, "records", d.id));
-        });
-
-        await batch.commit();
-        i += 200;
-      }
-
-      setSelectedRecord(null);
-      setShowDetails(false);
-      setSearch("");
-
-      // ✅ success toast
-      showToast(
-        "Archived Successfully",
-        `✅ Archived ${docsArr.length} records for ${month}.`
-      );
-
-      await fetchCurrent();
-      setRefresh?.((p) => !p);
-    } catch (e) {
-      console.error("Close Month error:", e);
-      showToast("Close Month Failed", "❌ Check Firestore rules / console.");
-    } finally {
-      setClosing(false);
-      setShowCloseConfirm(false);
+    if (navActiveId && (records || []).length) {
+      setActiveId(navActiveId); // ✅ highlight only (no details)
+      window.history.replaceState({}, document.title); // clear state
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, records]);
 
   const handleRenewSaved = ({ oldId, newRecord }) => {
     setSelectedRecord(newRecord);
@@ -284,7 +189,6 @@ useEffect(() => {
     border: `1px solid ${C.primary}`,
     background: C.primary,
     color: "#fff",
-    opacity: closing ? 0.7 : 1,
   };
 
   const content = {
@@ -353,13 +257,20 @@ useEffect(() => {
           <div style={hSub}>View current records + details + close month</div>
         </div>
 
-        <button
-          style={btnRed}
-          onClick={() => setShowCloseConfirm(true)}
-          disabled={closing}
-        >
-          {closing ? "Closing..." : "Close Month"}
-        </button>
+        {/* ✅ SEPARATED CLOSE MONTH (still connected) */}
+        <CloseMonthControl
+          C={C}
+          buttonStyle={btnRed}
+          showToast={showToast}
+          fetchCurrent={fetchCurrent}
+          setRefresh={setRefresh}
+          onAfterCloseUIReset={() => {
+            setSelectedRecord(null);
+            setShowDetails(false);
+            setSearch("");
+            setActiveId(null);
+          }}
+        />
       </div>
 
       <div style={topbar}>
@@ -368,7 +279,14 @@ useEffect(() => {
             <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>
               Current Records
             </div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 4 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                color: C.muted,
+                marginTop: 4,
+              }}
+            >
               Click a row → details opens full screen
             </div>
           </div>
@@ -398,7 +316,7 @@ useEffect(() => {
               records={filtered}
               onRowClick={onSelectRow}
               apiBase={API}
-              activeId={activeId} // ✅ highlight-only supported
+              activeId={activeId}
             />
           </div>
         </div>
@@ -419,7 +337,9 @@ useEffect(() => {
           onUpdated={(updated) => {
             setRecords((prev) => {
               const copy = [...(prev || [])];
-              const idx = copy.findIndex((r) => String(r.id) === String(updated.id));
+              const idx = copy.findIndex(
+                (r) => String(r.id) === String(updated.id)
+              );
               if (idx !== -1) copy[idx] = updated;
               return copy;
             });
@@ -427,20 +347,6 @@ useEffect(() => {
           }}
         />
       </DetailsFullScreen>
-
-      {/* ✅ Close Month ConfirmModal */}
-      <ConfirmModal
-        C={C}
-        open={showCloseConfirm}
-        title="Close Month"
-        message="This will archive ALL current records and remove them from Current Records. Proceed?"
-        cancelText="Cancel"
-        confirmText="Yes, Close"
-        danger={true}
-        busy={closing}
-        onCancel={() => !closing && setShowCloseConfirm(false)}
-        onConfirm={doCloseMonth}
-      />
     </div>
   );
 }

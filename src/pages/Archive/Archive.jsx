@@ -2,7 +2,8 @@
 // ✅ Updates:
 // 1) Unclose uses ConfirmModal (glass) instead of window.confirm
 // 2) Success/Error uses your TopRightToast (same design)
-// 3) DetailsFullScreen stays as-is (modal already ok). If you want the same glass modal too, tell me.
+// 3) Month dropdown + Closed date display are NOT numeric (e.g., "February 2026")
+// 4) Archive list ORDERED newest -> oldest (orderBy createdAt desc + fallback sort)
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -24,6 +25,55 @@ import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
 
 import ConfirmModal from "../../components/ConfirmModal.jsx"; // adjust if needed
 import TopRightToast from "../../components/TopRightToast.jsx"; // ✅ your toast
+
+/** ✅ Convert "YYYY-MM" -> "February 2026" */
+const formatMonthLabel = (yyyy_mm) => {
+  if (!yyyy_mm) return "";
+  const [y, m] = String(yyyy_mm).split("-");
+  const monthIndex = Number(m) - 1;
+
+  const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December",
+  ];
+
+  if (!y || monthIndex < 0 || monthIndex > 11) return String(yyyy_mm);
+  return `${months[monthIndex]} ${y}`;
+};
+
+/** ✅ Pretty datetime like "February 1, 2026 3:45 PM" (PH locale) */
+const formatDateTimePretty = (dt) => {
+  if (!dt) return "";
+  try {
+    const d = dt instanceof Date ? dt : new Date(dt);
+    if (Number.isNaN(d.getTime())) return String(dt);
+
+    return d.toLocaleString("en-US", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return String(dt);
+  }
+};
+
+/** ✅ Safe timestamp to millis (Firestore Timestamp | Date | string | number) */
+const toMillisSafe = (v) => {
+  if (!v) return 0;
+  if (v?.toMillis) return v.toMillis(); // Firestore Timestamp
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === "string") {
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? 0 : t;
+  }
+  if (typeof v === "number") return v;
+  return 0;
+};
 
 export default function Archive() {
   const [months, setMonths] = useState([]);
@@ -95,6 +145,7 @@ export default function Archive() {
    * ✅ Behavior:
    * - If month has 0 records => DELETE archives/{month} doc
    *   so closeDate disappears and you can Close Month again.
+   * ✅ ORDER: newest -> oldest (createdAt desc + fallback sort)
    */
   const fetchArchiveMonth = async (m) => {
     if (!m) {
@@ -114,16 +165,40 @@ export default function Archive() {
     setCloseInfo(null);
     setShowDetails(false);
 
-    // ✅ 1) fetch records first
-    const snap = await getDocs(collection(db, "archives", m, "records"));
+    // ✅ 1) fetch records first (NEWEST -> OLDEST)
+    const arcRef = collection(db, "archives", m, "records");
 
-    const list = snap.docs.map((d) => {
+    let snap;
+    try {
+      // prefer ordered query
+      const qArc = query(arcRef, orderBy("createdAt", "desc"));
+      snap = await getDocs(qArc);
+    } catch (e) {
+      // fallback (if no createdAt / missing index)
+      snap = await getDocs(arcRef);
+    }
+
+    let list = snap.docs.map((d) => {
       const data = d.data() || {};
       return {
         id: d.id,
         ...data,
         entityKey: data.entityKey || makeEntityKey(data),
       };
+    });
+
+    // ✅ extra safety sort (NEWEST -> OLDEST)
+    // If createdAt is missing, it falls back to archivedAt or restoredAt if present.
+    list = list.sort((a, b) => {
+      const bt =
+        toMillisSafe(b.createdAt) ||
+        toMillisSafe(b.archivedAt) ||
+        toMillisSafe(b.restoredAt);
+      const at =
+        toMillisSafe(a.createdAt) ||
+        toMillisSafe(a.archivedAt) ||
+        toMillisSafe(a.restoredAt);
+      return bt - at;
     });
 
     // ❗ IF EMPTY → delete month doc (removes close date)
@@ -185,11 +260,14 @@ export default function Archive() {
     setShowDetails(true);
   };
 
-  // ✅ close date string
-  const closeDateText =
-    closeInfo?.closedAt?.toDate?.()
-      ? closeInfo.closedAt.toDate().toLocaleString()
-      : closeInfo?.closedAt || closeInfo?.closeDate || "";
+  // ✅ close date string (pretty)
+  const closeDateText = (() => {
+    const raw =
+      closeInfo?.closedAt?.toDate?.()
+        ? closeInfo.closedAt.toDate()
+        : closeInfo?.closedAt || closeInfo?.closeDate || "";
+    return formatDateTimePretty(raw);
+  })();
 
   // ✅ treat month as "closed" if closedAt exists
   const isClosed = !!closeDateText;
@@ -216,7 +294,9 @@ export default function Archive() {
       setUnclosing(true);
 
       // 1) read all archived docs for this month
-      const arcSnap = await getDocs(collection(db, "archives", selectedMonth, "records"));
+      const arcSnap = await getDocs(
+        collection(db, "archives", selectedMonth, "records")
+      );
       const arcDocs = arcSnap.docs;
       if (!arcDocs.length) {
         showToast("No Archived Docs", "No archived docs found.");
@@ -256,7 +336,9 @@ export default function Archive() {
 
         // delete archive docs for ALL in slice (even if skipped restore)
         slice.forEach((d) => {
-          batch.delete(doc(db, "archives", selectedMonth, "records", String(d.id)));
+          batch.delete(
+            doc(db, "archives", selectedMonth, "records", String(d.id))
+          );
         });
 
         await batch.commit();
@@ -266,10 +348,10 @@ export default function Archive() {
       // 4) delete month doc itself (removes closedAt)
       await deleteDoc(doc(db, "archives", selectedMonth));
 
-      // ✅ Success toast
+      // ✅ Success toast (month label not numeric)
       showToast(
         "Unclosed Successfully",
-        `✅ Restored: ${restored}\nSkipped: ${skipped}\nTotal: ${arcDocs.length}`
+        `✅ Month: ${formatMonthLabel(selectedMonth)}\nRestored: ${restored}\nSkipped: ${skipped}\nTotal: ${arcDocs.length}`
       );
 
       // 5) reset UI + refresh months
@@ -417,7 +499,7 @@ export default function Archive() {
   const modalTitle =
     selectedRecord?.establishmentName ||
     selectedRecord?.fsicAppNo ||
-    `Archive: ${selectedMonth || ""}`;
+    `Archive: ${formatMonthLabel(selectedMonth) || ""}`;
 
   return (
     <div style={page}>
@@ -449,10 +531,10 @@ export default function Archive() {
             await fetchArchiveMonth(m);
           }}
         >
-          <option value="">📁 Select Month (YYYY-MM)</option>
+          <option value="">📁 Select Month</option>
           {months.map((m) => (
             <option key={m} value={m}>
-              {m}
+              {formatMonthLabel(m)}
             </option>
           ))}
         </select>
@@ -480,7 +562,7 @@ export default function Archive() {
       <div style={card}>
         <div style={cardHead}>
           <div>
-            Month: {selectedMonth ? selectedMonth : "-"}
+            Month: {selectedMonth ? formatMonthLabel(selectedMonth) : "-"}
             {selectedMonth && !hasData ? (
               <span style={{ marginLeft: 10, color: C.muted }}>(No records)</span>
             ) : null}
@@ -488,7 +570,9 @@ export default function Archive() {
 
           <div style={{ opacity: 0.85, color: C.muted }}>
             Results: {filtered.length}
-            {closeDateText ? <span style={{ marginLeft: 12 }}>• Closed: {closeDateText}</span> : null}
+            {closeDateText ? (
+              <span style={{ marginLeft: 12 }}>• Closed: {closeDateText}</span>
+            ) : null}
           </div>
         </div>
 
@@ -497,7 +581,7 @@ export default function Archive() {
             <div style={emptyBox}>Select a month to view archived records.</div>
           ) : !hasData ? (
             <div style={emptyBox}>
-              No archived records found for <b>{selectedMonth}</b>.
+              No archived records found for <b>{formatMonthLabel(selectedMonth)}</b>.
               <div style={{ marginTop: 8 }}>
                 (If month had no records, it auto-deletes the close date so you can close again.)
               </div>
@@ -522,7 +606,7 @@ export default function Archive() {
         <RecordDetailsPanel
           styles={panelTableStyles}
           record={selectedRecord}
-          source={selectedMonth ? `Archive: ${selectedMonth}` : "Archive"}
+          source={selectedMonth ? `Archive: ${formatMonthLabel(selectedMonth)}` : "Archive"}
           isArchive={true}
           onRenewSaved={({ oldId, newRecord }) => {
             console.log("Renew saved:", oldId, newRecord);
@@ -532,7 +616,9 @@ export default function Archive() {
             setRecords((prev) =>
               (prev || []).map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
             );
-            setSelectedRecord((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev));
+            setSelectedRecord((prev) =>
+              prev?.id === updated.id ? { ...prev, ...updated } : prev
+            );
             showToast("Updated", "✅ Record updated successfully.");
           }}
         />
@@ -542,9 +628,11 @@ export default function Archive() {
       <ConfirmModal
         C={C}
         open={showUncloseConfirm}
-        title={`Unclose Month ${selectedMonth || ""}`}
+        title={`Unclose Month ${formatMonthLabel(selectedMonth) || ""}`}
         message={
-          "This will restore archived records back to CURRENT records and remove the archive month.\n\nProceed?"
+          `This will restore archived records back to CURRENT records and remove the archive month (${formatMonthLabel(
+            selectedMonth
+          )}).\n\nProceed?`
         }
         cancelText="Cancel"
         confirmText="Yes, Unclose"
