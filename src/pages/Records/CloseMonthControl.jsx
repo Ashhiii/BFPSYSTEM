@@ -15,7 +15,6 @@ import {
 
 import ConfirmModal from "../../components/closemonthmodal.jsx";
 
-/** ✅ Month key in PH timezone -> "YYYY-MM" */
 const monthKeyNow = () => {
   const now = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
@@ -25,7 +24,6 @@ const monthKeyNow = () => {
   return `${y}-${m}`;
 };
 
-/** ✅ Convert "YYYY-MM" -> "February 2026" */
 const formatMonthLabel = (yyyy_mm) => {
   if (!yyyy_mm) return "";
   const [y, m] = String(yyyy_mm).split("-");
@@ -495,24 +493,9 @@ const gridTop = {
 
             {/* ACTIONS */}
             <div style={actionsRow}>
-              <button
-                type="button"
-                style={ghostBtn}
-                onClick={selectVisible}
-                disabled={closing || loadingRows || filtered.length === 0}
-              >
-                Select visible
-              </button>
+                  
 
-              <button
-                type="button"
-                style={dangerGhostBtn}
-                onClick={clearVisible}
-                disabled={closing || loadingRows || filtered.length === 0}
-              >
-                Clear visible
-              </button>
-
+              
               <button
                 type="button"
                 style={ghostBtn}
