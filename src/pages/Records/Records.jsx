@@ -172,7 +172,7 @@ export default function Records({ refresh, setRefresh }) {
       return (
         (r.ownerName || "").toLowerCase().includes(key) ||
         (r.establishmentName || "").toLowerCase().includes(key) ||
-        (r.businessAddress || "").toLowerCase().includes(key) ||
+        (r.ioNumber || "").toLowerCase().includes(key) ||
         (r.fsicAppNo || "").toLowerCase().includes(key) ||
         (r.natureOfInspection || "").toLowerCase().includes(key) ||
         (r.inspectors || "").toLowerCase().includes(key)

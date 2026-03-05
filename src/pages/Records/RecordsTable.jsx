@@ -1,11 +1,11 @@
-// ✅ RecordsTable.jsx (FULL) — with highlight when navigated from Dashboard
+// ✅ RecordsTable.jsx (UPDATED) — IO Number added, Address removed
 import React, { useEffect, useRef } from "react";
 
 export default function RecordsTable({
   records = [],
   onRowClick,
   apiBase,
-  activeId, // ✅ highlight row id
+  activeId,
 }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
@@ -112,9 +112,13 @@ export default function RecordsTable({
 
   // ✅ auto-scroll to highlighted row
   const activeRowRef = useRef(null);
+
   useEffect(() => {
     if (activeRowRef.current) {
-      activeRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      activeRowRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
     }
   }, [activeId]);
 
@@ -125,19 +129,19 @@ export default function RecordsTable({
           <tr>
             <th style={{ ...S.th, width: "12%" }}>FSIC App No</th>
             <th style={{ ...S.th, width: "15%" }}>Nature</th>
+            <th style={{ ...S.th, width: "12%" }}>IO No</th>
             <th style={{ ...S.th, width: "15%" }}>Owner</th>
-            <th style={{ ...S.th, width: "15%" }}>Establishment</th>
-            <th style={{ ...S.th, width: "15%" }}>FSIC NO</th>
-            <th style={{ ...S.th, width: "23%" }}>Address</th>
+            <th style={{ ...S.th, width: "18%" }}>Establishment</th>
+            <th style={{ ...S.th, width: "13%" }}>FSIC No</th>
             <th style={{ ...S.th, width: "10%" }}>Date</th>
-            <th style={{ ...S.th, width: "30%" }}>Generate</th>
+            <th style={{ ...S.th, width: "25%" }}>Generate</th>
           </tr>
         </thead>
 
         <tbody>
           {records.length === 0 ? (
             <tr>
-              <td colSpan={7} style={S.empty}>
+              <td colSpan={8} style={S.empty}>
                 No records found
               </td>
             </tr>
@@ -171,21 +175,27 @@ export default function RecordsTable({
                   <td style={S.td}>
                     <div style={wrap}>{r.fsicAppNo || "-"}</div>
                   </td>
+
                   <td style={S.td}>
                     <div style={wrap}>{r.natureOfInspection || "-"}</div>
                   </td>
+
+                  <td style={S.td}>
+                    <div style={wrap}>{r.ioNumber || "-"}</div>
+                  </td>
+
                   <td style={S.td}>
                     <div style={wrap}>{r.ownerName || "-"}</div>
                   </td>
+
                   <td style={S.td}>
                     <div style={wrap}>{r.establishmentName || "-"}</div>
                   </td>
+
                   <td style={S.td}>
                     <div style={wrap}>{r.fsicNo || "-"}</div>
                   </td>
-                  <td style={S.td}>
-                    <div style={wrap}>{r.businessAddress || "-"}</div>
-                  </td>
+
                   <td style={S.td}>
                     <div style={wrap}>{r.dateInspected || "-"}</div>
                   </td>

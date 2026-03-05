@@ -163,10 +163,8 @@ const UPPER_KEYS = new Set([
   "orAmount",
 ]);
 
-// ✅ input-only (no select) but with suggested values
 const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "RE-INSPECTION"];
 
-// ✅ Dropdown options for Type of Occupancy
 const OCCUPANCY_OPTIONS = [
   "ASSEMBLY",
   "EDUCATIONAL",
