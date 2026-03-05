@@ -392,15 +392,13 @@ export default function Records({ refresh, setRefresh }) {
             </div>
           </div>
 
-          {/* ✅ Search */}
-          <input
+\          <input
             placeholder="🔍 Search records..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={input}
           />
 
-          {/* ✅ NEW Month + Year Filters */}
           <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} style={select}>
             {MONTHS.map((m) => (
               <option key={m.value} value={m.value}>
@@ -417,7 +415,6 @@ export default function Records({ refresh, setRefresh }) {
             ))}
           </select>
 
-          {/* ✅ quick reset */}
           <button
             style={btn}
             onClick={() => {
@@ -445,7 +442,6 @@ export default function Records({ refresh, setRefresh }) {
         </div>
       </div>
 
-      {/* ✅ FULL SCREEN DETAILS OVERLAY */}
       <DetailsFullScreen open={showDetails} title={fullTitle} onClose={() => setShowDetails(false)}>
         <RecordDetailsPanel
           styles={panelStyles}
