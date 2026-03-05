@@ -187,7 +187,7 @@ const FIELDS = [
   { key: "inspector5", label: "Inspector 5", placeholder: "Inspector 5", required: false, type: "text", span: 1 },
   { key: "inspector5Serial", label: "Inspector 5 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
-  { key: "inspectors", label: "Inspectors (combined)", placeholder: "Auto from Inspector 1/2/3/4/5", required: false, type: "text", span: 2 },
+  { key: "inspectors", label: "Inspectors (combined)", placeholder: "Auto Inspectors", required: false, type: "text", span: 2 },
 
   { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
   { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
