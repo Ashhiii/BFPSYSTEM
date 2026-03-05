@@ -1,8 +1,10 @@
 // ✅ AddRecord.jsx (FULL) — INPUT HISTORY via <datalist> (no buttons, no select)
 // ✅ Nature Of Inspection remains INPUT but has suggestions (ANNUAL/RENEW/RE-INSPECTION)
 // ✅ Team Leader/Inspectors keep EXACT casing
-// ✅ Auto-combine Inspector 1/2/3 -> "inspectors (combined)" readOnly
+// ✅ Auto-combine Inspector 1/2/3/4/5 -> "inspectors (combined)" readOnly
 // ✅ NEW: After Save/Clear, auto scroll back to TOP (smooth)
+// ✅ FIX: combine now triggers for ANY inspector field (inspector1..inspectorN) except Serial fields
+// ✅ FIX: Combine also runs once on submit (safety)
 
 import React, { useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
@@ -150,7 +152,6 @@ const FIELDS = [
 
   { key: "fsicNo", label: "FSIC NO", placeholder: "FSIC NO", required: false, type: "text", span: 1 },
 
-  // ✅ still input
   { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "ANNUAL / RENEW / RE-INSPECTION", required: false, type: "text", span: 1 },
 
   { key: "businessAddress", label: "Business Address", placeholder: "Full address", required: false, type: "text", span: 2 },
@@ -179,11 +180,9 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3", placeholder: "Inspector 3", required: false, type: "text", span: 1 },
   { key: "inspector3Serial", label: "Inspector 3 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
-  
   { key: "inspector4", label: "Inspector 4", placeholder: "Inspector 4", required: false, type: "text", span: 1 },
   { key: "inspector4Serial", label: "Inspector 4 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
-  
   { key: "inspector5", label: "Inspector 5", placeholder: "Inspector 5", required: false, type: "text", span: 1 },
   { key: "inspector5Serial", label: "Inspector 5 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
@@ -218,7 +217,7 @@ export default function AddRecord({ setRefresh }) {
   const [touched, setTouched] = useState({});
   const [toastOpen, setToastOpen] = useState(false);
 
-  // ✅ NEW: top anchor for smooth scroll
+  // ✅ top anchor for smooth scroll
   const topRef = useRef(null);
   const scrollToTop = () => {
     if (topRef.current?.scrollIntoView) {
@@ -229,12 +228,9 @@ export default function AddRecord({ setRefresh }) {
   };
 
   // ✅ HISTORY per field (recent typed values)
-  const [history, setHistory] = useState(() => {
-    // initial nature suggestions
-    return {
-      natureOfInspection: [...NATURE_SUGGESTIONS],
-    };
-  });
+  const [history, setHistory] = useState(() => ({
+    natureOfInspection: [...NATURE_SUGGESTIONS],
+  }));
 
   const requiredKeys = useMemo(() => FIELDS.filter((f) => f.required).map((f) => f.key), []);
 
@@ -247,6 +243,7 @@ export default function AddRecord({ setRefresh }) {
     return miss;
   }, [form, requiredKeys]);
 
+  // ✅ combine inspector1..5 (names only)
   const combineInspectors = (state) => {
     return [state.inspector1, state.inspector2, state.inspector3, state.inspector4, state.inspector5]
       .map((x) => String(x ?? "").trim())
@@ -373,7 +370,6 @@ export default function AddRecord({ setRefresh }) {
       const cur = Array.isArray(prev[fieldKey]) ? prev[fieldKey] : [];
       const next = [v, ...cur.filter((x) => String(x) !== v)].slice(0, 10);
 
-      // keep nature suggestions always included
       if (fieldKey === "natureOfInspection") {
         const merged = [...NATURE_SUGGESTIONS, ...next].filter((x, i, arr) => arr.indexOf(x) === i);
         return { ...prev, [fieldKey]: merged.slice(0, 10) };
@@ -385,7 +381,6 @@ export default function AddRecord({ setRefresh }) {
 
   const onBlur = (k) => {
     setTouched((p) => ({ ...p, [k]: true }));
-    // ✅ when leaving input, save typed value into history
     pushHistory(k, form[k]);
   };
 
@@ -411,23 +406,24 @@ export default function AddRecord({ setRefresh }) {
     setForm((prev) => {
       const updated = { ...prev, [name]: v };
 
-      // ✅ AUTO combine inspectors
-      if (name === "inspector1" || name === "inspector2" || name === "inspector3" || name === "inspector4" || name === "inspector5") {
+      // ✅ FIX: auto-combine ANY inspector name field (inspector1..inspectorN), NOT serial
+      if (name.startsWith("inspector") && !name.toLowerCase().includes("serial")) {
         updated.inspectors = combineInspectors(updated);
       }
+
       return updated;
     });
   };
 
-  const buildPayload = () => {
-    const payload = { ...form };
+  const buildPayload = (state) => {
+    const payload = { ...state };
 
     // ✅ Store long dates for PDF/template
-    payload.dateInspected = formatDateLong(form.dateInspected);
-    payload.ioDate = formatDateLong(form.ioDate);
-    payload.nfsiDate = formatDateLong(form.nfsiDate);
-    payload.orDate = formatDateLong(form.orDate);
-    payload.ntcDate = formatDateLong(form.ntcDate);
+    payload.dateInspected = formatDateLong(state.dateInspected);
+    payload.ioDate = formatDateLong(state.ioDate);
+    payload.nfsiDate = formatDateLong(state.nfsiDate);
+    payload.orDate = formatDateLong(state.orDate);
+    payload.ntcDate = formatDateLong(state.ntcDate);
 
     payload.createdAt = serverTimestamp();
     payload.updatedAt = serverTimestamp();
@@ -437,16 +433,19 @@ export default function AddRecord({ setRefresh }) {
   const submit = async () => {
     if (!form.fsicAppNo?.trim() || !form.ownerName?.trim()) {
       setTouched((p) => ({ ...p, fsicAppNo: true, ownerName: true }));
-      scrollToTop(); // ✅ NEW: if missing required, balik taas para makita error
+      scrollToTop();
       return;
     }
 
-    // ✅ push all values to history before save (para mo-suggest next time)
+    // ✅ push all values to history before save
     Object.keys(form).forEach((k) => pushHistory(k, form[k]));
 
     setSaving(true);
     try {
-      const payload = buildPayload();
+      // ✅ SAFETY: compute combined inspectors right before saving (so never missing)
+      const withCombined = { ...form, inspectors: combineInspectors(form) };
+
+      const payload = buildPayload(withCombined);
       await addDoc(collection(db, "records"), payload);
 
       setToastOpen(true);
@@ -454,7 +453,7 @@ export default function AddRecord({ setRefresh }) {
       setTouched({});
       setRefresh?.((p) => !p);
 
-      scrollToTop(); // ✅ NEW: after save, balik taas dayun
+      scrollToTop();
     } catch (e) {
       console.error(e);
       alert("Firestore error. Check rules / permissions.");
@@ -466,7 +465,7 @@ export default function AddRecord({ setRefresh }) {
   return (
     <>
       <div style={styles.wrap}>
-        {/* ✅ NEW: TOP ANCHOR */}
+        {/* ✅ TOP ANCHOR */}
         <div ref={topRef} />
 
         <div style={styles.headerRow}>
@@ -483,7 +482,8 @@ export default function AddRecord({ setRefresh }) {
             const isCombinedInspectors = f.key === "inspectors";
 
             const dlId = `dl_${f.key}`;
-            const hasDatalist = f.type !== "date" && f.type !== "file" && f.key !== "inspectors" && f.key !== "fsicValidity";
+            const hasDatalist =
+              f.type !== "date" && f.type !== "file" && f.key !== "inspectors" && f.key !== "fsicValidity";
 
             return (
               <div
@@ -546,7 +546,7 @@ export default function AddRecord({ setRefresh }) {
             onClick={() => {
               setForm(INITIAL_FORM);
               setTouched({});
-              scrollToTop(); // ✅ NEW: after clear, balik taas
+              scrollToTop();
             }}
             disabled={saving}
           >

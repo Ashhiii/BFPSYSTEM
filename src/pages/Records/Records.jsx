@@ -1,6 +1,7 @@
 // src/pages/Records/Records.jsx
 // ✅ Close Month separated into CloseMonthControl (still connected via props)
 // ✅ Success/Error uses your TopRightToast (open/title/message)
+// ✅ NEW: Month + Year filter based on dateInspected
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -17,6 +18,79 @@ import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
 import TopRightToast from "../../components/TopRightToast.jsx";
 import CloseMonthControl from "./CloseMonthControl.jsx"; // ✅ NEW
 
+const MONTHS = [
+  { value: "ALL", label: "All Months" },
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
+// ✅ parse month/year from "January 2, 2026" or "2026-02-01" or Date
+const parseMonthYear = (val) => {
+  if (!val) return { month: null, year: null };
+
+  // Firestore Timestamp (if ever)
+  if (typeof val === "object" && val?.toDate) {
+    const dt = val.toDate();
+    return { month: dt.getMonth() + 1, year: dt.getFullYear() };
+  }
+
+  // Date object
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return { month: val.getMonth() + 1, year: val.getFullYear() };
+  }
+
+  const s = String(val).trim();
+  if (!s) return { month: null, year: null };
+
+  // format: YYYY-MM-DD
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const year = Number(iso[1]);
+    const month = Number(iso[2]);
+    return { month: isNaN(month) ? null : month, year: isNaN(year) ? null : year };
+  }
+
+  // format: "January 2, 2026"
+  const dt = new Date(s);
+  if (!isNaN(dt.getTime())) {
+    return { month: dt.getMonth() + 1, year: dt.getFullYear() };
+  }
+
+  // fallback month-name contains
+  const lower = s.toLowerCase();
+  const map = {
+    january: 1,
+    february: 2,
+    march: 3,
+    april: 4,
+    may: 5,
+    june: 6,
+    july: 7,
+    august: 8,
+    september: 9,
+    october: 10,
+    november: 11,
+    december: 12,
+  };
+  const found = Object.keys(map).find((m) => lower.includes(m));
+  const yearMatch = s.match(/\b(19\d{2}|20\d{2})\b/);
+
+  return {
+    month: found ? map[found] : null,
+    year: yearMatch ? Number(yearMatch[1]) : null,
+  };
+};
+
 export default function Records({ refresh, setRefresh }) {
   const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
@@ -30,6 +104,10 @@ export default function Records({ refresh, setRefresh }) {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastTitle, setToastTitle] = useState("Success");
   const [toastMsg, setToastMsg] = useState("");
+
+  // ✅ NEW: Month + Year filters
+  const [monthFilter, setMonthFilter] = useState("ALL"); // "ALL" or 1..12
+  const [yearFilter, setYearFilter] = useState("ALL"); // "ALL" or "2026"
 
   const location = useLocation();
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -64,9 +142,33 @@ export default function Records({ refresh, setRefresh }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
+  // ✅ Year options from records dateInspected
+  const yearOptions = useMemo(() => {
+    const set = new Set();
+    (records || []).forEach((r) => {
+      const { year } = parseMonthYear(r.dateInspected);
+      if (year) set.add(year);
+    });
+    const years = Array.from(set).sort((a, b) => b - a).map(String);
+    return ["ALL", ...years];
+  }, [records]);
+
   const filtered = useMemo(() => {
     const key = search.toLowerCase().trim();
+
+    const wantMonth = monthFilter === "ALL" ? null : Number(monthFilter);
+    const wantYear = yearFilter === "ALL" ? null : Number(yearFilter);
+
     return (records || []).filter((r) => {
+      // ✅ Month/Year filter based on dateInspected
+      const { month, year } = parseMonthYear(r.dateInspected);
+
+      if (wantMonth && month !== wantMonth) return false;
+      if (wantYear && year !== wantYear) return false;
+
+      // ✅ Search filter
+      if (!key) return true;
+
       return (
         (r.ownerName || "").toLowerCase().includes(key) ||
         (r.establishmentName || "").toLowerCase().includes(key) ||
@@ -76,7 +178,7 @@ export default function Records({ refresh, setRefresh }) {
         (r.inspectors || "").toLowerCase().includes(key)
       );
     });
-  }, [records, search]);
+  }, [records, search, monthFilter, yearFilter]);
 
   const onSelectRow = (record) => {
     if (!record) return;
@@ -85,9 +187,7 @@ export default function Records({ refresh, setRefresh }) {
 
     const fixed = {
       ...record,
-      entityKey:
-        record.entityKey ||
-        (record.fsicAppNo ? `fsic:${record.fsicAppNo}` : ""),
+      entityKey: record.entityKey || (record.fsicAppNo ? `fsic:${record.fsicAppNo}` : ""),
     };
     setSelectedRecord(fixed);
     setShowDetails(true);
@@ -173,6 +273,17 @@ export default function Records({ refresh, setRefresh }) {
     minWidth: 260,
   };
 
+  const select = {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: `1px solid ${C.border}`,
+    background: "#fff",
+    color: C.text,
+    outline: "none",
+    fontWeight: 950,
+    whiteSpace: "nowrap",
+  };
+
   const btn = {
     padding: "10px 12px",
     borderRadius: 12,
@@ -234,10 +345,7 @@ export default function Records({ refresh, setRefresh }) {
     },
   };
 
-  const fullTitle =
-    selectedRecord?.establishmentName ||
-    selectedRecord?.fsicAppNo ||
-    "Record Details";
+  const fullTitle = selectedRecord?.establishmentName || selectedRecord?.fsicAppNo || "Record Details";
 
   return (
     <div style={page}>
@@ -269,6 +377,8 @@ export default function Records({ refresh, setRefresh }) {
             setShowDetails(false);
             setSearch("");
             setActiveId(null);
+            setMonthFilter("ALL"); // ✅ reset filters too
+            setYearFilter("ALL");
           }}
         />
       </div>
@@ -276,27 +386,47 @@ export default function Records({ refresh, setRefresh }) {
       <div style={topbar}>
         <div style={topbarInner}>
           <div style={{ minWidth: 220 }}>
-            <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>
-              Current Records
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 800,
-                color: C.muted,
-                marginTop: 4,
-              }}
-            >
+            <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>Current Records</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 4 }}>
               Click a row → details opens full screen
             </div>
           </div>
 
+          {/* ✅ Search */}
           <input
             placeholder="🔍 Search records..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={input}
           />
+
+          {/* ✅ NEW Month + Year Filters */}
+          <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} style={select}>
+            {MONTHS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+
+          <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} style={select}>
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y === "ALL" ? "All Years" : y}
+              </option>
+            ))}
+          </select>
+
+          {/* ✅ quick reset */}
+          <button
+            style={btn}
+            onClick={() => {
+              setMonthFilter("ALL");
+              setYearFilter("ALL");
+            }}
+          >
+            Reset Filters
+          </button>
         </div>
 
         <div style={{ height: 4, background: C.primary }} />
@@ -306,28 +436,17 @@ export default function Records({ refresh, setRefresh }) {
         <div style={card}>
           <div style={cardHead}>
             <div>Current List</div>
-            <div style={{ opacity: 0.85, color: C.muted }}>
-              Results: {filtered.length}
-            </div>
+            <div style={{ opacity: 0.85, color: C.muted }}>Results: {filtered.length}</div>
           </div>
 
           <div style={scroll}>
-            <RecordsTable
-              records={filtered}
-              onRowClick={onSelectRow}
-              apiBase={API}
-              activeId={activeId}
-            />
+            <RecordsTable records={filtered} onRowClick={onSelectRow} apiBase={API} activeId={activeId} />
           </div>
         </div>
       </div>
 
       {/* ✅ FULL SCREEN DETAILS OVERLAY */}
-      <DetailsFullScreen
-        open={showDetails}
-        title={fullTitle}
-        onClose={() => setShowDetails(false)}
-      >
+      <DetailsFullScreen open={showDetails} title={fullTitle} onClose={() => setShowDetails(false)}>
         <RecordDetailsPanel
           styles={panelStyles}
           record={selectedRecord}
@@ -337,9 +456,7 @@ export default function Records({ refresh, setRefresh }) {
           onUpdated={(updated) => {
             setRecords((prev) => {
               const copy = [...(prev || [])];
-              const idx = copy.findIndex(
-                (r) => String(r.id) === String(updated.id)
-              );
+              const idx = copy.findIndex((r) => String(r.id) === String(updated.id));
               if (idx !== -1) copy[idx] = updated;
               return copy;
             });
