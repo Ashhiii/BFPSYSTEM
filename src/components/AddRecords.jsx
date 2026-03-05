@@ -2,8 +2,9 @@
 // ✅ Nature Of Inspection remains INPUT but has suggestions (ANNUAL/RENEW/RE-INSPECTION)
 // ✅ Team Leader/Inspectors keep EXACT casing
 // ✅ Auto-combine Inspector 1/2/3 -> "inspectors (combined)" readOnly
+// ✅ NEW: After Save/Clear, auto scroll back to TOP (smooth)
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -16,8 +17,18 @@ const formatDateLong = (yyyy_mm_dd) => {
   if (!y || !m || !d) return String(yyyy_mm_dd);
 
   const months = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
   return `${months[m - 1]} ${d}, ${y}`;
 };
@@ -77,6 +88,10 @@ const INITIAL_FORM = {
   inspector2Serial: "",
   inspector3: "",
   inspector3Serial: "",
+  inspector4: "",
+  inspector4Serial: "",
+  inspector5: "",
+  inspector5Serial: "",
 
   inspectors: "",
 
@@ -164,7 +179,15 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3", placeholder: "Inspector 3", required: false, type: "text", span: 1 },
   { key: "inspector3Serial", label: "Inspector 3 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
 
-  { key: "inspectors", label: "Inspectors (combined)", placeholder: "Auto from Inspector 1/2/3", required: false, type: "text", span: 2 },
+  
+  { key: "inspector4", label: "Inspector 4", placeholder: "Inspector 4", required: false, type: "text", span: 1 },
+  { key: "inspector4Serial", label: "Inspector 4 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
+
+  
+  { key: "inspector5", label: "Inspector 5", placeholder: "Inspector 5", required: false, type: "text", span: 1 },
+  { key: "inspector5Serial", label: "Inspector 5 Serial", placeholder: "Serial no", required: false, type: "text", span: 1 },
+
+  { key: "inspectors", label: "Inspectors (combined)", placeholder: "Auto from Inspector 1/2/3/4/5", required: false, type: "text", span: 2 },
 
   { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
   { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
@@ -195,6 +218,16 @@ export default function AddRecord({ setRefresh }) {
   const [touched, setTouched] = useState({});
   const [toastOpen, setToastOpen] = useState(false);
 
+  // ✅ NEW: top anchor for smooth scroll
+  const topRef = useRef(null);
+  const scrollToTop = () => {
+    if (topRef.current?.scrollIntoView) {
+      topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   // ✅ HISTORY per field (recent typed values)
   const [history, setHistory] = useState(() => {
     // initial nature suggestions
@@ -203,10 +236,7 @@ export default function AddRecord({ setRefresh }) {
     };
   });
 
-  const requiredKeys = useMemo(
-    () => FIELDS.filter((f) => f.required).map((f) => f.key),
-    []
-  );
+  const requiredKeys = useMemo(() => FIELDS.filter((f) => f.required).map((f) => f.key), []);
 
   const missingRequired = useMemo(() => {
     const miss = {};
@@ -218,7 +248,7 @@ export default function AddRecord({ setRefresh }) {
   }, [form, requiredKeys]);
 
   const combineInspectors = (state) => {
-    return [state.inspector1, state.inspector2, state.inspector3]
+    return [state.inspector1, state.inspector2, state.inspector3, state.inspector4, state.inspector5]
       .map((x) => String(x ?? "").trim())
       .filter(Boolean)
       .join(", ");
@@ -345,9 +375,7 @@ export default function AddRecord({ setRefresh }) {
 
       // keep nature suggestions always included
       if (fieldKey === "natureOfInspection") {
-        const merged = [...NATURE_SUGGESTIONS, ...next].filter(
-          (x, i, arr) => arr.indexOf(x) === i
-        );
+        const merged = [...NATURE_SUGGESTIONS, ...next].filter((x, i, arr) => arr.indexOf(x) === i);
         return { ...prev, [fieldKey]: merged.slice(0, 10) };
       }
 
@@ -384,7 +412,7 @@ export default function AddRecord({ setRefresh }) {
       const updated = { ...prev, [name]: v };
 
       // ✅ AUTO combine inspectors
-      if (name === "inspector1" || name === "inspector2" || name === "inspector3") {
+      if (name === "inspector1" || name === "inspector2" || name === "inspector3" || name === "inspector4" || name === "inspector5") {
         updated.inspectors = combineInspectors(updated);
       }
       return updated;
@@ -409,6 +437,7 @@ export default function AddRecord({ setRefresh }) {
   const submit = async () => {
     if (!form.fsicAppNo?.trim() || !form.ownerName?.trim()) {
       setTouched((p) => ({ ...p, fsicAppNo: true, ownerName: true }));
+      scrollToTop(); // ✅ NEW: if missing required, balik taas para makita error
       return;
     }
 
@@ -424,6 +453,8 @@ export default function AddRecord({ setRefresh }) {
       setForm(INITIAL_FORM);
       setTouched({});
       setRefresh?.((p) => !p);
+
+      scrollToTop(); // ✅ NEW: after save, balik taas dayun
     } catch (e) {
       console.error(e);
       alert("Firestore error. Check rules / permissions.");
@@ -435,6 +466,9 @@ export default function AddRecord({ setRefresh }) {
   return (
     <>
       <div style={styles.wrap}>
+        {/* ✅ NEW: TOP ANCHOR */}
+        <div ref={topRef} />
+
         <div style={styles.headerRow}>
           <div>
             <div style={styles.title}>Add Record</div>
@@ -449,8 +483,7 @@ export default function AddRecord({ setRefresh }) {
             const isCombinedInspectors = f.key === "inspectors";
 
             const dlId = `dl_${f.key}`;
-            const hasDatalist =
-              f.type !== "date" && f.type !== "file" && f.key !== "inspectors" && f.key !== "fsicValidity";
+            const hasDatalist = f.type !== "date" && f.type !== "file" && f.key !== "inspectors" && f.key !== "fsicValidity";
 
             return (
               <div
@@ -505,9 +538,7 @@ export default function AddRecord({ setRefresh }) {
 
         <div style={styles.footerBar}>
           <div style={styles.footerLeft}>
-            {Object.keys(missingRequired).length > 0
-              ? "Please fill required fields before saving."
-              : "Ready to save."}
+            {Object.keys(missingRequired).length > 0 ? "Please fill required fields before saving." : "Ready to save."}
           </div>
 
           <button
@@ -515,6 +546,7 @@ export default function AddRecord({ setRefresh }) {
             onClick={() => {
               setForm(INITIAL_FORM);
               setTouched({});
+              scrollToTop(); // ✅ NEW: after clear, balik taas
             }}
             disabled={saving}
           >

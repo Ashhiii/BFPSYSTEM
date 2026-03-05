@@ -29,6 +29,12 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3" },
   { key: "inspector3Serial", label: "Inspector 3 Serial" },
 
+  { key: "inspector4", label: "Inspector 4" },
+  { key: "inspector4Serial", label: "Inspector 4 Serial" },
+
+  { key: "inspector5", label: "Inspector 5" },
+  { key: "inspector5Serial", label: "Inspector 5 Serial" },
+
   // ✅ combined auto
   { key: "inspectors", label: "Inspectors (Combined)" },
 
@@ -60,6 +66,10 @@ const NO_CAPS_KEYS = new Set([
   "inspector2Serial",
   "inspector3",
   "inspector3Serial",
+  "inspector4",
+  "inspector4Serial",
+  "inspector5",
+  "inspector5Serial",
   "inspectors", // combined (auto)
 ]);
 
@@ -131,7 +141,7 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
     });
 
     // ✅ auto compute inspectors combined
-    init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3);
+    init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3, init.inspector4, init.inspector5);
 
     setForm(init);
   }, [doc]);
@@ -166,8 +176,8 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       else next[k] = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : String(v ?? "");
 
       // ✅ inspector changes -> auto combined inspectors
-      if (k === "inspector1" || k === "inspector2" || k === "inspector3") {
-        next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3);
+      if (k === "inspector1" || k === "inspector2" || k === "inspector3" || k === "inspector4" || k === "inspector5") {
+        next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3, next.inspector4, next.inspector5);
       }
 
       return next;
@@ -203,7 +213,9 @@ export default function DocumentDetailsPanel({ doc, onUpdated }) {
       ensured.inspectors = combineInspectors(
         ensured.inspector1,
         ensured.inspector2,
-        ensured.inspector3
+        ensured.inspector3,
+        ensured.inspector4,
+        ensured.inspector5
       );
 
       const payload = {};

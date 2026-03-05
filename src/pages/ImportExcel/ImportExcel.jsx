@@ -618,6 +618,10 @@ export default function ImportExcelFullScreen({ setRefresh, onClose }) {
       inspector2Serial: toText(get("inspector 2 serial", "inspector2serial", "inspector_2_serial")),
       inspector3: toText(get("inspector3", "inspector 3", "inspector_3")),
       inspector3Serial: toText(get("inspector 3 serial", "inspector3serial", "inspector_3_serial")),
+      inspector4: toText(get("inspector4", "inspector 4", "inspector_4")),
+      inspector4Serial: toText(get("inspector 4 serial", "inspector4serial", "inspector_4_serial")),
+      inspector5: toText(get("inspector5", "inspector 5", "inspector_5")),
+      inspector5Serial: toText(get("inspector 5 serial", "inspector5serial", "inspector_5_serial")),
       chiefName: toText(get("chiefname", "chief")),
       marshalName: toText(get("marshalname", "marshal")),
     };

@@ -46,6 +46,12 @@ const FIELDS = [
   { key: "inspector3", label: "Inspector 3" },
   { key: "inspector3Serial", label: "Inspector 3 Serial" },
 
+  { key: "inspector4", label: "Inspector 4" },
+  { key: "inspector4Serial", label: "Inspector 4 Serial" },
+
+  { key: "inspector5", label: "Inspector 5" },
+  { key: "inspector5Serial", label: "Inspector 5 Serial" },
+
   { key: "inspectors", label: "Inspectors (combined)" },
 
   // ✅ CANONICAL IMPORT KEYS + OLD KEY ALIASES
@@ -103,6 +109,10 @@ const NO_CAPS_KEYS = new Set([
   "inspector2Serial",
   "inspector3",
   "inspector3Serial",
+  "inspector4",
+  "inspector4Serial",
+  "inspector5",
+  "inspector5Serial",
   "inspectors",
 ]);
 
@@ -197,7 +207,7 @@ export default function RecordDetailsPanel({
     });
 
     if (init.dateInspected) init.fsicValidity = addOneYear(init.dateInspected);
-    init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3);
+    init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3, init.inspector4, init.inspector5);
 
     setForm(init);
 
@@ -228,8 +238,8 @@ export default function RecordDetailsPanel({
       else next[k] = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : String(v ?? "");
 
       if (k === "dateInspected") next.fsicValidity = addOneYear(String(v ?? ""));
-      if (k === "inspector1" || k === "inspector2" || k === "inspector3") {
-        next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3);
+      if (k === "inspector1" || k === "inspector2" || k === "inspector3" || k === "inspector4" || k === "inspector5") {
+        next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3, next.inspector4, next.inspector5);
       }
       return next;
     });
@@ -260,7 +270,7 @@ export default function RecordDetailsPanel({
 
       const ensured = { ...form };
       if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
-      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3);
+      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3, ensured.inspector4, ensured.inspector5);
 
       // ✅ payload canonical
       const payload = {};
@@ -297,7 +307,7 @@ export default function RecordDetailsPanel({
 
       const ensured = { ...form };
       if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
-      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3);
+      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3, ensured.inspector4, ensured.inspector5);
 
       const newRecord = {
         ...record,
