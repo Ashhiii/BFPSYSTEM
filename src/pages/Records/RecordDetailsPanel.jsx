@@ -8,6 +8,7 @@ import {
   collection,
   writeBatch,
 } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No" },
@@ -32,7 +33,6 @@ const FIELDS = [
 
   { key: "fsicNo", label: "FSIC No" },
   { key: "fsicValidity", label: "FSIC Validity" },
-  
 
   { key: "teamLeader", label: "Team Leader" },
   { key: "teamLeaderSerial", label: "Team Leader Serial" },
@@ -150,8 +150,8 @@ const addOneYear = (yyyy_mm_dd) => {
   return `${y}-${m}-${day}`;
 };
 
-const combineInspectors = (a, b, c) =>
-  [a, b, c].map((x) => String(x || "").trim()).filter(Boolean).join(", ");
+const combineInspectors = (...names) =>
+  names.map((x) => String(x || "").trim()).filter(Boolean).join(", ");
 
 /** ✅ read record value using canonical key + aliases */
 const readField = (record, key, aliases = []) => {
@@ -172,6 +172,8 @@ export default function RecordDetailsPanel({
   onRenewSaved,
   onUpdated,
 }) {
+  const navigate = useNavigate();
+
   const [editing, setEditing] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -207,7 +209,14 @@ export default function RecordDetailsPanel({
     });
 
     if (init.dateInspected) init.fsicValidity = addOneYear(init.dateInspected);
-    init.inspectors = combineInspectors(init.inspector1, init.inspector2, init.inspector3, init.inspector4, init.inspector5);
+
+    init.inspectors = combineInspectors(
+      init.inspector1,
+      init.inspector2,
+      init.inspector3,
+      init.inspector4,
+      init.inspector5
+    );
 
     setForm(init);
 
@@ -239,7 +248,13 @@ export default function RecordDetailsPanel({
 
       if (k === "dateInspected") next.fsicValidity = addOneYear(String(v ?? ""));
       if (k === "inspector1" || k === "inspector2" || k === "inspector3" || k === "inspector4" || k === "inspector5") {
-        next.inspectors = combineInspectors(next.inspector1, next.inspector2, next.inspector3, next.inspector4, next.inspector5);
+        next.inspectors = combineInspectors(
+          next.inspector1,
+          next.inspector2,
+          next.inspector3,
+          next.inspector4,
+          next.inspector5
+        );
       }
       return next;
     });
@@ -260,7 +275,36 @@ export default function RecordDetailsPanel({
       return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
     if (variant === "danger")
       return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
-    return common;
+    return { ...common, border: `1px solid ${C.border}`, background: "#fff", color: C.text };
+  };
+
+  // ✅ NEW: Use as Template (prefill AddRecord, NOT SAVE)
+  const useAsTemplate = () => {
+    if (!record) return;
+
+    const prefill = {
+      // ✅ only copy fields you want in AddRecord
+      ...record,
+
+      // remove IDs/timestamps/status
+      id: undefined,
+      createdAt: undefined,
+      updatedAt: undefined,
+      renewedAt: undefined,
+      renewedFromId: undefined,
+      isRenewedCopy: undefined,
+      status: undefined,
+      source: undefined,
+      entityKey: undefined,
+
+      // ✅ if canonical exists, also mirror to legacy for AddRecord fields
+      occupancyType: record.typeOfOccupancy ?? record.occupancyType ?? "",
+      buildingDesc: record.buildingDescription ?? record.buildingDesc ?? "",
+      floorArea: record.floorAreaSqm ?? record.floorArea ?? "",
+      storeyCount: record.noOfStorey ?? record.storeyCount ?? "",
+    };
+
+    navigate("/app/add-record", { state: { prefill } });
   };
 
   const saveEdit = async () => {
@@ -270,7 +314,13 @@ export default function RecordDetailsPanel({
 
       const ensured = { ...form };
       if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
-      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3, ensured.inspector4, ensured.inspector5);
+      ensured.inspectors = combineInspectors(
+        ensured.inspector1,
+        ensured.inspector2,
+        ensured.inspector3,
+        ensured.inspector4,
+        ensured.inspector5
+      );
 
       // ✅ payload canonical
       const payload = {};
@@ -307,7 +357,13 @@ export default function RecordDetailsPanel({
 
       const ensured = { ...form };
       if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
-      ensured.inspectors = combineInspectors(ensured.inspector1, ensured.inspector2, ensured.inspector3, ensured.inspector4, ensured.inspector5);
+      ensured.inspectors = combineInspectors(
+        ensured.inspector1,
+        ensured.inspector2,
+        ensured.inspector3,
+        ensured.inspector4,
+        ensured.inspector5
+      );
 
       const newRecord = {
         ...record,
@@ -429,6 +485,11 @@ export default function RecordDetailsPanel({
             <>
               <button style={btn("primary")} onClick={() => setEditing(true)}>
                 Edit
+              </button>
+
+              {/* ✅ NEW BUTTON */}
+              <button style={btn()} onClick={useAsTemplate}>
+                Add this data
               </button>
 
               {isArchive && (

@@ -1,14 +1,17 @@
-// ✅ AddRecord.jsx (FULL) — INPUT HISTORY via <datalist> (no buttons, no select)
+// ✅ AddRecord.jsx (FULL)
+// ✅ INPUT HISTORY via <datalist> (no buttons, no select) EXCEPT occupancyType (dropdown)
 // ✅ Nature Of Inspection remains INPUT but has suggestions (ANNUAL/RENEW/RE-INSPECTION)
 // ✅ Team Leader/Inspectors keep EXACT casing
 // ✅ Auto-combine Inspector 1/2/3/4/5 -> "inspectors (combined)" readOnly
-// ✅ NEW: After Save/Clear, auto scroll back to TOP (smooth)
-// ✅ FIX: combine now triggers for ANY inspector field (inspector1..inspectorN) except Serial fields
-// ✅ FIX: Combine also runs once on submit (safety)
+// ✅ After Save/Clear, auto scroll back to TOP (smooth)
+// ✅ FIX: combine triggers for ANY inspector field (inspector1..inspectorN) except Serial fields
+// ✅ NEW: PREFILL from RecordDetailsPanel "Use as Template" (NOT auto-save)
+// ✅ NEW: Type of Occupancy is DROPDOWN (select) with your choices
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
+import { useLocation } from "react-router-dom";
 
 import TopRightToast from "../components/TopRightToast";
 
@@ -19,18 +22,8 @@ const formatDateLong = (yyyy_mm_dd) => {
   if (!y || !m || !d) return String(yyyy_mm_dd);
 
   const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December",
   ];
   return `${months[m - 1]} ${d}, ${y}`;
 };
@@ -54,6 +47,34 @@ const addYearsYMD = (yyyy_mm_dd, years = 1) => {
   const mm = String(dt.getMonth() + 1).padStart(2, "0");
   const dd = String(dt.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
+};
+
+// ✅ Convert "January 2, 2026" or Timestamp -> YYYY-MM-DD for <input type="date">
+const toInputDate = (v) => {
+  if (!v) return "";
+
+  // Firestore Timestamp
+  if (v?.toDate) {
+    const d = v.toDate();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  // already YYYY-MM-DD
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+
+  // parseable date string (includes "January 2, 2026")
+  if (typeof v === "string" && !Number.isNaN(Date.parse(v))) {
+    const d = new Date(v);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  return "";
 };
 
 const INITIAL_FORM = {
@@ -100,7 +121,7 @@ const INITIAL_FORM = {
   fsicValidity: "",
   defects: "",
 
-  occupancyType: "",
+  occupancyType: "", // ✅ dropdown
   buildingDesc: "",
   floorArea: "",
   buildingHeight: "",
@@ -145,13 +166,33 @@ const UPPER_KEYS = new Set([
 // ✅ input-only (no select) but with suggested values
 const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "RE-INSPECTION"];
 
+// ✅ Dropdown options for Type of Occupancy
+const OCCUPANCY_OPTIONS = [
+  "ASSEMBLY",
+  "EDUCATIONAL",
+  "DAY CARE",
+  "HEALTH CARE",
+  "RESIDENTIAL BOARD AND CARE",
+  "DETENTION & CORRECTIONAL",
+  "HOTEL",
+  "DORMITORIES",
+  "APARTMENT BUILDINGS",
+  "LODGING & ROOMING HOUSE",
+  "SINGLE & TWO FAMILY DWELLING UNIT",
+  "MERCANTILE",
+  "BUSINESS",
+  "INDUSTRIAL",
+  "STORAGE",
+  "SPECIAL STRUCTURES",
+  "NON-STRUCTURAL (E.G., VEHICLE USED AS ROLLING STORE, ETC.)",
+];
+
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No", placeholder: "2026-00123", required: true, type: "text", span: 1 },
   { key: "ownerName", label: "Owner", placeholder: "Owner name", required: true, type: "text", span: 1 },
   { key: "establishmentName", label: "Establishment", placeholder: "Establishment name", required: false, type: "text", span: 2 },
 
   { key: "fsicNo", label: "FSIC NO", placeholder: "FSIC NO", required: false, type: "text", span: 1 },
-
   { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "ANNUAL / RENEW / RE-INSPECTION", required: false, type: "text", span: 1 },
 
   { key: "businessAddress", label: "Business Address", placeholder: "Full address", required: false, type: "text", span: 2 },
@@ -191,9 +232,10 @@ const FIELDS = [
   { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
   { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
 
-  { key: "occupancyType", label: "Occupancy Type", placeholder: "Occupancy", required: false, type: "text", span: 1 },
-  { key: "buildingDesc", label: "Building Description", placeholder: "Description", required: false, type: "text", span: 1 },
+  // ✅ DROPDOWN HERE
+  { key: "occupancyType", label: "Type of Occupancy", required: false, type: "select", span: 1 },
 
+  { key: "buildingDesc", label: "Building Description", placeholder: "Description", required: false, type: "text", span: 1 },
   { key: "floorArea", label: "Floor Area", placeholder: "120 SQM", required: false, type: "text", span: 1 },
   { key: "buildingHeight", label: "Building Height", placeholder: "10 M", required: false, type: "text", span: 1 },
 
@@ -212,6 +254,8 @@ const FIELDS = [
 ];
 
 export default function AddRecord({ setRefresh }) {
+  const location = useLocation();
+
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
@@ -250,6 +294,43 @@ export default function AddRecord({ setRefresh }) {
       .filter(Boolean)
       .join(", ");
   };
+
+  // ✅ PREFILL from Details "Use as Template"
+  useEffect(() => {
+    const prefill = location.state?.prefill;
+    if (!prefill) return;
+
+    setForm(() => {
+      const next = { ...INITIAL_FORM, ...prefill };
+
+      // ✅ normalize date fields for <input type="date">
+      next.dateInspected = toInputDate(next.dateInspected);
+      next.ioDate = toInputDate(next.ioDate);
+      next.ntcDate = toInputDate(next.ntcDate);
+      next.nfsiDate = toInputDate(next.nfsiDate);
+      next.orDate = toInputDate(next.orDate);
+
+      // ✅ recompute combined inspectors
+      next.inspectors = combineInspectors(next);
+
+      // ✅ recompute fsicValidity from dateInspected
+      if (next.dateInspected) {
+        const untilYMD = addYearsYMD(next.dateInspected, 1);
+        next.fsicValidity = untilYMD ? `${formatDateLong(untilYMD)}` : "";
+      } else {
+        next.fsicValidity = "";
+      }
+
+      return next;
+    });
+
+    setTouched({});
+    scrollToTop();
+
+    // ✅ clear navigation state so refresh/back won't re-prefill
+    window.history.replaceState({}, document.title);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const styles = {
     wrap: {
@@ -363,8 +444,8 @@ export default function AddRecord({ setRefresh }) {
     const v = String(rawValue ?? "").trim();
     if (!v) return;
 
-    // skip auto fields
-    if (fieldKey === "inspectors" || fieldKey === "fsicValidity") return;
+    // skip auto fields + dropdown field
+    if (fieldKey === "inspectors" || fieldKey === "fsicValidity" || fieldKey === "occupancyType") return;
 
     setHistory((prev) => {
       const cur = Array.isArray(prev[fieldKey]) ? prev[fieldKey] : [];
@@ -406,7 +487,7 @@ export default function AddRecord({ setRefresh }) {
     setForm((prev) => {
       const updated = { ...prev, [name]: v };
 
-      // ✅ FIX: auto-combine ANY inspector name field (inspector1..inspectorN), NOT serial
+      // ✅ auto-combine ANY inspector name field (inspector1..inspectorN), NOT serial
       if (name.startsWith("inspector") && !name.toLowerCase().includes("serial")) {
         updated.inspectors = combineInspectors(updated);
       }
@@ -442,7 +523,7 @@ export default function AddRecord({ setRefresh }) {
 
     setSaving(true);
     try {
-      // ✅ SAFETY: compute combined inspectors right before saving (so never missing)
+      // ✅ SAFETY: compute combined inspectors right before saving
       const withCombined = { ...form, inspectors: combineInspectors(form) };
 
       const payload = buildPayload(withCombined);
@@ -483,7 +564,12 @@ export default function AddRecord({ setRefresh }) {
 
             const dlId = `dl_${f.key}`;
             const hasDatalist =
-              f.type !== "date" && f.type !== "file" && f.key !== "inspectors" && f.key !== "fsicValidity";
+              f.type !== "date" &&
+              f.type !== "file" &&
+              f.type !== "select" && // ✅ no datalist on dropdown
+              f.key !== "inspectors" &&
+              f.key !== "fsicValidity" &&
+              f.key !== "occupancyType";
 
             return (
               <div
@@ -499,37 +585,59 @@ export default function AddRecord({ setRefresh }) {
                   {f.required && <div style={styles.reqPill}>Required</div>}
                 </div>
 
-                <input
-                  name={f.key}
-                  value={form[f.key] ?? ""}
-                  onChange={onChange}
-                  onBlur={() => onBlur(f.key)}
-                  type={f.type || "text"}
-                  placeholder={f.placeholder || ""}
-                  autoComplete="off"
-                  readOnly={isValidity || isCombinedInspectors}
-                  list={hasDatalist ? dlId : undefined}
-                  style={{
-                    ...styles.input,
-                    border: showError ? "1px solid #dc2626" : styles.input.border,
-                    textTransform:
-                      f.type === "date"
-                        ? "none"
-                        : UPPER_KEYS.has(f.key)
-                        ? "uppercase"
-                        : "none",
-                    background: isValidity || isCombinedInspectors ? "#f1f5f9" : styles.input.background,
-                    cursor: isValidity || isCombinedInspectors ? "not-allowed" : "text",
-                  }}
-                />
-
-                {/* ✅ datalist suggestions (history) */}
-                {hasDatalist && (
-                  <datalist id={dlId}>
-                    {(history[f.key] || []).map((opt) => (
-                      <option key={`${f.key}-${opt}`} value={opt} />
+                {/* ✅ DROPDOWN */}
+                {f.type === "select" ? (
+                  <select
+                    name={f.key}
+                    value={form[f.key] ?? ""}
+                    onChange={onChange}
+                    onBlur={() => onBlur(f.key)}
+                    style={{
+                      ...styles.input,
+                      border: showError ? "1px solid #dc2626" : styles.input.border,
+                      textTransform: UPPER_KEYS.has(f.key) ? "uppercase" : "none",
+                      background: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="">-- SELECT OCCUPANCY --</option>
+                    {(f.key === "occupancyType" ? OCCUPANCY_OPTIONS : []).map((opt) => (
+                      <option key={`${f.key}-${opt}`} value={opt}>
+                        {opt}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
+                ) : (
+                  <>
+                    <input
+                      name={f.key}
+                      value={form[f.key] ?? ""}
+                      onChange={onChange}
+                      onBlur={() => onBlur(f.key)}
+                      type={f.type || "text"}
+                      placeholder={f.placeholder || ""}
+                      autoComplete="off"
+                      readOnly={isValidity || isCombinedInspectors}
+                      list={hasDatalist ? dlId : undefined}
+                      style={{
+                        ...styles.input,
+                        border: showError ? "1px solid #dc2626" : styles.input.border,
+                        textTransform:
+                          f.type === "date" ? "none" : UPPER_KEYS.has(f.key) ? "uppercase" : "none",
+                        background: isValidity || isCombinedInspectors ? "#f1f5f9" : styles.input.background,
+                        cursor: isValidity || isCombinedInspectors ? "not-allowed" : "text",
+                      }}
+                    />
+
+                    {/* ✅ datalist suggestions (history) */}
+                    {hasDatalist && (
+                      <datalist id={dlId}>
+                        {(history[f.key] || []).map((opt) => (
+                          <option key={`${f.key}-${opt}`} value={opt} />
+                        ))}
+                      </datalist>
+                    )}
+                  </>
                 )}
               </div>
             );

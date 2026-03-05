@@ -392,7 +392,7 @@ export default function Records({ refresh, setRefresh }) {
             </div>
           </div>
 
-\          <input
+           <input
             placeholder="🔍 Search records..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
