@@ -1,4 +1,3 @@
-// ✅ RecordsTable.jsx (UPDATED) — IO Number added, Address removed
 import React, { useEffect, useRef } from "react";
 
 export default function RecordsTable({
@@ -8,11 +7,6 @@ export default function RecordsTable({
   activeId,
 }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
-
-  const open = (url, e) => {
-    e.stopPropagation();
-    window.open(url, "_blank");
-  };
 
   const wrap = {
     whiteSpace: "nowrap",
@@ -27,9 +21,6 @@ export default function RecordsTable({
     border: "#e5e7eb",
     text: "#111827",
     muted: "#6b7280",
-    ownerBg: "#fff7ed",
-    ownerBorder: "#fb923c",
-    bfpBg: "#fef2f2",
   };
 
   const S = {
@@ -79,27 +70,17 @@ export default function RecordsTable({
       textAlign: "left",
     },
 
-    btn: {
-      padding: "6px 10px",
-      borderRadius: 999,
+    select: {
+      width: "100%",
+      padding: "8px 10px",
+      borderRadius: 10,
       fontSize: 12,
-      fontWeight: 900,
-      cursor: "pointer",
-      marginRight: 6,
+      fontWeight: 800,
       border: `1px solid ${C.border}`,
       background: "#fff",
-    },
-
-    btnOwner: {
-      border: `1px solid ${C.ownerBorder}`,
-      background: C.ownerBg,
-      color: "#9a3412",
-    },
-
-    btnBfp: {
-      border: `1px solid ${C.primary}`,
-      background: C.bfpBg,
-      color: C.primaryDark,
+      color: C.text,
+      outline: "none",
+      cursor: "pointer",
     },
 
     empty: {
@@ -110,7 +91,6 @@ export default function RecordsTable({
     },
   };
 
-  // ✅ auto-scroll to highlighted row
   const activeRowRef = useRef(null);
 
   useEffect(() => {
@@ -121,6 +101,29 @@ export default function RecordsTable({
       });
     }
   }, [activeId]);
+
+  const handleGenerateChange = (value, record, e) => {
+    e.stopPropagation();
+    if (!value) return;
+
+    let url = "";
+
+    if (value === "owner") {
+      url = `${API}/records/${record.id}/certificate/owner/pdf`;
+    } else if (value === "bfp") {
+      url = `${API}/records/${record.id}/certificate/bfp/pdf`;
+    } else if (value === "owner-new") {
+      url = `${API}/records/${record.id}/certificate/owner-new/pdf`;
+    } else if (value === "bfp-new") {
+      url = `${API}/records/${record.id}/certificate/bfp-new/pdf`;
+    }
+
+    if (url) {
+      window.open(url, "_blank");
+    }
+
+    e.target.value = "";
+  };
 
   return (
     <div style={S.tableWrap}>
@@ -166,9 +169,10 @@ export default function RecordsTable({
                     if (!isActive) e.currentTarget.style.background = "#fff1f2";
                   }}
                   onMouseLeave={(e) => {
-                    if (!isActive)
+                    if (!isActive) {
                       e.currentTarget.style.background =
                         i % 2 === 0 ? "#fff" : "#fafafa";
+                    }
                   }}
                   onClick={() => onRowClick?.(r)}
                 >
@@ -201,23 +205,20 @@ export default function RecordsTable({
                   </td>
 
                   <td style={S.actionsTd}>
-                    <button
-                      style={{ ...S.btn, ...S.btnOwner }}
-                      onClick={(e) =>
-                        open(`${API}/records/${r.id}/certificate/owner/pdf`, e)
-                      }
+                    <select
+                      defaultValue=""
+                      style={S.select}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleGenerateChange(e.target.value, r, e)}
                     >
-                      Owner PDF
-                    </button>
-
-                    <button
-                      style={{ ...S.btn, ...S.btnBfp }}
-                      onClick={(e) =>
-                        open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)
-                      }
-                    >
-                      BFP PDF
-                    </button>
+                      <option value="" disabled>
+                        Select template...
+                      </option>
+                      <option value="owner">Owner PDF</option>
+                      <option value="bfp">BFP PDF</option>
+                      <option value="owner-new">New Owner PDF</option>
+                      <option value="bfp-new">New BFP PDF</option>
+                    </select>
                   </td>
                 </tr>
               );
