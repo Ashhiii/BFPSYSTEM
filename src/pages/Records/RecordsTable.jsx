@@ -21,6 +21,7 @@ export default function RecordsTable({
     border: "#e5e7eb",
     text: "#111827",
     muted: "#6b7280",
+    white: "#ffffff",
   };
 
   const S = {
@@ -70,17 +71,39 @@ export default function RecordsTable({
       textAlign: "left",
     },
 
+    selectWrap: {
+      position: "relative",
+      width: "100%",
+      maxWidth: 180,
+    },
+
     select: {
       width: "100%",
-      padding: "8px 10px",
+      padding: "8px 34px 8px 12px",
       borderRadius: 10,
       fontSize: 12,
       fontWeight: 800,
       border: `1px solid ${C.border}`,
-      background: "#fff",
+      background: C.white,
       color: C.text,
       outline: "none",
       cursor: "pointer",
+      appearance: "none",
+      WebkitAppearance: "none",
+      MozAppearance: "none",
+      boxSizing: "border-box",
+      lineHeight: 1.2,
+    },
+
+    selectArrow: {
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      transform: "translateY(-50%)",
+      pointerEvents: "none",
+      fontSize: 10,
+      color: C.muted,
+      fontWeight: 900,
     },
 
     empty: {
@@ -205,20 +228,28 @@ export default function RecordsTable({
                   </td>
 
                   <td style={S.actionsTd}>
-                    <select
-                      defaultValue=""
-                      style={S.select}
+                    <div
+                      style={S.selectWrap}
                       onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => handleGenerateChange(e.target.value, r, e)}
                     >
-                      <option value="" disabled>
-                        Select template...
-                      </option>
-                      <option value="owner">Owner PDF</option>
-                      <option value="bfp">BFP PDF</option>
-                      <option value="owner-new">New Owner PDF</option>
-                      <option value="bfp-new">New BFP PDF</option>
-                    </select>
+                      <select
+                        defaultValue=""
+                        style={S.select}
+                        onChange={(e) =>
+                          handleGenerateChange(e.target.value, r, e)
+                        }
+                      >
+                        <option value="" disabled>
+                          Select template
+                        </option>
+                        <option value="owner">Owner PDF</option>
+                        <option value="bfp">BFP PDF</option>
+                        <option value="owner-new">New Owner PDF</option>
+                        <option value="bfp-new">New BFP PDF</option>
+                      </select>
+
+                      <span style={S.selectArrow}>▼</span>
+                    </div>
                   </td>
                 </tr>
               );
