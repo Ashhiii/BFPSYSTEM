@@ -163,7 +163,7 @@ const UPPER_KEYS = new Set([
   "orAmount",
 ]);
 
-const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "RE-INSPECTION"];
+const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "NEW", "RE-INSPECTION"];
 
 const OCCUPANCY_OPTIONS = [
   "ASSEMBLY",
@@ -191,7 +191,7 @@ const FIELDS = [
   { key: "establishmentName", label: "Establishment", placeholder: "Establishment name", required: false, type: "text", span: 2 },
 
   { key: "fsicNo", label: "FSIC NO", placeholder: "FSIC NO", required: false, type: "text", span: 1 },
-  { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "ANNUAL / RENEW / RE-INSPECTION", required: false, type: "text", span: 1 },
+  { key: "natureOfInspection", label: "Nature of Inspection", placeholder: "ANNUAL / RENEW / NEW / RE-INSPECTION", required: false, type: "text", span: 1 },
 
   { key: "businessAddress", label: "Business Address", placeholder: "Full address", required: false, type: "text", span: 2 },
 
