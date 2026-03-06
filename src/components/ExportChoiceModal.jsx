@@ -259,7 +259,7 @@ export default function ExportChoiceModal({
                     style={input}
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search establishment, owner, FSIC NO..."
+                    placeholder="Search establishment, owner, FSIC APP NO..."
                   />
                 </div>
 
@@ -321,7 +321,7 @@ export default function ExportChoiceModal({
                           <div style={t}>{r.establishmentName || r.fsicAppNo || r.ioNumber || "Record"}</div>
                           <div style={s}>
                             {r.ownerName ? `Owner: ${r.ownerName} • ` : ""}
-                            {r.fsicAppNo ? `FSIC NO: ${r.fsicAppNo} • ` : ""}
+                            {r.fsicAppNo ? `FSIC APP NO: ${r.fsicAppNo} • ` : ""}
                             {r.ioNumber ? `IO: ${r.ioNumber}` : ""}
                           </div>
                         </div>
