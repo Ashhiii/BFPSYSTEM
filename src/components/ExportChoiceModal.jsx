@@ -36,6 +36,7 @@ export default function ExportChoiceModal({
       const hay = [
         r.establishmentName,
         r.ownerName,
+        r.fsicAppNo,
         r.fsicNo,
         r.ioNumber,
         r.primaryId,
@@ -317,10 +318,10 @@ export default function ExportChoiceModal({
                     return (
                       <div key={id} style={{ ...row, borderTop: idx === 0 ? `1px solid ${C.border}` : row.borderTop }}>
                         <div style={left}>
-                          <div style={t}>{r.establishmentName || r.fsicNo || r.ioNumber || "Record"}</div>
+                          <div style={t}>{r.establishmentName || r.fsicAppNo || r.ioNumber || "Record"}</div>
                           <div style={s}>
                             {r.ownerName ? `Owner: ${r.ownerName} • ` : ""}
-                            {r.fsicNo ? `FSIC NO: ${r.fsicNo} • ` : ""}
+                            {r.fsicAppNo ? `FSIC NO: ${r.fsicAppNo} • ` : ""}
                             {r.ioNumber ? `IO: ${r.ioNumber}` : ""}
                           </div>
                         </div>
