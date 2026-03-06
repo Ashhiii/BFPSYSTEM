@@ -182,7 +182,7 @@ export default function Dashboard() {
         "NTC DATE": dateText(r.ntcDate || r.NTC_DATE),
 
         // ✅ separate FSIC NO column
-        "FSIC NO": S(r.fsicNo || r.FSIC_NO),
+        "FSIC NO": S(r.fsicNo || r.FSIC_NUMBER),
 
         "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
         DEFECTS: S(r.defects || r.DEFECTS),
