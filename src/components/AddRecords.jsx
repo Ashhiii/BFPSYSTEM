@@ -187,6 +187,11 @@ const OCCUPANCY_OPTIONS = [
   "NON-STRUCTURAL (E.G., VEHICLE USED AS ROLLING STORE, ETC.)",
 ];
 
+const HIGH_RISE_CHOICES = ["YES", "NO"];
+const FSMR_CHOICES = ["YES", "NO"];
+
+const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"]
+
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No", placeholder: "2026-00123", required: true, type: "text", span: 1 },
   { key: "ownerName", label: "Owner", placeholder: "Owner name", required: true, type: "text", span: 1 },
@@ -240,10 +245,10 @@ const FIELDS = [
   { key: "buildingHeight", label: "Building Height", placeholder: "10 M", required: false, type: "text", span: 1 },
 
   { key: "storeyCount", label: "Storey Count", placeholder: "2", required: false, type: "number", span: 1 },
-  { key: "highRise", label: "High Rise", placeholder: "YES / NO", required: false, type: "text", span: 1 },
+  { key: "highRise", label: "High Rise", placeholder: "YES / NO", required: false, type: "select", span: 1 },
 
-  { key: "fsmr", label: "FSMR", placeholder: "FSMR", required: false, type: "text", span: 1 },
-  { key: "remarks", label: "Remarks", placeholder: "Remarks", required: false, type: "text", span: 1 },
+  { key: "fsmr", label: "FSMR", placeholder: "FSMR", required: false, type: "select", span: 1 },
+  { key: "remarks", label: "Remarks", placeholder: "Remarks", required: false, type: "select", span: 1 },
 
   { key: "orNumber", label: "OR Number", placeholder: "OR no", required: false, type: "text", span: 1 },
   { key: "orAmount", label: "OR Amount", placeholder: "0.00", required: false, type: "number", span: 1 },
@@ -602,11 +607,22 @@ export default function AddRecord({ setRefresh }) {
                       cursor: "pointer",
                     }}
                   >
-                    <option value="">-- SELECT OCCUPANCY --</option>
-                    {(f.key === "occupancyType" ? OCCUPANCY_OPTIONS : []).map((opt) => (
+                  <option value="">-- SELECT --</option>
+                  {(
+                    f.key === "occupancyType"
+                      ? OCCUPANCY_OPTIONS
+                      : f.key === "highRise"
+                      ? HIGH_RISE_CHOICES
+                      : f.key === "fsmr"
+                      ? FSMR_CHOICES
+                      : f.key === "remarks"
+                      ? REMARKS_CHOICES
+                      : []
+                  ).map((opt) => (
                       <option key={`${f.key}-${opt}`} value={opt}>
                         {opt}
                       </option>
+                      
                     ))}
                   </select>
                 ) : (
