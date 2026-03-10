@@ -38,6 +38,7 @@ const FIELDS = [
   { key: "inspectors", label: "Inspectors (Combined)" },
 
   { key: "chiefName", label: "Chief" },
+  { key: "chiefPosition", label: "Chief Position" },
   { key: "marshalName", label: "Marshal" },
 ];
 

@@ -68,6 +68,7 @@ const FIELDS = [
   { key: "orAmount", label: "OR Amount" },
   { key: "orDate", label: "OR Date" },
   { key: "chiefName", label: "Chief" },
+  {key: "chiefPosition", label: "Chief Position"},
   { key: "marshalName", label: "Marshal" },
 ];
 
