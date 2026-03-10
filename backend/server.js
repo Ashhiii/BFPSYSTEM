@@ -144,8 +144,8 @@ const toLongDate = (v) => {
 };
 
 const pickAllowedRecordFields = (obj = {}) => ({
-  appno: obj.appno ?? obj.APPLICATION_NO ?? "",
-  fsicAppNo: obj.fsicAppNo ?? obj.FSIC_APP_NO ?? obj.FSIC_NUMBER ?? "",
+  FSIC_NUMBER: record.FSIC_NUMBER || record.fsicNo || "",
+  FSIC_APP_NO: record.FSIC_APP_NO || record.fsicAppNo || "",
   natureOfInspection: obj.natureOfInspection ?? obj.NATURE_OF_INSPECTION ?? "",
   ownerName: obj.ownerName ?? obj.OWNERS_NAME ?? "",
   establishmentName: obj.establishmentName ?? obj.ESTABLISHMENT_NAME ?? "",
@@ -179,11 +179,13 @@ const pickAllowedRecordFields = (obj = {}) => ({
   orDate: obj.orDate ?? obj.OR_DATE ?? "",
 
   chiefName: obj.chiefName ?? obj.CHIEF ?? "",
+  chiefPosition: obj.chiefPosition ?? obj.CHIEF_POSITION ?? "",
   marshalName: obj.marshalName ?? obj.MARSHAL ?? "",
 });
 
 const pickAllowedDocumentFields = (obj = {}) => ({
-  fsicAppNo: obj.fsicAppNo ?? obj.FSIC_APP_NO ?? obj.FSIC_NUMBER ?? "",
+  FSIC_NUMBER: record.FSIC_NUMBER || record.fsicNo || "",
+  FSIC_APP_NO: record.FSIC_APP_NO || record.fsicAppNo || "",
   ownerName: obj.ownerName ?? obj.OWNERS_NAME ?? "",
   establishmentName: obj.establishmentName ?? obj.ESTABLISHMENT_NAME ?? "",
   businessAddress: obj.businessAddress ?? obj.BUSSINESS_ADDRESS ?? obj.ADDRESS ?? "",
@@ -219,6 +221,7 @@ const pickAllowedDocumentFields = (obj = {}) => ({
   inspector5Serial: obj.inspector5Serial ?? obj.INSPECTOR_5_SERIAL ?? "",
 
   chiefName: obj.chiefName ?? obj.CHIEF ?? "",
+  chiefPosition: obj.chiefPosition ?? obj.CHIEF_POSITION ?? "",
   marshalName: obj.marshalName ?? obj.MARSHAL ?? "",
 });
 
@@ -355,6 +358,7 @@ const generatePDF = (record, templateFile, filenameBase, res) => {
 
       DATE: toLongDate(new Date()),
       CHIEF: record.CHIEF || record.chiefName || "",
+      CHIEF_POSITION: record.CHIEF_POSITION ||record.chiefPosition || "",
       MARSHAL: record.MARSHAL || record.marshalName || "",
     };
 
@@ -511,6 +515,7 @@ const mapExcelRowToRecord = (row = {}) => {
     inspectors: String(get("inspectors", "inspector") || ""),
 
     chiefName: String(get("chiefname", "chief") || ""),
+    chiefPosition: String(get("chiefposition", "position") || ""),
     marshalName: String(get("marshalname", "marshal") || ""),
   };
 

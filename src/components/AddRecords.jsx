@@ -83,7 +83,9 @@ const INITIAL_FORM = {
   fsicNo: "",
 
   chiefName: "",
+  chiefPosition: "",
   marshalName: "",
+
 
   natureOfInspection: "",
 
@@ -248,7 +250,9 @@ const FIELDS = [
   { key: "orDate", label: "OR Date", placeholder: "", required: false, type: "date", span: 2 },
 
   { key: "chiefName", label: "Chief, Fire Safety Enforcement Section", placeholder: "Chief name", required: false, type: "text", span: 1 },
+  { key: "chiefPosition", label: "Chief Position", placeholder: "Chief, Fire Prevention Branch", required: false, type: "text", span: 1 },
   { key: "marshalName", label: "District Fire Marshal", placeholder: "Marshal name", required: false, type: "text", span: 1 },
+
 ];
 
 export default function AddRecord({ setRefresh }) {
