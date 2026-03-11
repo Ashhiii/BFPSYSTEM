@@ -56,11 +56,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
       color: C.text,
     },
     row: { cursor: "pointer", transition: "background .15s ease" },
-    actionsTd: {
-      padding: "10px 12px",
-      borderBottom: `1px solid ${C.border}`,
-      whiteSpace: "nowrap",
-    },
     btn: {
       padding: "8px 12px",
       borderRadius: 999,
@@ -123,21 +118,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
                 </td>
                 <td style={S.td}>
                   <div style={clamp}>{r.dateInspected || "-"}</div>
-                </td>
-
-                <td style={S.actionsTd}>
-                  <button
-                    style={{ ...S.btn, ...S.btnOwner }}
-                      onClick={(e) => open(`${API}/records/${r.id}/certificate/owner/pdf`, e)}
-                  >
-                    Owner PDF
-                  </button>
-                  <button
-                    style={{ ...S.btn, ...S.btnBfp }}
-                      onClick={(e) => open(`${API}/records/${r.id}/certificate/bfp/pdf`, e)}
-                  >
-                    BFP PDF
-                  </button>
                 </td>
               </tr>
             ))

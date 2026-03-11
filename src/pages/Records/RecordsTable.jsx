@@ -242,8 +242,8 @@ export default function RecordsTable({
                         <option value="" disabled>
                           Select template
                         </option>
-                        <option value="owner">Owner PDF</option>
-                        <option value="bfp">BFP PDF</option>
+                        <option value="owner">Renew Owner PDF</option>
+                        <option value="bfp">Renew BFP PDF</option>
                         <option value="owner-new">New Owner PDF</option>
                         <option value="bfp-new">New BFP PDF</option>
                       </select>
