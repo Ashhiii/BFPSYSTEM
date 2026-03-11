@@ -82,7 +82,6 @@ export default function RenewedTable({ records = [], onRowClick }) {
             <th style={{ ...S.th, width: 180 }}>Establishment</th>
             <th style={{ ...S.th, width: 200 }}>Address</th>
             <th style={{ ...S.th, width: 180 }}>Date Inspected</th>
-            <th style={{ ...S.th, width: 280 }}>Generate</th>
           </tr>
         </thead>
 
