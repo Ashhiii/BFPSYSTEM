@@ -8,7 +8,7 @@ export default function ClearanceTable({
   apiBase,
   activeId,
 }) {
-  const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const wrap = {
     whiteSpace: "nowrap",
