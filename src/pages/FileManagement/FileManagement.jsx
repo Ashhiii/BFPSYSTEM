@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
+import { MdVerified } from "react-icons/md";
 import RecordsManager from "./RecordsManager";
 import RenewedManager from "./RenewedManager";
+import ClearanceManager from "./ClearanceManager";
 
 /* 🔥 BFP COLOR PALETTE */
 const C = {
@@ -16,7 +18,7 @@ const C = {
 };
 
 export default function FileManagement({ refresh, setRefresh }) {
-  const [tab, setTab] = useState("records"); // records | renewed
+  const [tab, setTab] = useState("records"); // records | renewed | clearance
 
   const shell = {
     padding: 14,
@@ -65,6 +67,7 @@ export default function FileManagement({ refresh, setRefresh }) {
     background: "rgba(245, 204, 204, 0.75)",
     border: `1px solid ${C.border}`,
     boxShadow: "0 10px 20px rgba(0,0,0,0.05)",
+    flexWrap: "wrap",
   };
 
   const tabPill = (active) => ({
@@ -79,7 +82,17 @@ export default function FileManagement({ refresh, setRefresh }) {
     boxShadow: active ? "0 10px 18px rgba(185,28,28,0.25)" : "none",
   });
 
-  const shared = useMemo(() => ({ C, refresh, setRefresh }), [refresh, setRefresh]);
+  const tabLabel =
+    tab === "records"
+      ? "• Records"
+      : tab === "renewed"
+      ? "• Renewed"
+      : "• Clearance";
+
+  const shared = useMemo(
+    () => ({ C, refresh, setRefresh }),
+    [refresh, setRefresh]
+  );
 
   return (
     <div style={shell}>
@@ -90,17 +103,32 @@ export default function FileManagement({ refresh, setRefresh }) {
           <div style={subtitle}>
             Archive / delete files
             <span style={{ marginLeft: 8, fontWeight: 950, color: C.accent }}>
-              {tab === "records" ? "• Records" : "• Renewed"}
+              {tabLabel}
             </span>
           </div>
         </div>
 
         <div style={pillGroup}>
-          <button style={tabPill(tab === "records")} onClick={() => setTab("records")}>
+          <button
+            style={tabPill(tab === "records")}
+            onClick={() => setTab("records")}
+          >
             📄 Records
           </button>
-          <button style={tabPill(tab === "renewed")} onClick={() => setTab("renewed")}>
+
+          <button
+            style={tabPill(tab === "renewed")}
+            onClick={() => setTab("renewed")}
+          >
             ♻️ Renewed
+          </button>
+
+          <button
+            style={tabPill(tab === "clearance")}
+            onClick={() => setTab("clearance")}
+          >
+            <MdVerified style={{ marginRight: 6, color: "green"}} />
+            Clearance
           </button>
         </div>
       </div>
@@ -109,8 +137,10 @@ export default function FileManagement({ refresh, setRefresh }) {
       <div style={{ marginTop: 12 }}>
         {tab === "records" ? (
           <RecordsManager {...shared} />
-        ) : (
+        ) : tab === "renewed" ? (
           <RenewedManager {...shared} />
+        ) : (
+          <ClearanceManager {...shared} />
         )}
       </div>
     </div>

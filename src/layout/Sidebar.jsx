@@ -6,6 +6,7 @@ import {
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
   HiOutlineViewGrid,
+  HiOutlineBadgeCheck
 } from "react-icons/hi";
 
 import bfpLogo from "../assets/logo/bfp-logo.png";
@@ -132,7 +133,7 @@ export default function Sidebar({
         style={navBtn(active.clearance, collapsed)}
         onClick={() => navigate("/app/clearances")}
       >
-        <HiOutlineViewGrid style={iconStyle} />
+        <HiOutlineBadgeCheck style={iconStyle} />
         {!collapsed && <span>Clearance</span>}
       </div>
 

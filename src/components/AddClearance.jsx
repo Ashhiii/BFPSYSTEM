@@ -5,74 +5,548 @@ import { db } from "../firebase";
 import TopRightToast from "../components/TopRightToast";
 import AddTabs from "../components/AddTabs";
 
+/** YYYY-MM-DD -> January 2, 2026 */
+const formatDateLong = (yyyy_mm_dd) => {
+  if (!yyyy_mm_dd) return "";
+  const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
+  if (!y || !m || !d) return String(yyyy_mm_dd);
+
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  return `${months[m - 1]} ${d}, ${y}`;
+};
+
+/** add 1 year to YYYY-MM-DD */
+const addYearsYMD = (yyyy_mm_dd, years = 1) => {
+  if (!yyyy_mm_dd) return "";
+  const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
+  if (!y || !m || !d) return "";
+
+  const dt = new Date(y, m - 1, d);
+  const targetYear = y + years;
+  dt.setFullYear(targetYear);
+
+  if (m === 2 && d === 29 && dt.getMonth() === 2) {
+    return `${targetYear}-02-28`;
+  }
+
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+const TEMPLATE_OPTIONS = [
+  { value: "CONVEYANCE", label: "Conveyance" },
+  { value: "STORAGE", label: "Storage" },
+  { value: "HOT_WORKS", label: "Hot Works" },
+  { value: "FIRE_DRILL", label: "Fire Drill Certification" },
+  { value: "FUMIGATION", label: "Fumigation" },
+];
+
+const HOTWORKS_MODE_OPTIONS = ["ANNUAL", "PROJECT BASED"];
+
 const INITIAL_FORM = {
-  clearanceType: "",
-  recordId: "",
-  fsicNumber: "",
-  fsicAppNo: "",
-  ownerName: "",
+  templateType: "CONVEYANCE",
+
   establishmentName: "",
   businessAddress: "",
-  contactNumber: "",
-  orNumber: "",
-  orAmount: "",
-  orDate: "",
+  ownerName: "",
+
   chiefName: "",
   chiefPosition: "",
   marshalName: "",
+  marshalPosition: "",
+
+  orNumber: "",
+  orAmount: "",
+  orDate: "",
+
+  clearanceDate: "",
+  clearanceValidity: "",
+
+  // CONVEYANCE
+  vehicleType: "",
+  motorNumber: "",
+  driverName: "",
   plateNumber: "",
+  chassisNumber: "",
+  licenseNumber: "",
+  trailerNumber: "",
+  capacity: "",
+
+  // STORAGE
+  storageAddress: "",
+  flammable1: "",
+  capacity1: "",
+  flammable2: "",
+  capacity2: "",
+  flammable3: "",
+  capacity3: "",
+  flammable4: "",
+  capacity4: "",
+
+  // HOT WORKS
+  companyName: "",
+  hotWorksMode: "",
+  jobOrderNumber: "",
+  natureOfJob: "",
+  facilityAddress: "",
+  permitAuthorizingIndividual: "",
+  hotWorkOperator: "",
+  fireWatchName: "",
+
+  // FIRE DRILL
+  fireDrillDate: "",
+  issuedDay: "",
+  issuedMonth: "",
+
+  // FUMIGATION
+  operatorName: "",
+  operationDate: "",
+  operationTime: "",
+  operationDuration: "",
 };
 
 const UPPER_KEYS = new Set([
-  "recordId",
-  "fsicNumber",
-  "fsicAppNo",
-  "ownerName",
+  "templateType",
   "establishmentName",
   "businessAddress",
-  "contactNumber",
-  "orNumber",
-  "orAmount",
+  "ownerName",
   "chiefName",
   "chiefPosition",
   "marshalName",
+  "marshalPosition",
+  "orNumber",
+
+  "vehicleType",
+  "motorNumber",
+  "driverName",
   "plateNumber",
+  "chassisNumber",
+  "licenseNumber",
+  "trailerNumber",
+  "capacity",
+
+  "storageAddress",
+  "flammable1",
+  "capacity1",
+  "flammable2",
+  "capacity2",
+  "flammable3",
+  "capacity3",
+  "flammable4",
+  "capacity4",
+
+  "companyName",
+  "hotWorksMode",
+  "jobOrderNumber",
+  "natureOfJob",
+  "facilityAddress",
+  "permitAuthorizingIndividual",
+  "hotWorkOperator",
+  "fireWatchName",
+
+  "issuedMonth",
+
+  "operatorName",
+  "operationTime",
+  "operationDuration",
 ]);
 
-const CLEARANCE_TYPES = [
-  "Conveyance",
-  "Business Permit",
-  "Occupancy Permit",
-  "Fireworks Display",
-  "Installation Clearance",
-  "Storage Permit",
-  "Other",
+const COMMON_FIELDS = [
+  {
+    key: "templateType",
+    label: "Template Type",
+    type: "select",
+    required: true,
+    span: 2,
+  },
+
+  {
+    key: "establishmentName",
+    label: "Building / Facility Name",
+    type: "text",
+    required: true,
+    span: 1,
+    placeholder: "Name of building/facility",
+  },
+  {
+    key: "ownerName",
+    label: "Owner Name",
+    type: "text",
+    required: true,
+    span: 1,
+    placeholder: "Owner name",
+  },
+  {
+    key: "businessAddress",
+    label: "Address",
+    type: "text",
+    required: true,
+    span: 2,
+    placeholder: "Full address",
+  },
+
+  {
+    key: "clearanceDate",
+    label: "Clearance Date",
+    type: "date",
+    required: false,
+    span: 1,
+  },
+  {
+    key: "clearanceValidity",
+    label: "Validity Until",
+    type: "text",
+    required: false,
+    span: 1,
+    readOnly: true,
+    placeholder: "Auto from clearance date",
+  },
+
+  {
+    key: "orNumber",
+    label: "OR Number",
+    type: "text",
+    required: false,
+    span: 1,
+    placeholder: "Official receipt number",
+  },
+  {
+    key: "orAmount",
+    label: "OR Amount",
+    type: "number",
+    required: false,
+    span: 1,
+    placeholder: "0.00",
+  },
+  {
+    key: "orDate",
+    label: "OR Date",
+    type: "date",
+    required: false,
+    span: 2,
+  },
+
+  {
+    key: "chiefName",
+    label: "Chief, FSES",
+    type: "text",
+    required: false,
+    span: 1,
+    placeholder: "Chief name",
+  },
+  {
+    key: "marshalName",
+    label: "City / Municipal Fire Marshal",
+    type: "text",
+    required: false,
+    span: 1,
+    placeholder: "Fire marshal name",
+  },
+
+  {
+    key: "chiefPosition",
+    label: "Chief Position",
+    type: "text",
+    required: false,
+    span: 1,
+    placeholder: "CHIEF, FSES",
+  },
+  {
+    key: "marshalPosition",
+    label: "Marshal Position",
+    type: "text",
+    required: false,
+    span: 1,
+    placeholder: "CITY / MUNICIPAL FIRE MARSHAL",
+  },
 ];
 
-const FIELDS = [
-  { key: "clearanceType", label: "Clearance Type", type: "select", required: true, span: 1 },
-  { key: "recordId", label: "Record ID", type: "text", placeholder: "Record ID", required: false, span: 1 },
+const TEMPLATE_FIELDS = {
+  CONVEYANCE: [
+    {
+      key: "vehicleType",
+      label: "Type of Vehicle",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Example: TANKER TRUCK",
+    },
+    {
+      key: "plateNumber",
+      label: "Plate Number",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Example: ABC 1234",
+    },
+    {
+      key: "motorNumber",
+      label: "Motor Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Motor number",
+    },
+    {
+      key: "chassisNumber",
+      label: "Chassis Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Chassis number",
+    },
+    {
+      key: "driverName",
+      label: "Name of Driver",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Driver name",
+    },
+    {
+      key: "licenseNumber",
+      label: "License Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "License number",
+    },
+    {
+      key: "trailerNumber",
+      label: "Trailer Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Trailer number",
+    },
+    {
+      key: "capacity",
+      label: "Capacity",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 5000 L",
+    },
+  ],
 
-  { key: "fsicNumber", label: "FSIC Number", type: "text", placeholder: "FSIC Number", required: false, span: 1 },
-  { key: "fsicAppNo", label: "FSIC App No.", type: "text", placeholder: "FSIC App No.", required: true, span: 1 },
+  STORAGE: [
+    {
+      key: "storageAddress",
+      label: "Storage Address",
+      type: "text",
+      required: true,
+      span: 2,
+      placeholder: "Location where liquids will be stored",
+    },
+    {
+      key: "flammable1",
+      label: "Flammable / Combustible Liquid 1",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: DIESEL",
+    },
+    {
+      key: "capacity1",
+      label: "Capacity 1",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 2000 L",
+    },
+    {
+      key: "flammable2",
+      label: "Flammable / Combustible Liquid 2",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: GASOLINE",
+    },
+    {
+      key: "capacity2",
+      label: "Capacity 2",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 1500 L",
+    },
+    {
+      key: "flammable3",
+      label: "Flammable / Combustible Liquid 3",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: KEROSENE",
+    },
+    {
+      key: "capacity3",
+      label: "Capacity 3",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 500 L",
+    },
+    {
+      key: "flammable4",
+      label: "Flammable / Combustible Liquid 4",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: PAINT THINNER",
+    },
+    {
+      key: "capacity4",
+      label: "Capacity 4",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 100 L",
+    },
+  ],
 
-  { key: "ownerName", label: "Owner Name", type: "text", placeholder: "Owner Name", required: true, span: 1 },
-  { key: "establishmentName", label: "Establishment Name", type: "text", placeholder: "Establishment Name", required: true, span: 1 },
+  HOT_WORKS: [
+    {
+      key: "companyName",
+      label: "Installer / Company",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Company name",
+    },
+    {
+      key: "hotWorksMode",
+      label: "Mode",
+      type: "select",
+      required: true,
+      span: 1,
+      options: HOTWORKS_MODE_OPTIONS,
+    },
+    {
+      key: "jobOrderNumber",
+      label: "Job Order No. / Letter Request",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "For project based only",
+    },
+    {
+      key: "natureOfJob",
+      label: "Nature of Job / Object",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Nature of work",
+    },
+    {
+      key: "facilityAddress",
+      label: "Building / Structure / Facility Address",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Work site address",
+    },
+    {
+      key: "permitAuthorizingIndividual",
+      label: "Permit Authorizing Individual (PAI)",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "PAI name",
+    },
+    {
+      key: "hotWorkOperator",
+      label: "Hot Work Operator / Contractor",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Operator / contractor",
+    },
+    {
+      key: "fireWatchName",
+      label: "Fire Watch / Watchmen",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Fire watch / watchmen",
+    },
+  ],
 
-  { key: "businessAddress", label: "Business Address", type: "text", placeholder: "Business Address", required: false, span: 2 },
+  FIRE_DRILL: [
+    {
+      key: "fireDrillDate",
+      label: "Fire Drill Date",
+      type: "date",
+      required: true,
+      span: 1,
+    },
+    {
+      key: "issuedDay",
+      label: "Issued Day",
+      type: "number",
+      required: false,
+      span: 1,
+      placeholder: "Example: 12",
+    },
+    {
+      key: "issuedMonth",
+      label: "Issued Month",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Example: MARCH",
+    },
+  ],
 
-  { key: "contactNumber", label: "Contact Number", type: "text", placeholder: "Contact Number", required: false, span: 1 },
-  { key: "orNumber", label: "OR Number", type: "text", placeholder: "OR Number", required: false, span: 1 },
-
-  { key: "orAmount", label: "OR Amount", type: "number", placeholder: "0.00", required: false, span: 1 },
-  { key: "orDate", label: "OR Date", type: "date", placeholder: "", required: false, span: 1 },
-
-  { key: "chiefName", label: "Chief Name", type: "text", placeholder: "Chief Name", required: false, span: 1 },
-  { key: "chiefPosition", label: "Chief Position", type: "text", placeholder: "Chief Position", required: false, span: 1 },
-
-  { key: "marshalName", label: "Marshal Name", type: "text", placeholder: "Marshal Name", required: false, span: 1 },
-  { key: "plateNumber", label: "Plate Number", type: "text", placeholder: "Plate Number", required: false, span: 1 },
-];
+  FUMIGATION: [
+    {
+      key: "operatorName",
+      label: "Authorized Operator / Contractor",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Operator name",
+    },
+    {
+      key: "operationDate",
+      label: "Operation Date",
+      type: "date",
+      required: false,
+      span: 1,
+    },
+    {
+      key: "operationTime",
+      label: "Operation Time",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 8:00 AM - 12:00 PM",
+    },
+    {
+      key: "operationDuration",
+      label: "Duration of Operation",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 4 HOURS",
+    },
+  ],
+};
 
 export default function AddClearance({ setRefresh }) {
   const [form, setForm] = useState(INITIAL_FORM);
@@ -82,10 +556,25 @@ export default function AddClearance({ setRefresh }) {
 
   const topRef = useRef(null);
 
-  const requiredKeys = useMemo(
-    () => FIELDS.filter((f) => f.required).map((f) => f.key),
-    []
-  );
+  const scrollToTop = () => {
+    if (topRef.current?.scrollIntoView) {
+      topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const activeTemplateFields = useMemo(() => {
+    return TEMPLATE_FIELDS[form.templateType] || [];
+  }, [form.templateType]);
+
+  const visibleFields = useMemo(() => {
+    return [...COMMON_FIELDS, ...activeTemplateFields];
+  }, [activeTemplateFields]);
+
+  const requiredKeys = useMemo(() => {
+    return visibleFields.filter((f) => f.required).map((f) => f.key);
+  }, [visibleFields]);
 
   const missingRequired = useMemo(() => {
     const miss = {};
@@ -95,14 +584,6 @@ export default function AddClearance({ setRefresh }) {
     }
     return miss;
   }, [form, requiredKeys]);
-
-  const scrollToTop = () => {
-    if (topRef.current?.scrollIntoView) {
-      topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
 
   const styles = {
     wrap: {
@@ -120,8 +601,18 @@ export default function AddClearance({ setRefresh }) {
       flexWrap: "wrap",
       alignItems: "center",
     },
-    title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
-    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 },
+    title: {
+      fontSize: 18,
+      fontWeight: 950,
+      color: "#0f172a",
+      textTransform: "uppercase",
+    },
+    sub: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#64748b",
+      marginTop: 6,
+    },
     grid: {
       marginTop: 14,
       display: "grid",
@@ -205,62 +696,79 @@ export default function AddClearance({ setRefresh }) {
     },
   };
 
-  const onBlur = (k) => {
-    setTouched((p) => ({ ...p, [k]: true }));
+  const handleBlur = (key) => {
+    setTouched((prev) => ({ ...prev, [key]: true }));
   };
 
-  const onChange = (e) => {
-    const { name, value, tagName } = e.target;
+  const handleChange = (e) => {
+    const { name, value } = e.target;
 
-    const finalValue =
-      tagName === "SELECT"
-        ? value
-        : UPPER_KEYS.has(name)
-        ? String(value ?? "").toUpperCase()
-        : value;
+    if (name === "clearanceDate") {
+      const untilYMD = addYearsYMD(value, 1);
+      const validityText = untilYMD ? formatDateLong(untilYMD) : "";
+
+      setForm((prev) => ({
+        ...prev,
+        clearanceDate: value,
+        clearanceValidity: validityText,
+      }));
+      return;
+    }
+
+    const nextValue = UPPER_KEYS.has(name)
+      ? String(value ?? "").toUpperCase()
+      : value;
 
     setForm((prev) => ({
       ...prev,
-      [name]: finalValue,
+      [name]: nextValue,
     }));
   };
 
+  const resetForm = () => {
+    setForm(INITIAL_FORM);
+    setTouched({});
+    scrollToTop();
+  };
+
+  const buildPayload = (state) => {
+    return {
+      ...state,
+      templateLabel:
+        TEMPLATE_OPTIONS.find((item) => item.value === state.templateType)?.label || "",
+      clearanceDate: formatDateLong(state.clearanceDate),
+      clearanceValidity: state.clearanceValidity,
+      orDate: formatDateLong(state.orDate),
+      fireDrillDate: formatDateLong(state.fireDrillDate),
+      operationDate: formatDateLong(state.operationDate),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+  };
+
   const submit = async () => {
-    if (
-      !form.clearanceType?.trim() ||
-      !form.fsicAppNo?.trim() ||
-      !form.ownerName?.trim() ||
-      !form.establishmentName?.trim()
-    ) {
-      setTouched((p) => ({
-        ...p,
-        clearanceType: true,
-        fsicAppNo: true,
-        ownerName: true,
-        establishmentName: true,
-      }));
+    if (requiredKeys.some((k) => !(form[k] ?? "").toString().trim())) {
+      const nextTouched = {};
+      requiredKeys.forEach((k) => {
+        nextTouched[k] = true;
+      });
+      setTouched((prev) => ({ ...prev, ...nextTouched }));
       scrollToTop();
       return;
     }
 
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
+      const payload = buildPayload(form);
       await addDoc(collection(db, "clearances"), payload);
 
       setToastOpen(true);
       setForm(INITIAL_FORM);
       setTouched({});
-      setRefresh?.((p) => !p);
-
+      setRefresh?.((prev) => !prev);
       scrollToTop();
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
       alert("Firestore error. Check rules / permissions.");
     } finally {
       setSaving(false);
@@ -277,13 +785,16 @@ export default function AddClearance({ setRefresh }) {
         <div style={styles.headerRow}>
           <div>
             <div style={styles.title}>Add Clearance</div>
-            <div style={styles.sub}>Fill out the clearance details below.</div>
+            <div style={styles.sub}>
+              Conveyance is selected by default. You can still change the template if needed.
+            </div>
           </div>
         </div>
 
         <div style={styles.grid}>
-          {FIELDS.map((f) => {
+          {visibleFields.map((f) => {
             const showError = f.required && touched[f.key] && missingRequired[f.key];
+            const isReadOnly = !!f.readOnly;
 
             return (
               <div
@@ -303,30 +814,40 @@ export default function AddClearance({ setRefresh }) {
                   <select
                     name={f.key}
                     value={form[f.key] ?? ""}
-                    onChange={onChange}
-                    onBlur={() => onBlur(f.key)}
+                    onChange={handleChange}
+                    onBlur={() => handleBlur(f.key)}
                     style={{
                       ...styles.input,
                       border: showError ? "1px solid #dc2626" : styles.input.border,
+                      textTransform: UPPER_KEYS.has(f.key) ? "uppercase" : "none",
+                      background: "#fff",
                       cursor: "pointer",
                     }}
                   >
-                    <option value="">-- SELECT --</option>
-                    {CLEARANCE_TYPES.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
+                    {f.key === "templateType" &&
+                      TEMPLATE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+
+                    {f.key !== "templateType" &&
+                      (f.options || []).map((opt) => (
+                        <option key={`${f.key}-${opt}`} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
                   </select>
                 ) : (
                   <input
                     name={f.key}
                     value={form[f.key] ?? ""}
-                    onChange={onChange}
-                    onBlur={() => onBlur(f.key)}
+                    onChange={handleChange}
+                    onBlur={() => handleBlur(f.key)}
                     type={f.type || "text"}
                     placeholder={f.placeholder || ""}
                     autoComplete="off"
+                    readOnly={isReadOnly}
                     style={{
                       ...styles.input,
                       border: showError ? "1px solid #dc2626" : styles.input.border,
@@ -336,6 +857,8 @@ export default function AddClearance({ setRefresh }) {
                           : UPPER_KEYS.has(f.key)
                           ? "uppercase"
                           : "none",
+                      background: isReadOnly ? "#f1f5f9" : "#fff",
+                      cursor: isReadOnly ? "not-allowed" : "text",
                     }}
                   />
                 )}
@@ -351,20 +874,11 @@ export default function AddClearance({ setRefresh }) {
               : "Ready to save."}
           </div>
 
-          <button
-            type="button"
-            style={styles.btn}
-            onClick={() => {
-              setForm(INITIAL_FORM);
-              setTouched({});
-              scrollToTop();
-            }}
-            disabled={saving}
-          >
+          <button style={styles.btn} onClick={resetForm} disabled={saving}>
             Clear
           </button>
 
-          <button type="button" style={styles.primary} onClick={submit} disabled={saving}>
+          <button style={styles.primary} onClick={submit} disabled={saving}>
             {saving ? "Saving..." : "Save Clearance"}
           </button>
         </div>
