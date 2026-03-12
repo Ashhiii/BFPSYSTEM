@@ -39,7 +39,7 @@ function Shell() {
     renewed: path.includes("/app/renewed"),
     filemgmt: path.includes("/app/filemgmt"),
     importexcel: path.includes("/app/import"),
-    clearances: path.includes("/app/clearances"),
+    clearance: path.includes("/app/clearances"),
     addrecord: path.includes("/app/add-record"),
   };
 
