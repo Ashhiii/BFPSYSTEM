@@ -1,19 +1,10 @@
-// ✅ AddRecord.jsx (FULL)
-// ✅ INPUT HISTORY via <datalist> (no buttons, no select) EXCEPT occupancyType (dropdown)
-// ✅ Nature Of Inspection remains INPUT but has suggestions (ANNUAL/RENEW/RE-INSPECTION)
-// ✅ Team Leader/Inspectors keep EXACT casing
-// ✅ Auto-combine Inspector 1/2/3/4/5 -> "inspectors (combined)" readOnly
-// ✅ After Save/Clear, auto scroll back to TOP (smooth)
-// ✅ FIX: combine triggers for ANY inspector field (inspector1..inspectorN) except Serial fields
-// ✅ NEW: PREFILL from RecordDetailsPanel "Use as Template" (NOT auto-save)
-// ✅ NEW: Type of Occupancy is DROPDOWN (select) with your choices
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useLocation } from "react-router-dom";
 
 import TopRightToast from "../components/TopRightToast";
+import AddTabs from "../components/AddTabs";
 
 /** ✅ Format "YYYY-MM-DD" => "January 2, 2026" */
 const formatDateLong = (yyyy_mm_dd) => {
@@ -22,8 +13,8 @@ const formatDateLong = (yyyy_mm_dd) => {
   if (!y || !m || !d) return String(yyyy_mm_dd);
 
   const months = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
   ];
   return `${months[m - 1]} ${d}, ${y}`;
 };
@@ -38,7 +29,6 @@ const addYearsYMD = (yyyy_mm_dd, years = 1) => {
   const targetYear = y + years;
   dt.setFullYear(targetYear);
 
-  // clamp Feb 29 -> Feb 28 if needed
   if (m === 2 && d === 29 && dt.getMonth() === 2) {
     return `${targetYear}-02-28`;
   }
@@ -49,11 +39,10 @@ const addYearsYMD = (yyyy_mm_dd, years = 1) => {
   return `${yy}-${mm}-${dd}`;
 };
 
-// ✅ Convert "January 2, 2026" or Timestamp -> YYYY-MM-DD for <input type="date">
+// ✅ Convert to YYYY-MM-DD for <input type="date">
 const toInputDate = (v) => {
   if (!v) return "";
 
-  // Firestore Timestamp
   if (v?.toDate) {
     const d = v.toDate();
     const y = d.getFullYear();
@@ -62,10 +51,8 @@ const toInputDate = (v) => {
     return `${y}-${m}-${day}`;
   }
 
-  // already YYYY-MM-DD
   if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
 
-  // parseable date string (includes "January 2, 2026")
   if (typeof v === "string" && !Number.isNaN(Date.parse(v))) {
     const d = new Date(v);
     const y = d.getFullYear();
@@ -84,8 +71,8 @@ const INITIAL_FORM = {
 
   chiefName: "",
   chiefPosition: "",
+  marshalPosition: "",
   marshalName: "",
-
 
   natureOfInspection: "",
 
@@ -123,7 +110,7 @@ const INITIAL_FORM = {
   fsicValidity: "",
   defects: "",
 
-  occupancyType: "", // ✅ dropdown
+  occupancyType: "",
   buildingDesc: "",
   floorArea: "",
   buildingHeight: "",
@@ -137,7 +124,6 @@ const INITIAL_FORM = {
   orDate: "",
 };
 
-/** ✅ ONLY THESE FIELDS WILL BE AUTO-UPPERCASED */
 const UPPER_KEYS = new Set([
   "fsicAppNo",
   "fsicNo",
@@ -189,8 +175,7 @@ const OCCUPANCY_OPTIONS = [
 
 const HIGH_RISE_CHOICES = ["YES", "NO"];
 const FSMR_CHOICES = ["YES", "NO"];
-
-const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"]
+const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
 
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No", placeholder: "2026-00123", required: true, type: "text", span: 1 },
@@ -237,9 +222,7 @@ const FIELDS = [
   { key: "fsicValidity", label: "FSIC Validity", placeholder: "Auto (based on Date Inspected)", required: false, type: "text", span: 1 },
   { key: "defects", label: "Defects / Violations", placeholder: "List defects", required: false, type: "text", span: 1 },
 
-  // ✅ DROPDOWN HERE
   { key: "occupancyType", label: "Type of Occupancy", required: false, type: "select", span: 1 },
-
   { key: "buildingDesc", label: "Building Description", placeholder: "Description", required: false, type: "text", span: 1 },
   { key: "floorArea", label: "Floor Area", placeholder: "120 SQM", required: false, type: "text", span: 1 },
   { key: "buildingHeight", label: "Building Height", placeholder: "10 M", required: false, type: "text", span: 1 },
@@ -256,8 +239,8 @@ const FIELDS = [
 
   { key: "chiefName", label: "Chief, Fire Safety Enforcement Section", placeholder: "Chief name", required: false, type: "text", span: 1 },
   { key: "chiefPosition", label: "Chief Position", placeholder: "Chief, Fire Prevention Branch", required: false, type: "text", span: 1 },
+  { key: "marshalPosition", label: "Chief Position", placeholder: "District Fire Marshal", required: false, type: "text", span: 1 },
   { key: "marshalName", label: "District Fire Marshal", placeholder: "Marshal name", required: false, type: "text", span: 1 },
-
 ];
 
 export default function AddRecord({ setRefresh }) {
@@ -268,8 +251,8 @@ export default function AddRecord({ setRefresh }) {
   const [touched, setTouched] = useState({});
   const [toastOpen, setToastOpen] = useState(false);
 
-  // ✅ top anchor for smooth scroll
   const topRef = useRef(null);
+
   const scrollToTop = () => {
     if (topRef.current?.scrollIntoView) {
       topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -278,7 +261,6 @@ export default function AddRecord({ setRefresh }) {
     }
   };
 
-  // ✅ HISTORY per field (recent typed values)
   const [history, setHistory] = useState(() => ({
     natureOfInspection: [...NATURE_SUGGESTIONS],
   }));
@@ -294,7 +276,6 @@ export default function AddRecord({ setRefresh }) {
     return miss;
   }, [form, requiredKeys]);
 
-  // ✅ combine inspector1..5 (names only)
   const combineInspectors = (state) => {
     return [state.inspector1, state.inspector2, state.inspector3, state.inspector4, state.inspector5]
       .map((x) => String(x ?? "").trim())
@@ -302,7 +283,6 @@ export default function AddRecord({ setRefresh }) {
       .join(", ");
   };
 
-  // ✅ PREFILL from Details "Use as Template"
   useEffect(() => {
     const prefill = location.state?.prefill;
     if (!prefill) return;
@@ -310,17 +290,14 @@ export default function AddRecord({ setRefresh }) {
     setForm(() => {
       const next = { ...INITIAL_FORM, ...prefill };
 
-      // ✅ normalize date fields for <input type="date">
       next.dateInspected = toInputDate(next.dateInspected);
       next.ioDate = toInputDate(next.ioDate);
       next.ntcDate = toInputDate(next.ntcDate);
       next.nfsiDate = toInputDate(next.nfsiDate);
       next.orDate = toInputDate(next.orDate);
 
-      // ✅ recompute combined inspectors
       next.inspectors = combineInspectors(next);
 
-      // ✅ recompute fsicValidity from dateInspected
       if (next.dateInspected) {
         const untilYMD = addYearsYMD(next.dateInspected, 1);
         next.fsicValidity = untilYMD ? `${formatDateLong(untilYMD)}` : "";
@@ -333,10 +310,7 @@ export default function AddRecord({ setRefresh }) {
 
     setTouched({});
     scrollToTop();
-
-    // ✅ clear navigation state so refresh/back won't re-prefill
     window.history.replaceState({}, document.title);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
   const styles = {
@@ -357,14 +331,12 @@ export default function AddRecord({ setRefresh }) {
     },
     title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
     sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 },
-
     grid: {
       marginTop: 14,
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
       gap: 12,
     },
-
     card: {
       background: "#f8fafc",
       border: "1px solid #e2e8f0",
@@ -384,7 +356,6 @@ export default function AddRecord({ setRefresh }) {
       color: "#0f172a",
       textTransform: "uppercase",
     },
-
     reqPill: {
       fontSize: 11,
       fontWeight: 900,
@@ -396,7 +367,6 @@ export default function AddRecord({ setRefresh }) {
       lineHeight: 1,
       textTransform: "uppercase",
     },
-
     input: {
       width: "100%",
       padding: "10px 12px",
@@ -409,7 +379,6 @@ export default function AddRecord({ setRefresh }) {
       boxSizing: "border-box",
       textTransform: "none",
     },
-
     footerBar: {
       marginTop: 14,
       paddingTop: 12,
@@ -426,7 +395,6 @@ export default function AddRecord({ setRefresh }) {
       fontWeight: 800,
       color: "#64748b",
     },
-
     btn: {
       padding: "10px 12px",
       borderRadius: 12,
@@ -446,12 +414,10 @@ export default function AddRecord({ setRefresh }) {
     },
   };
 
-  // ✅ update history list per field (unique, recent-first, max 10)
   const pushHistory = (fieldKey, rawValue) => {
     const v = String(rawValue ?? "").trim();
     if (!v) return;
 
-    // skip auto fields + dropdown field
     if (fieldKey === "inspectors" || fieldKey === "fsicValidity" || fieldKey === "occupancyType") return;
 
     setHistory((prev) => {
@@ -475,7 +441,6 @@ export default function AddRecord({ setRefresh }) {
   const onChange = (e) => {
     const { name, value } = e.target;
 
-    // FSIC validity auto-calc
     if (name === "dateInspected") {
       const untilYMD = addYearsYMD(value, 1);
       const validityText = untilYMD ? `${formatDateLong(untilYMD)}` : "";
@@ -488,13 +453,11 @@ export default function AddRecord({ setRefresh }) {
       return;
     }
 
-    // ✅ Only uppercase selected fields; others keep exact casing
     const v = UPPER_KEYS.has(name) ? String(value ?? "").toUpperCase() : value;
 
     setForm((prev) => {
       const updated = { ...prev, [name]: v };
 
-      // ✅ auto-combine ANY inspector name field (inspector1..inspectorN), NOT serial
       if (name.startsWith("inspector") && !name.toLowerCase().includes("serial")) {
         updated.inspectors = combineInspectors(updated);
       }
@@ -506,7 +469,6 @@ export default function AddRecord({ setRefresh }) {
   const buildPayload = (state) => {
     const payload = { ...state };
 
-    // ✅ Store long dates for PDF/template
     payload.dateInspected = formatDateLong(state.dateInspected);
     payload.ioDate = formatDateLong(state.ioDate);
     payload.nfsiDate = formatDateLong(state.nfsiDate);
@@ -525,15 +487,13 @@ export default function AddRecord({ setRefresh }) {
       return;
     }
 
-    // ✅ push all values to history before save
     Object.keys(form).forEach((k) => pushHistory(k, form[k]));
 
     setSaving(true);
     try {
-      // ✅ SAFETY: compute combined inspectors right before saving
       const withCombined = { ...form, inspectors: combineInspectors(form) };
-
       const payload = buildPayload(withCombined);
+
       await addDoc(collection(db, "records"), payload);
 
       setToastOpen(true);
@@ -553,13 +513,16 @@ export default function AddRecord({ setRefresh }) {
   return (
     <>
       <div style={styles.wrap}>
-        {/* ✅ TOP ANCHOR */}
         <div ref={topRef} />
+
+        <AddTabs />
 
         <div style={styles.headerRow}>
           <div>
             <div style={styles.title}>Add Record</div>
-            <div style={styles.sub}>Type normally—suggestions will appear from your recent inputs.</div>
+            <div style={styles.sub}>
+              Type normally—suggestions will appear from your recent inputs.
+            </div>
           </div>
         </div>
 
@@ -573,7 +536,7 @@ export default function AddRecord({ setRefresh }) {
             const hasDatalist =
               f.type !== "date" &&
               f.type !== "file" &&
-              f.type !== "select" && // ✅ no datalist on dropdown
+              f.type !== "select" &&
               f.key !== "inspectors" &&
               f.key !== "fsicValidity" &&
               f.key !== "occupancyType";
@@ -592,7 +555,6 @@ export default function AddRecord({ setRefresh }) {
                   {f.required && <div style={styles.reqPill}>Required</div>}
                 </div>
 
-                {/* ✅ DROPDOWN */}
                 {f.type === "select" ? (
                   <select
                     name={f.key}
@@ -607,22 +569,21 @@ export default function AddRecord({ setRefresh }) {
                       cursor: "pointer",
                     }}
                   >
-                  <option value="">-- SELECT --</option>
-                  {(
-                    f.key === "occupancyType"
-                      ? OCCUPANCY_OPTIONS
-                      : f.key === "highRise"
-                      ? HIGH_RISE_CHOICES
-                      : f.key === "fsmr"
-                      ? FSMR_CHOICES
-                      : f.key === "remarks"
-                      ? REMARKS_CHOICES
-                      : []
-                  ).map((opt) => (
+                    <option value="">-- SELECT --</option>
+                    {(
+                      f.key === "occupancyType"
+                        ? OCCUPANCY_OPTIONS
+                        : f.key === "highRise"
+                        ? HIGH_RISE_CHOICES
+                        : f.key === "fsmr"
+                        ? FSMR_CHOICES
+                        : f.key === "remarks"
+                        ? REMARKS_CHOICES
+                        : []
+                    ).map((opt) => (
                       <option key={`${f.key}-${opt}`} value={opt}>
                         {opt}
                       </option>
-                      
                     ))}
                   </select>
                 ) : (
@@ -647,7 +608,6 @@ export default function AddRecord({ setRefresh }) {
                       }}
                     />
 
-                    {/* ✅ datalist suggestions (history) */}
                     {hasDatalist && (
                       <datalist id={dlId}>
                         {(history[f.key] || []).map((opt) => (
@@ -664,7 +624,9 @@ export default function AddRecord({ setRefresh }) {
 
         <div style={styles.footerBar}>
           <div style={styles.footerLeft}>
-            {Object.keys(missingRequired).length > 0 ? "Please fill required fields before saving." : "Ready to save."}
+            {Object.keys(missingRequired).length > 0
+              ? "Please fill required fields before saving."
+              : "Ready to save."}
           </div>
 
           <button

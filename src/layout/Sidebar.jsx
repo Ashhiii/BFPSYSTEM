@@ -29,6 +29,15 @@ export default function Sidebar({
   const wrapStyle = collapsed ? sidebarWrapClosed : sidebarWrapOpen;
   const iconStyle = { fontSize: 20, color: "#fff" };
 
+  const sectionLabel = {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 1,
+    opacity: 0.6,
+    padding: collapsed ? "10px 6px" : "12px 16px 4px",
+    textTransform: "uppercase",
+  };
+
   return (
     <aside style={wrapStyle}>
       {/* ================= LOGO ================= */}
@@ -80,7 +89,7 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* ================= NAV ================= */}
+      {/* ================= DASHBOARD ================= */}
       <div
         style={navBtn(active.dashboard, collapsed)}
         onClick={() => navigate("/app/dashboard")}
@@ -88,6 +97,9 @@ export default function Sidebar({
         <HiOutlineViewGrid style={iconStyle} />
         {!collapsed && <span>Dashboard</span>}
       </div>
+
+      {/* ================= FIRE RECORDS ================= */}
+      {!collapsed && <div style={sectionLabel}>Fire Records</div>}
 
       <div
         style={navBtn(active.records, collapsed)}
@@ -112,6 +124,20 @@ export default function Sidebar({
         <HiOutlineRefresh style={iconStyle} />
         {!collapsed && <span>Renewed</span>}
       </div>
+
+      {/* ================= FIRE CLEARANCE ================= */}
+      {!collapsed && <div style={sectionLabel}>Fire Clearance</div>}
+
+      <div
+        style={navBtn(active.clearance, collapsed)}
+        onClick={() => navigate("/app/clearances")}
+      >
+        <HiOutlineViewGrid style={iconStyle} />
+        {!collapsed && <span>Clearance</span>}
+      </div>
+
+      {/* ================= DELETION ================= */}
+      {!collapsed && <div style={sectionLabel}>Deletion</div>}
 
       <div
         style={navBtn(active.filemgmt, collapsed)}

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import PinUnlock from "./auth/PinUnlock.jsx";
-import ForgotPin from "./auth/ForgotPin.jsx"; // ✅ PUBLIC route
+import ForgotPin from "./auth/ForgotPin.jsx";
 import ProtectedRoute from "./auth/ProtectedRoute.jsx";
 
 import Records from "./pages/Records/Records";
@@ -18,10 +18,12 @@ import Dashboard from "./pages/Home/Dashboard.jsx";
 import Archive from "./pages/Archive/Archive.jsx";
 
 import AddRecordPage from "./components/AddRecords.jsx";
+import AddClearance from "./components/AddClearance.jsx";
+
+import ClearancePage from "./pages/Clearance/ClearancePage.jsx";
 
 import logo from "./assets/logo/bfp-logo.png";
 
-/* ================= Shell ================= */
 function Shell() {
   const navigate = useNavigate();
   const [refresh, setRefresh] = useState(false);
@@ -37,6 +39,8 @@ function Shell() {
     renewed: path.includes("/app/renewed"),
     filemgmt: path.includes("/app/filemgmt"),
     importexcel: path.includes("/app/import"),
+    clearances: path.includes("/app/clearances"),
+    addrecord: path.includes("/app/add-record"),
   };
 
   const requestLock = () => {
@@ -62,9 +66,6 @@ function Shell() {
 
         <main style={main}>
           <Routes>
-            {/* ✅ NOTE: this is /app/forgot-pin (not needed now, can remove) */}
-            {/* <Route path="forgot-pin" element={<ForgotPin />} /> */}
-
             <Route path="dashboard" element={<Dashboard setRefresh={setRefresh} />} />
             <Route path="records" element={<Records refresh={refresh} setRefresh={setRefresh} />} />
             <Route path="add-record" element={<AddRecordPage setRefresh={setRefresh} />} />
@@ -73,6 +74,9 @@ function Shell() {
             <Route path="filemgmt" element={<FileManagement refresh={refresh} setRefresh={setRefresh} />} />
             <Route path="import" element={<ImportExcel refresh={refresh} setRefresh={setRefresh} />} />
             <Route path="archive" element={<Archive />} />
+            <Route path="add-clearance" element={<AddClearance refresh={refresh} setRefresh={setRefresh} />} />
+            <Route path="clearances" element={<ClearancePage refresh={refresh} setRefresh={setRefresh} />} />
+
             <Route path="*" element={<Navigate to="dashboard" replace />} />
           </Routes>
         </main>
@@ -119,13 +123,10 @@ function Shell() {
   );
 }
 
-/* ================= App Routes ================= */
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<PinUnlock />} />
-
-      {/* ✅ FIX: PUBLIC ROUTE */}
       <Route path="/forgot-pin" element={<ForgotPin />} />
 
       <Route
