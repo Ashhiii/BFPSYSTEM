@@ -190,7 +190,7 @@ export default function ClearancePage() {
             Clearance Management
           </div>
           <div style={{ fontSize: 12, fontWeight: 800, color: C.bg, marginTop: 6 }}>
-            Firestore-based clearance records • Edit • Delete • View details
+            Clearance records • Edit • Delete • View details
           </div>
         </div>
       </div>
