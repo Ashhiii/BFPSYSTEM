@@ -10,10 +10,43 @@ import {
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
+const HIGH_RISE_CHOICES = ["YES", "NO"];
+const FSMR_CHOICES = ["YES", "NO"];
+const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
+const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "NEW", "RE-INSPECTION"];
+
+const OCCUPANCY_OPTIONS = [
+  "ASSEMBLY",
+  "EDUCATIONAL",
+  "DAY CARE",
+  "HEALTH CARE",
+  "RESIDENTIAL BOARD AND CARE",
+  "DETENTION & CORRECTIONAL",
+  "HOTEL",
+  "DORMITORIES",
+  "APARTMENT BUILDINGS",
+  "LODGING & ROOMING HOUSE",
+  "SINGLE & TWO FAMILY DWELLING UNIT",
+  "MERCANTILE",
+  "BUSINESS",
+  "INDUSTRIAL",
+  "STORAGE",
+  "SPECIAL STRUCTURES",
+  "NON-STRUCTURAL (E.G., VEHICLE USED AS ROLLING STORE, ETC.)",
+];
+
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No" },
 
-  { key: "natureOfInspection", label: "Nature Of Inspection" },
+  {
+    key: "natureOfInspection",
+    label: "Nature of Inspection",
+    placeholder: "Select Nature of Inspection",
+    required: false,
+    type: "select",
+    span: 1,
+  },
+
   { key: "ownerName", label: "Owner" },
   { key: "establishmentName", label: "Establishment" },
   { key: "businessAddress", label: "Address" },
@@ -54,25 +87,23 @@ const FIELDS = [
 
   { key: "inspectors", label: "Inspectors (combined)" },
 
-  // ✅ CANONICAL IMPORT KEYS + OLD KEY ALIASES
-  { key: "typeOfOccupancy", label: "Type of Occupancy", aliases: ["occupancyType"] },
+  { key: "occupancyType", label: "Type of Occupancy", required: false, type: "select", span: 1 },
   { key: "buildingDescription", label: "Building Description", aliases: ["buildingDesc"] },
   { key: "floorAreaSqm", label: "Floor Area (SQM)", aliases: ["floorArea"] },
   { key: "buildingHeight", label: "Height" },
   { key: "noOfStorey", label: "No. of Storey", aliases: ["storeyCount"] },
-  { key: "highRise", label: "High Rise" },
-  { key: "fsmr", label: "FSMR" },
+  { key: "highRise", label: "High Rise", placeholder: "YES / NO", required: false, type: "select", span: 1 },
+  { key: "fsmr", label: "FSMR", placeholder: "FSMR", required: false, type: "select", span: 1 },
 
-  { key: "remarks", label: "Remarks" },
+  { key: "remarks", label: "Remarks", placeholder: "Remarks", required: false, type: "select", span: 1 },
   { key: "orNumber", label: "OR No" },
   { key: "orAmount", label: "OR Amount" },
   { key: "orDate", label: "OR Date" },
   { key: "chiefName", label: "Chief" },
-  {key: "chiefPosition", label: "Chief Position"},
+  { key: "chiefPosition", label: "Chief Position" },
   { key: "marshalName", label: "Marshal" },
 ];
 
-// ✅ ONLY fields you want ALWAYS UPPERCASE
 const CAPS_KEYS = new Set([
   "fsicAppNo",
   "natureOfInspection",
@@ -86,7 +117,7 @@ const CAPS_KEYS = new Set([
   "fsicNo",
   "fsicValidity",
   "defects",
-  "typeOfOccupancy",
+  "occupancyType",
   "buildingDescription",
   "floorAreaSqm",
   "buildingHeight",
@@ -100,7 +131,6 @@ const CAPS_KEYS = new Set([
   "marshalName",
 ]);
 
-// ✅ Keep EXACT casing as typed
 const NO_CAPS_KEYS = new Set([
   "teamLeader",
   "teamLeaderSerial",
@@ -119,7 +149,6 @@ const NO_CAPS_KEYS = new Set([
 
 const DATE_KEYS = new Set(["dateInspected", "ioDate", "nfsiDate", "ntcDate", "orDate"]);
 
-/** ✅ Convert value -> YYYY-MM-DD for <input type="date"> */
 const toInputDate = (v) => {
   if (!v) return "";
   if (v?.toDate) {
@@ -154,14 +183,15 @@ const addOneYear = (yyyy_mm_dd) => {
 const combineInspectors = (...names) =>
   names.map((x) => String(x || "").trim()).filter(Boolean).join(", ");
 
-/** ✅ read record value using canonical key + aliases */
 const readField = (record, key, aliases = []) => {
   const direct = record?.[key];
   if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
+
   for (const a of aliases) {
     const v = record?.[a];
     if (v !== undefined && v !== null && String(v).trim() !== "") return v;
   }
+
   return record?.[key] ?? "";
 };
 
@@ -196,20 +226,18 @@ export default function RecordDetailsPanel({
     danger: "#dc2626",
   };
 
-  useEffect(() => {
-    setEditing(false);
-    setRenewing(false);
-    setSaving(false);
-    setRenewedRecord(null);
-    if (!record) return;
+  const buildFormFromRecord = (src) => {
+    if (!src) return {};
 
     const init = {};
     FIELDS.forEach((f) => {
-      const raw = readField(record, f.key, f.aliases || []);
+      const raw = readField(src, f.key, f.aliases || []);
       init[f.key] = DATE_KEYS.has(f.key) ? toInputDate(raw) : raw;
     });
 
-    if (init.dateInspected) init.fsicValidity = addOneYear(init.dateInspected);
+    if (init.dateInspected) {
+      init.fsicValidity = addOneYear(init.dateInspected);
+    }
 
     init.inspectors = combineInspectors(
       init.inspector1,
@@ -219,7 +247,22 @@ export default function RecordDetailsPanel({
       init.inspector5
     );
 
-    setForm(init);
+    return init;
+  };
+
+  const resetFormToRecord = () => {
+    setForm(buildFormFromRecord(record));
+  };
+
+  useEffect(() => {
+    setEditing(false);
+    setRenewing(false);
+    setSaving(false);
+    setRenewedRecord(null);
+
+    if (!record) return;
+
+    setForm(buildFormFromRecord(record));
 
     if (!entityKey) return;
     getDoc(doc(db, "renewals", entityKey))
@@ -244,11 +287,24 @@ export default function RecordDetailsPanel({
   const setField = (k, v) => {
     setForm((p) => {
       const next = { ...p };
-      if (NO_CAPS_KEYS.has(k)) next[k] = String(v ?? "");
-      else next[k] = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : String(v ?? "");
 
-      if (k === "dateInspected") next.fsicValidity = addOneYear(String(v ?? ""));
-      if (k === "inspector1" || k === "inspector2" || k === "inspector3" || k === "inspector4" || k === "inspector5") {
+      if (NO_CAPS_KEYS.has(k)) {
+        next[k] = String(v ?? "");
+      } else {
+        next[k] = CAPS_KEYS.has(k) ? String(v ?? "").toUpperCase() : String(v ?? "");
+      }
+
+      if (k === "dateInspected") {
+        next.fsicValidity = addOneYear(String(v ?? ""));
+      }
+
+      if (
+        k === "inspector1" ||
+        k === "inspector2" ||
+        k === "inspector3" ||
+        k === "inspector4" ||
+        k === "inspector5"
+      ) {
         next.inspectors = combineInspectors(
           next.inspector1,
           next.inspector2,
@@ -257,6 +313,7 @@ export default function RecordDetailsPanel({
           next.inspector5
         );
       }
+
       return next;
     });
   };
@@ -270,24 +327,47 @@ export default function RecordDetailsPanel({
       whiteSpace: "nowrap",
       opacity: saving ? 0.7 : 1,
     };
-    if (variant === "primary")
-      return { ...common, border: `1px solid ${C.primary}`, background: C.primary, color: "#fff" };
-    if (variant === "gold")
-      return { ...common, border: `1px solid ${C.gold}`, background: C.gold, color: "#111827" };
-    if (variant === "danger")
-      return { ...common, border: `1px solid ${C.danger}`, background: C.softBg, color: C.danger };
-    return { ...common, border: `1px solid ${C.border}`, background: "#fff", color: C.text };
+
+    if (variant === "primary") {
+      return {
+        ...common,
+        border: `1px solid ${C.primary}`,
+        background: C.primary,
+        color: "#fff",
+      };
+    }
+
+    if (variant === "gold") {
+      return {
+        ...common,
+        border: `1px solid ${C.gold}`,
+        background: C.gold,
+        color: "#111827",
+      };
+    }
+
+    if (variant === "danger") {
+      return {
+        ...common,
+        border: `1px solid ${C.danger}`,
+        background: C.softBg,
+        color: C.danger,
+      };
+    }
+
+    return {
+      ...common,
+      border: `1px solid ${C.border}`,
+      background: "#fff",
+      color: C.text,
+    };
   };
 
-  // ✅ NEW: Use as Template (prefill AddRecord, NOT SAVE)
   const useAsTemplate = () => {
     if (!record) return;
 
     const prefill = {
-      // ✅ only copy fields you want in AddRecord
       ...record,
-
-      // remove IDs/timestamps/status
       id: undefined,
       createdAt: undefined,
       updatedAt: undefined,
@@ -298,8 +378,7 @@ export default function RecordDetailsPanel({
       source: undefined,
       entityKey: undefined,
 
-      // ✅ if canonical exists, also mirror to legacy for AddRecord fields
-      occupancyType: record.typeOfOccupancy ?? record.occupancyType ?? "",
+      occupancyType: record.occupancyType ?? record.typeOfOccupancy ?? "",
       buildingDesc: record.buildingDescription ?? record.buildingDesc ?? "",
       floorArea: record.floorAreaSqm ?? record.floorArea ?? "",
       storeyCount: record.noOfStorey ?? record.storeyCount ?? "",
@@ -310,11 +389,16 @@ export default function RecordDetailsPanel({
 
   const saveEdit = async () => {
     if (!record?.id) return alert("Missing record.id (cannot save).");
+
     try {
       setSaving(true);
 
       const ensured = { ...form };
-      if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
+
+      if (ensured.dateInspected) {
+        ensured.fsicValidity = addOneYear(ensured.dateInspected);
+      }
+
       ensured.inspectors = combineInspectors(
         ensured.inspector1,
         ensured.inspector2,
@@ -323,13 +407,14 @@ export default function RecordDetailsPanel({
         ensured.inspector5
       );
 
-      // ✅ payload canonical
       const payload = {};
-      FIELDS.forEach((f) => (payload[f.key] = ensured[f.key] ?? ""));
+      FIELDS.forEach((f) => {
+        payload[f.key] = ensured[f.key] ?? "";
+      });
+
       payload.updatedAt = serverTimestamp();
 
-      // ✅ ALSO write legacy keys so other UI parts still work
-      payload.occupancyType = payload.typeOfOccupancy;
+      payload.typeOfOccupancy = payload.occupancyType;
       payload.buildingDesc = payload.buildingDescription;
       payload.floorArea = payload.floorAreaSqm;
       payload.storeyCount = payload.noOfStorey;
@@ -341,6 +426,7 @@ export default function RecordDetailsPanel({
       await setDoc(targetDocRef, payload, { merge: true });
 
       setEditing(false);
+      setForm(buildFormFromRecord({ ...record, ...payload }));
       onUpdated?.({ ...record, ...payload, id: record.id });
     } catch (e) {
       alert(`❌ SAVE ERROR: ${e.message}`);
@@ -357,7 +443,11 @@ export default function RecordDetailsPanel({
       setSaving(true);
 
       const ensured = { ...form };
-      if (ensured.dateInspected) ensured.fsicValidity = addOneYear(ensured.dateInspected);
+
+      if (ensured.dateInspected) {
+        ensured.fsicValidity = addOneYear(ensured.dateInspected);
+      }
+
       ensured.inspectors = combineInspectors(
         ensured.inspector1,
         ensured.inspector2,
@@ -376,8 +466,7 @@ export default function RecordDetailsPanel({
         status: "RENEWED",
         isRenewedCopy: true,
 
-        // ✅ legacy mirror
-        occupancyType: ensured.typeOfOccupancy,
+        typeOfOccupancy: ensured.occupancyType,
         buildingDesc: ensured.buildingDescription,
         floorArea: ensured.floorAreaSqm,
         storeyCount: ensured.noOfStorey,
@@ -404,6 +493,7 @@ export default function RecordDetailsPanel({
       await batch.commit();
 
       setRenewedRecord({ ...newRecord, id: newRecordRef.id });
+      resetFormToRecord();
       setRenewing(false);
 
       onRenewSaved?.({
@@ -415,6 +505,61 @@ export default function RecordDetailsPanel({
     } finally {
       setSaving(false);
     }
+  };
+
+  const renderEditorField = (f) => {
+    const commonProps = {
+      name: f.key,
+      value: form[f.key] ?? "",
+      onChange: (e) => setField(f.key, e.target.value),
+      style: {
+        ...inputStyle(f.key),
+        ...(f.key === "inspectors" ? { background: "#f3f4f6", cursor: "not-allowed" } : {}),
+        ...(f.key === "fsicValidity" ? { background: "#f3f4f6", cursor: "not-allowed" } : {}),
+      },
+    };
+
+    if (f.key === "inspectors" || f.key === "fsicValidity") {
+      return (
+        <input
+          {...commonProps}
+          autoComplete="off"
+          placeholder={f.label}
+          type={DATE_KEYS.has(f.key) ? "date" : "text"}
+          readOnly
+        />
+      );
+    }
+
+    if (f.type === "select") {
+      let options = [];
+
+      if (f.key === "natureOfInspection") options = NATURE_SUGGESTIONS;
+      if (f.key === "occupancyType") options = OCCUPANCY_OPTIONS;
+      if (f.key === "highRise") options = HIGH_RISE_CHOICES;
+      if (f.key === "fsmr") options = FSMR_CHOICES;
+      if (f.key === "remarks") options = REMARKS_CHOICES;
+
+      return (
+        <select {...commonProps}>
+          <option value="">{f.placeholder || `Select ${f.label}`}</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    return (
+      <input
+        {...commonProps}
+        autoComplete="off"
+        placeholder={f.label}
+        type={DATE_KEYS.has(f.key) ? "date" : "text"}
+      />
+    );
   };
 
   const panel = {
@@ -439,20 +584,34 @@ export default function RecordDetailsPanel({
     flexWrap: "wrap",
   };
 
-  const body = { flex: 1, overflowY: "auto", padding: 12 };
+  const body = {
+    flex: 1,
+    overflowY: "auto",
+    padding: 12,
+  };
 
   const baseTd =
-    styles?.td ||
-    ({
+    styles?.td || {
       padding: "14px 12px",
       borderBottom: `1px solid ${C.border}`,
       fontWeight: 850,
       fontSize: 13,
       verticalAlign: "top",
-    });
+    };
 
-  const labelTd = { ...baseTd, fontWeight: 950, width: 160, color: C.primaryDark, background: "#fff" };
-  const valueTd = { ...baseTd, color: C.text, background: "#fff" };
+  const labelTd = {
+    ...baseTd,
+    fontWeight: 950,
+    width: 160,
+    color: C.primaryDark,
+    background: "#fff",
+  };
+
+  const valueTd = {
+    ...baseTd,
+    color: C.text,
+    background: "#fff",
+  };
 
   if (!record) {
     return (
@@ -484,11 +643,16 @@ export default function RecordDetailsPanel({
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {mode === "view" && (
             <>
-              <button style={btn("primary")} onClick={() => setEditing(true)}>
+              <button
+                style={btn("primary")}
+                onClick={() => {
+                  resetFormToRecord();
+                  setEditing(true);
+                }}
+              >
                 Edit
               </button>
 
-              {/* ✅ NEW BUTTON */}
               <button style={btn()} onClick={useAsTemplate}>
                 Add this data
               </button>
@@ -497,6 +661,7 @@ export default function RecordDetailsPanel({
                 <button
                   style={btn("gold")}
                   onClick={() => {
+                    resetFormToRecord();
                     setRenewing(true);
                     setEditing(false);
                   }}
@@ -512,7 +677,14 @@ export default function RecordDetailsPanel({
               <button style={btn("gold")} onClick={saveEdit} disabled={saving}>
                 {saving ? "Saving..." : "Save"}
               </button>
-              <button style={btn("danger")} onClick={() => setEditing(false)} disabled={saving}>
+              <button
+                style={btn("danger")}
+                onClick={() => {
+                  resetFormToRecord();
+                  setEditing(false);
+                }}
+                disabled={saving}
+              >
                 Cancel
               </button>
             </>
@@ -523,7 +695,14 @@ export default function RecordDetailsPanel({
               <button style={btn("gold")} onClick={saveRenew} disabled={saving}>
                 {saving ? "Saving..." : "Save Renew"}
               </button>
-              <button style={btn("danger")} onClick={() => setRenewing(false)} disabled={saving}>
+              <button
+                style={btn("danger")}
+                onClick={() => {
+                  resetFormToRecord();
+                  setRenewing(false);
+                }}
+                disabled={saving}
+              >
                 Cancel
               </button>
             </>
@@ -544,28 +723,9 @@ export default function RecordDetailsPanel({
                   <React.Fragment key={f.key}>
                     <td style={labelTd}>{f.label}</td>
                     <td style={valueTd}>
-                      {mode === "edit" || mode === "renew" ? (
-                        <input
-                          name={f.key}
-                          value={form[f.key] ?? ""}
-                          onChange={(e) => setField(f.key, e.target.value)}
-                          style={{
-                            ...inputStyle(f.key),
-                            ...(f.key === "inspectors"
-                              ? { background: "#f3f4f6", cursor: "not-allowed" }
-                              : null),
-                            ...(f.key === "fsicValidity"
-                              ? { background: "#f3f4f6", cursor: "not-allowed" }
-                              : null),
-                          }}
-                          autoComplete="off"
-                          placeholder={f.label}
-                          type={DATE_KEYS.has(f.key) ? "date" : "text"}
-                          readOnly={f.key === "inspectors" || f.key === "fsicValidity"}
-                        />
-                      ) : (
-                        (readField(record, f.key, f.aliases || []) ?? "") || "-"
-                      )}
+                      {mode === "edit" || mode === "renew"
+                        ? renderEditorField(f)
+                        : (readField(record, f.key, f.aliases || []) ?? "") || "-"}
                     </td>
                   </React.Fragment>
                 ))}
