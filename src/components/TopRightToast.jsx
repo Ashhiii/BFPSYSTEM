@@ -29,7 +29,7 @@ export default function TopRightToast({
   }, [open, autoCloseMs, onClose]);
 
   if (!open) return null;
-
+  
   const wrap = {
     position: "fixed",
     top: 16,

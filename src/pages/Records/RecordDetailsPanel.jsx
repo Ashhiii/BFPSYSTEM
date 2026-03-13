@@ -65,6 +65,7 @@ const FIELDS = [
   { key: "ntcDate", label: "NTC Date" },
 
   { key: "fsicNo", label: "FSIC No" },
+  
   { key: "fsicValidity", label: "FSIC Validity" },
 
   { key: "teamLeader", label: "Team Leader" },

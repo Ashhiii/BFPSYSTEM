@@ -437,7 +437,9 @@ export default function Records({ refresh, setRefresh }) {
           </div>
 
           <div style={scroll}>
-            <RecordsTable records={filtered} onRowClick={onSelectRow} apiBase={API} activeId={activeId} />
+            <RecordsTable records={filtered} onRowClick={onSelectRow} apiBase={API} activeId={activeId} onBulkUpdate={(updatedRecords) => {
+    setRecords(updatedRecords);
+  }} />
           </div>
         </div>
       </div>
