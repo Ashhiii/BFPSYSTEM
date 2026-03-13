@@ -1,8 +1,7 @@
 // src/pages/Records/Records.jsx
 // ✅ Close Month separated into CloseMonthControl (still connected via props)
 // ✅ Success/Error uses your TopRightToast (open/title/message)
-// ✅ NEW: Month + Year + Day filter based on dateInspected
-// ✅ Day filter updates based on selected month/year
+// ✅ NEW: Month + Year filter based on dateInspected
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -17,7 +16,7 @@ import injectTableStyles from "./injectTableStyles.jsx";
 import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
 
 import TopRightToast from "../../components/TopRightToast.jsx";
-import CloseMonthControl from "./CloseMonthControl.jsx";
+import CloseMonthControl from "./CloseMonthControl.jsx"; // ✅ NEW
 
 const MONTHS = [
   { value: "ALL", label: "All Months" },
@@ -35,53 +34,36 @@ const MONTHS = [
   { value: "12", label: "December" },
 ];
 
-// ✅ parse month/year/day from "January 2, 2026" or "2026-02-01" or Date
+// ✅ parse month/year from "January 2, 2026" or "2026-02-01" or Date
 const parseMonthYear = (val) => {
-  if (!val) return { month: null, year: null, day: null };
+  if (!val) return { month: null, year: null };
 
-  // Firestore Timestamp
+  // Firestore Timestamp (if ever)
   if (typeof val === "object" && val?.toDate) {
     const dt = val.toDate();
-    return {
-      month: dt.getMonth() + 1,
-      year: dt.getFullYear(),
-      day: dt.getDate(),
-    };
+    return { month: dt.getMonth() + 1, year: dt.getFullYear() };
   }
 
   // Date object
   if (val instanceof Date && !isNaN(val.getTime())) {
-    return {
-      month: val.getMonth() + 1,
-      year: val.getFullYear(),
-      day: val.getDate(),
-    };
+    return { month: val.getMonth() + 1, year: val.getFullYear() };
   }
 
   const s = String(val).trim();
-  if (!s) return { month: null, year: null, day: null };
+  if (!s) return { month: null, year: null };
 
   // format: YYYY-MM-DD
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) {
     const year = Number(iso[1]);
     const month = Number(iso[2]);
-    const day = Number(iso[3]);
-    return {
-      month: isNaN(month) ? null : month,
-      year: isNaN(year) ? null : year,
-      day: isNaN(day) ? null : day,
-    };
+    return { month: isNaN(month) ? null : month, year: isNaN(year) ? null : year };
   }
 
   // format: "January 2, 2026"
   const dt = new Date(s);
   if (!isNaN(dt.getTime())) {
-    return {
-      month: dt.getMonth() + 1,
-      year: dt.getFullYear(),
-      day: dt.getDate(),
-    };
+    return { month: dt.getMonth() + 1, year: dt.getFullYear() };
   }
 
   // fallback month-name contains
@@ -100,15 +82,12 @@ const parseMonthYear = (val) => {
     november: 11,
     december: 12,
   };
-
   const found = Object.keys(map).find((m) => lower.includes(m));
   const yearMatch = s.match(/\b(19\d{2}|20\d{2})\b/);
-  const dayMatch = s.match(/\b([1-9]|[12]\d|3[01])\b/);
 
   return {
     month: found ? map[found] : null,
     year: yearMatch ? Number(yearMatch[1]) : null,
-    day: dayMatch ? Number(dayMatch[1]) : null,
   };
 };
 
@@ -121,15 +100,14 @@ export default function Records({ refresh, setRefresh }) {
   // ✅ FULLSCREEN
   const [showDetails, setShowDetails] = useState(false);
 
-  // ✅ Toast state
+  // ✅ Toast state (matches TopRightToast props)
   const [toastOpen, setToastOpen] = useState(false);
   const [toastTitle, setToastTitle] = useState("Success");
   const [toastMsg, setToastMsg] = useState("");
 
-  // ✅ Filters
-  const [monthFilter, setMonthFilter] = useState("ALL");
-  const [yearFilter, setYearFilter] = useState("ALL");
-  const [dayFilter, setDayFilter] = useState("ALL");
+  // ✅ NEW: Month + Year filters
+  const [monthFilter, setMonthFilter] = useState("ALL"); // "ALL" or 1..12
+  const [yearFilter, setYearFilter] = useState("ALL"); // "ALL" or "2026"
 
   const location = useLocation();
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -171,59 +149,24 @@ export default function Records({ refresh, setRefresh }) {
       const { year } = parseMonthYear(r.dateInspected);
       if (year) set.add(year);
     });
-
-    const years = Array.from(set)
-      .sort((a, b) => b - a)
-      .map(String);
-
+    const years = Array.from(set).sort((a, b) => b - a).map(String);
     return ["ALL", ...years];
   }, [records]);
-
-  // ✅ Day options depend on selected month/year
-  const dayOptions = useMemo(() => {
-    const wantMonth = monthFilter === "ALL" ? null : Number(monthFilter);
-    const wantYear = yearFilter === "ALL" ? null : Number(yearFilter);
-
-    const set = new Set();
-
-    (records || []).forEach((r) => {
-      const { month, year, day } = parseMonthYear(r.dateInspected);
-
-      if (!day) return;
-      if (wantMonth && month !== wantMonth) return;
-      if (wantYear && year !== wantYear) return;
-
-      set.add(day);
-    });
-
-    const days = Array.from(set)
-      .sort((a, b) => a - b)
-      .map(String);
-
-    return ["ALL", ...days];
-  }, [records, monthFilter, yearFilter]);
-
-  // ✅ Reset invalid day if month/year changes
-  useEffect(() => {
-    if (dayFilter !== "ALL" && !dayOptions.includes(dayFilter)) {
-      setDayFilter("ALL");
-    }
-  }, [dayFilter, dayOptions]);
 
   const filtered = useMemo(() => {
     const key = search.toLowerCase().trim();
 
     const wantMonth = monthFilter === "ALL" ? null : Number(monthFilter);
     const wantYear = yearFilter === "ALL" ? null : Number(yearFilter);
-    const wantDay = dayFilter === "ALL" ? null : Number(dayFilter);
 
     return (records || []).filter((r) => {
-      const { month, year, day } = parseMonthYear(r.dateInspected);
+      // ✅ Month/Year filter based on dateInspected
+      const { month, year } = parseMonthYear(r.dateInspected);
 
       if (wantMonth && month !== wantMonth) return false;
       if (wantYear && year !== wantYear) return false;
-      if (wantDay && day !== wantDay) return false;
 
+      // ✅ Search filter
       if (!key) return true;
 
       return (
@@ -235,18 +178,17 @@ export default function Records({ refresh, setRefresh }) {
         (r.inspectors || "").toLowerCase().includes(key)
       );
     });
-  }, [records, search, monthFilter, yearFilter, dayFilter]);
+  }, [records, search, monthFilter, yearFilter]);
 
   const onSelectRow = (record) => {
     if (!record) return;
 
-    setActiveId(record.id);
+    setActiveId(record.id); // ✅ highlight
 
     const fixed = {
       ...record,
       entityKey: record.entityKey || (record.fsicAppNo ? `fsic:${record.fsicAppNo}` : ""),
     };
-
     setSelectedRecord(fixed);
     setShowDetails(true);
   };
@@ -256,8 +198,8 @@ export default function Records({ refresh, setRefresh }) {
     const navActiveId = location.state?.activeId;
 
     if (navActiveId && (records || []).length) {
-      setActiveId(navActiveId);
-      window.history.replaceState({}, document.title);
+      setActiveId(navActiveId); // ✅ highlight only (no details)
+      window.history.replaceState({}, document.title); // clear state
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, records]);
@@ -403,13 +345,11 @@ export default function Records({ refresh, setRefresh }) {
     },
   };
 
-  const fullTitle =
-    selectedRecord?.establishmentName ||
-    selectedRecord?.fsicAppNo ||
-    "Record Details";
+  const fullTitle = selectedRecord?.establishmentName || selectedRecord?.fsicAppNo || "Record Details";
 
   return (
     <div style={page}>
+      {/* ✅ YOUR TOP RIGHT TOAST */}
       <TopRightToast
         C={C}
         open={toastOpen}
@@ -425,6 +365,7 @@ export default function Records({ refresh, setRefresh }) {
           <div style={hSub}>View current records + details + close month</div>
         </div>
 
+        {/* ✅ SEPARATED CLOSE MONTH (still connected) */}
         <CloseMonthControl
           C={C}
           buttonStyle={btnRed}
@@ -436,9 +377,8 @@ export default function Records({ refresh, setRefresh }) {
             setShowDetails(false);
             setSearch("");
             setActiveId(null);
-            setMonthFilter("ALL");
+            setMonthFilter("ALL"); // ✅ reset filters too
             setYearFilter("ALL");
-            setDayFilter("ALL");
           }}
         />
       </div>
@@ -446,29 +386,20 @@ export default function Records({ refresh, setRefresh }) {
       <div style={topbar}>
         <div style={topbarInner}>
           <div style={{ minWidth: 220 }}>
-            <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>
-              Current Records
-            </div>
+            <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>Current Records</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 4 }}>
               Click a row → details opens full screen
             </div>
           </div>
 
-          <input
+           <input
             placeholder="🔍 Search records..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={input}
           />
 
-          <select
-            value={monthFilter}
-            onChange={(e) => {
-              setMonthFilter(e.target.value);
-              setDayFilter("ALL");
-            }}
-            style={select}
-          >
+          <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} style={select}>
             {MONTHS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
@@ -476,30 +407,10 @@ export default function Records({ refresh, setRefresh }) {
             ))}
           </select>
 
-          <select
-            value={yearFilter}
-            onChange={(e) => {
-              setYearFilter(e.target.value);
-              setDayFilter("ALL");
-            }}
-            style={select}
-          >
+          <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} style={select}>
             {yearOptions.map((y) => (
               <option key={y} value={y}>
                 {y === "ALL" ? "All Years" : y}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={dayFilter}
-            onChange={(e) => setDayFilter(e.target.value)}
-            style={select}
-            disabled={dayOptions.length <= 1}
-          >
-            {dayOptions.map((d) => (
-              <option key={d} value={d}>
-                {d === "ALL" ? "All Days" : d}
               </option>
             ))}
           </select>
@@ -509,7 +420,6 @@ export default function Records({ refresh, setRefresh }) {
             onClick={() => {
               setMonthFilter("ALL");
               setYearFilter("ALL");
-              setDayFilter("ALL");
             }}
           >
             Reset Filters
@@ -527,24 +437,14 @@ export default function Records({ refresh, setRefresh }) {
           </div>
 
           <div style={scroll}>
-            <RecordsTable
-              records={filtered}
-              onRowClick={onSelectRow}
-              apiBase={API}
-              activeId={activeId}
-              onBulkUpdate={(updatedRecords) => {
-                setRecords(updatedRecords);
-              }}
-            />
+            <RecordsTable records={filtered} onRowClick={onSelectRow} apiBase={API} activeId={activeId} onBulkUpdate={(updatedRecords) => {
+    setRecords(updatedRecords);
+  }} />
           </div>
         </div>
       </div>
 
-      <DetailsFullScreen
-        open={showDetails}
-        title={fullTitle}
-        onClose={() => setShowDetails(false)}
-      >
+      <DetailsFullScreen open={showDetails} title={fullTitle} onClose={() => setShowDetails(false)}>
         <RecordDetailsPanel
           styles={panelStyles}
           record={selectedRecord}

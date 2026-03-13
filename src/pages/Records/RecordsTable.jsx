@@ -1,5 +1,35 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopRightToast from "../../components/TopRightToast";
+
+const parseDayOnly = (val) => {
+  if (!val) return null;
+
+  if (typeof val === "object" && val?.toDate) {
+    const dt = val.toDate();
+    return dt.getDate();
+  }
+
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return val.getDate();
+  }
+
+  const s = String(val).trim();
+  if (!s) return null;
+
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const day = Number(iso[3]);
+    return Number.isNaN(day) ? null : day;
+  }
+
+  const dt = new Date(s);
+  if (!Number.isNaN(dt.getTime())) {
+    return dt.getDate();
+  }
+
+  const dayMatch = s.match(/\b([1-9]|[12]\d|3[01])\b/);
+  return dayMatch ? Number(dayMatch[1]) : null;
+};
 
 export default function RecordsTable({
   records = [],
@@ -134,31 +164,6 @@ export default function RecordsTable({
       color: C.selectedText,
     },
 
-    pasteHint: {
-      padding: "10px 12px",
-      fontSize: 12,
-      fontWeight: 800,
-      color: C.primaryDark,
-      background: "#fff7f7",
-      borderBottom: `1px solid ${C.border}`,
-      display: "flex",
-      gap: 10,
-      alignItems: "center",
-      flexWrap: "wrap",
-    },
-
-    badge: {
-      display: "inline-flex",
-      alignItems: "center",
-      padding: "4px 8px",
-      borderRadius: 999,
-      background: C.softBg,
-      color: C.primaryDark,
-      fontSize: 11,
-      fontWeight: 900,
-      border: `1px solid #fecaca`,
-    },
-
     headerFilterWrap: {
       position: "relative",
       display: "inline-flex",
@@ -194,7 +199,7 @@ export default function RecordsTable({
       position: "absolute",
       top: "calc(100% + 8px)",
       right: 0,
-      width: 150,
+      width: 240,
       background: "#fff",
       border: `1px solid ${C.border}`,
       borderRadius: 10,
@@ -202,7 +207,7 @@ export default function RecordsTable({
       zIndex: 9999,
       display: "flex",
       flexDirection: "column",
-      overflow: "visible",
+      overflow: "hidden",
     },
 
     headerDropdownBtn: {
@@ -223,17 +228,85 @@ export default function RecordsTable({
       background: "#fee2e2",
       color: "#7f1d1d",
     },
+
+    popupSection: {
+      padding: 12,
+      borderBottom: `1px solid ${C.border}`,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      background: "#fff",
+    },
+
+    popupLabel: {
+      fontSize: 11,
+      fontWeight: 900,
+      color: C.primaryDark,
+    },
+
+    popupRow: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8,
+    },
+
+    popupInput: {
+      width: "100%",
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: `1px solid ${C.border}`,
+      background: "#fff",
+      color: C.text,
+      fontSize: 12,
+      fontWeight: 800,
+      outline: "none",
+      boxSizing: "border-box",
+    },
+
+    popupActions: {
+      padding: 10,
+      display: "flex",
+      gap: 8,
+      justifyContent: "flex-end",
+      background: "#fff",
+    },
+
+    popupActionBtn: {
+      border: `1px solid ${C.border}`,
+      background: "#fff",
+      color: C.text,
+      borderRadius: 8,
+      padding: "8px 10px",
+      fontSize: 12,
+      fontWeight: 800,
+      cursor: "pointer",
+    },
+
+    popupActionBtnPrimary: {
+      border: `1px solid ${C.primary}`,
+      background: C.primary,
+      color: "#fff",
+      borderRadius: 8,
+      padding: "8px 10px",
+      fontSize: 12,
+      fontWeight: 800,
+      cursor: "pointer",
+    },
   };
 
   const activeRowRef = useRef(null);
   const containerRef = useRef(null);
-  const pasteBoxRef = useRef(null);
   const fsicMenuRef = useRef(null);
+  const dateMenuRef = useRef(null);
 
   const [selectedFsicRows, setSelectedFsicRows] = useState([]);
-  const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
+  const [lastSelectedId, setLastSelectedId] = useState(null);
   const [fsicFilterMode, setFsicFilterMode] = useState("all");
   const [fsicMenuOpen, setFsicMenuOpen] = useState(false);
+
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const [dateFromDay, setDateFromDay] = useState("");
+  const [dateToDay, setDateToDay] = useState("");
 
   const [toast, setToast] = useState({
     open: false,
@@ -242,6 +315,13 @@ export default function RecordsTable({
   });
 
   const [undoStack, setUndoStack] = useState([]);
+
+  const recordIds = useMemo(() => records.map((r) => r?.id), [records]);
+
+  const getIndexById = useCallback(
+    (id) => recordIds.findIndex((x) => x === id),
+    [recordIds]
+  );
 
   const handleGenerateChange = (value, record, e) => {
     e.stopPropagation();
@@ -259,12 +339,103 @@ export default function RecordsTable({
       url = `${API}/records/${record.id}/certificate/bfp-new/pdf`;
     }
 
-    if (url) {
-      window.open(url, "_blank");
-    }
+    if (url) window.open(url, "_blank");
 
     e.target.value = "";
   };
+
+  const sanitizeDayInput = (value) => {
+    if (value === "") return "";
+    const digits = String(value).replace(/[^\d]/g, "");
+    if (!digits) return "";
+    const num = Number(digits);
+    if (Number.isNaN(num)) return "";
+    if (num < 1) return "1";
+    if (num > 31) return "31";
+    return String(num);
+  };
+
+  const applyDateFilter = () => {
+    const fromNum = dateFromDay === "" ? null : Number(dateFromDay);
+    const toNum = dateToDay === "" ? null : Number(dateToDay);
+
+    if (fromNum !== null && (fromNum < 1 || fromNum > 31)) {
+      setToast({
+        open: true,
+        title: "Invalid Day",
+        message: "Day From must be between 1 and 31.",
+      });
+      return;
+    }
+
+    if (toNum !== null && (toNum < 1 || toNum > 31)) {
+      setToast({
+        open: true,
+        title: "Invalid Day",
+        message: "Day To must be between 1 and 31.",
+      });
+      return;
+    }
+
+    if (fromNum !== null && toNum !== null && fromNum > toNum) {
+      setToast({
+        open: true,
+        title: "Invalid Range",
+        message: "Day From should not be greater than Day To.",
+      });
+      return;
+    }
+
+    setDateMenuOpen(false);
+  };
+
+  const applyPasteValues = useCallback(
+    (text) => {
+      if (!selectedFsicRows.length) return;
+      if (typeof onBulkUpdate !== "function") return;
+      if (!text) return;
+
+      const values = text
+        .replace(/\r/g, "")
+        .split(/\n|\t/)
+        .map((v) => v.trim())
+        .filter((v) => v !== "");
+
+      if (!values.length) return;
+
+      const updated = [...records];
+      setUndoStack((prev) => [...prev, records]);
+
+      const targetRows = [...selectedFsicRows].sort(
+        (a, b) => getIndexById(a) - getIndexById(b)
+      );
+
+      if (values.length === 1) {
+        targetRows.forEach((rowId) => {
+          const rowIndex = updated.findIndex((row) => row?.id === rowId);
+          if (updated[rowIndex]) {
+            updated[rowIndex] = {
+              ...updated[rowIndex],
+              fsicNo: values[0],
+            };
+          }
+        });
+      } else {
+        targetRows.forEach((rowId, i) => {
+          const rowIndex = updated.findIndex((row) => row?.id === rowId);
+          if (updated[rowIndex] && values[i] !== undefined) {
+            updated[rowIndex] = {
+              ...updated[rowIndex],
+              fsicNo: values[i],
+            };
+          }
+        });
+      }
+
+      onBulkUpdate(updated);
+    },
+    [selectedFsicRows, onBulkUpdate, records, getIndexById]
+  );
 
   useEffect(() => {
     if (activeRowRef.current) {
@@ -273,34 +444,55 @@ export default function RecordsTable({
         block: "center",
       });
     }
-  }, [activeId, fsicFilterMode]);
+  }, [activeId, fsicFilterMode, dateFromDay, dateToDay]);
 
   const sortedSelectedRows = useMemo(() => {
-    return [...selectedFsicRows].sort((a, b) => a - b);
-  }, [selectedFsicRows]);
+    return [...selectedFsicRows].sort(
+      (a, b) => getIndexById(a) - getIndexById(b)
+    );
+  }, [selectedFsicRows, getIndexById]);
 
   const visibleRows = useMemo(() => {
-    if (fsicFilterMode === "selected") {
-      return sortedSelectedRows
-        .map((originalIndex) => ({
-          row: records[originalIndex],
-          originalIndex,
-        }))
-        .filter((item) => item.row);
+    let baseRows =
+      fsicFilterMode === "selected"
+        ? sortedSelectedRows
+            .map((selectedId) => {
+              const originalIndex = records.findIndex(
+                (row) => row?.id === selectedId
+              );
+              return {
+                row: records[originalIndex],
+                originalIndex,
+              };
+            })
+            .filter((item) => item.row)
+        : records.map((row, originalIndex) => ({
+            row,
+            originalIndex,
+          }));
+
+    const fromDay = dateFromDay === "" ? null : Number(dateFromDay);
+    const toDay = dateToDay === "" ? null : Number(dateToDay);
+
+    if (fromDay !== null || toDay !== null) {
+      baseRows = baseRows.filter(({ row }) => {
+        const day = parseDayOnly(row?.dateInspected);
+        if (day == null) return false;
+        if (fromDay !== null && day < fromDay) return false;
+        if (toDay !== null && day > toDay) return false;
+        return true;
+      });
     }
 
-    return records.map((row, originalIndex) => ({
-      row,
-      originalIndex,
-    }));
-  }, [records, fsicFilterMode, sortedSelectedRows]);
+    return baseRows;
+  }, [records, fsicFilterMode, sortedSelectedRows, dateFromDay, dateToDay]);
 
   const clearSelection = () => {
     setSelectedFsicRows([]);
-    setLastSelectedIndex(null);
+    setLastSelectedId(null);
   };
 
-  const handleFsicCellClick = (rowIndex, e) => {
+  const handleFsicCellClick = (rowId, e) => {
     e.stopPropagation();
 
     const isCtrl = e.ctrlKey || e.metaKey;
@@ -309,87 +501,74 @@ export default function RecordsTable({
     setSelectedFsicRows((prev) => {
       let next = [...prev];
 
-      if (isShift && lastSelectedIndex !== null) {
-        const start = Math.min(lastSelectedIndex, rowIndex);
-        const end = Math.max(lastSelectedIndex, rowIndex);
-        const range = [];
-        for (let i = start; i <= end; i++) range.push(i);
+      const currentIndex = getIndexById(rowId);
+      const lastIndex = lastSelectedId ? getIndexById(lastSelectedId) : null;
+
+      if (isShift && lastIndex !== null && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+
+        const rangeIds = records
+          .slice(start, end + 1)
+          .map((r) => r?.id)
+          .filter(Boolean);
 
         if (isCtrl) {
-          const set = new Set([...prev, ...range]);
+          const set = new Set([...prev, ...rangeIds]);
           next = [...set];
         } else {
-          next = range;
+          next = rangeIds;
         }
       } else if (isCtrl) {
-        if (next.includes(rowIndex)) {
-          next = next.filter((i) => i !== rowIndex);
+        if (next.includes(rowId)) {
+          next = next.filter((id) => id !== rowId);
         } else {
-          next.push(rowIndex);
+          next.push(rowId);
         }
       } else {
-        next = [rowIndex];
+        next = [rowId];
       }
 
-      return next.sort((a, b) => a - b);
+      return next;
     });
 
-    setLastSelectedIndex(rowIndex);
-
-    setTimeout(() => {
-      pasteBoxRef.current?.focus();
-    }, 0);
-  };
-
-  const handlePaste = (e) => {
-    if (!selectedFsicRows.length) return;
-
-    const text = e.clipboardData.getData("text");
-    if (!text) return;
-
-    e.preventDefault();
-
-    const values = text
-      .replace(/\r/g, "")
-      .split(/\n|\t/)
-      .map((v) => v.trim())
-      .filter((v) => v !== "");
-
-    if (!values.length) return;
-    if (typeof onBulkUpdate !== "function") return;
-
-    const updated = [...records];
-    setUndoStack((prev) => [...prev, records]);
-
-    const targetRows = [...selectedFsicRows].sort((a, b) => a - b);
-
-    if (values.length === 1) {
-      targetRows.forEach((rowIndex) => {
-        if (updated[rowIndex]) {
-          updated[rowIndex] = {
-            ...updated[rowIndex],
-            fsicNo: values[0],
-          };
-        }
-      });
-    } else {
-      targetRows.forEach((rowIndex, i) => {
-        if (updated[rowIndex] && values[i] !== undefined) {
-          updated[rowIndex] = {
-            ...updated[rowIndex],
-            fsicNo: values[i],
-          };
-        }
-      });
-    }
-
-    onBulkUpdate(updated);
+    setLastSelectedId(rowId);
   };
 
   useEffect(() => {
+    const handleGlobalPaste = (e) => {
+      if (!selectedFsicRows.length) return;
+      if (typeof onBulkUpdate !== "function") return;
+
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName?.toLowerCase();
+      const isContentEditable = activeEl?.isContentEditable;
+
+      if (
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        isContentEditable
+      ) {
+        return;
+      }
+
+      const text = e.clipboardData?.getData("text");
+      if (!text) return;
+
+      e.preventDefault();
+      applyPasteValues(text);
+    };
+
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => window.removeEventListener("paste", handleGlobalPaste);
+  }, [selectedFsicRows, onBulkUpdate, applyPasteValues]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         if (undoStack.length && typeof onBulkUpdate === "function") {
+          e.preventDefault();
           const last = undoStack[undoStack.length - 1];
           setUndoStack((prev) => prev.slice(0, -1));
           onBulkUpdate(last);
@@ -397,15 +576,30 @@ export default function RecordsTable({
         }
       }
 
-      if (selectedFsicRows.length && (e.key === "Delete" || e.key === "Backspace")) {
+      if (
+        selectedFsicRows.length &&
+        (e.key === "Delete" || e.key === "Backspace")
+      ) {
         const activeEl = document.activeElement;
         const tag = activeEl?.tagName?.toLowerCase();
+        const isContentEditable = activeEl?.isContentEditable;
 
-        if (tag === "input" || tag === "textarea" || tag === "select") return;
+        if (
+          tag === "input" ||
+          tag === "textarea" ||
+          tag === "select" ||
+          isContentEditable
+        ) {
+          return;
+        }
+
+        e.preventDefault();
 
         const updated = [...records];
+        setUndoStack((prev) => [...prev, records]);
 
-        selectedFsicRows.forEach((rowIndex) => {
+        selectedFsicRows.forEach((rowId) => {
+          const rowIndex = updated.findIndex((row) => row?.id === rowId);
           if (updated[rowIndex]) {
             updated[rowIndex] = {
               ...updated[rowIndex],
@@ -414,12 +608,15 @@ export default function RecordsTable({
           }
         });
 
-        onBulkUpdate(updated);
+        if (typeof onBulkUpdate === "function") {
+          onBulkUpdate(updated);
+        }
       }
 
       if (e.key === "Escape") {
         clearSelection();
         setFsicMenuOpen(false);
+        setDateMenuOpen(false);
       }
     };
 
@@ -432,6 +629,9 @@ export default function RecordsTable({
       if (fsicMenuRef.current && !fsicMenuRef.current.contains(e.target)) {
         setFsicMenuOpen(false);
       }
+      if (dateMenuRef.current && !dateMenuRef.current.contains(e.target)) {
+        setDateMenuOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -443,9 +643,20 @@ export default function RecordsTable({
       ref={containerRef}
       style={S.tableWrap}
       onClick={(e) => {
-        const clickedInsideFsicCell = e.target.closest?.("[data-fsic-cell='true']");
-        const clickedInsideHeaderFilter = e.target.closest?.("[data-fsic-header-filter='true']");
-        if (!clickedInsideFsicCell && !clickedInsideHeaderFilter) {
+        const clickedInsideFsicCell =
+          e.target.closest?.("[data-fsic-cell='true']");
+        const clickedInsideHeaderFilter = e.target.closest?.(
+          "[data-fsic-header-filter='true']"
+        );
+        const clickedInsideDateFilter = e.target.closest?.(
+          "[data-date-header-filter='true']"
+        );
+
+        if (
+          !clickedInsideFsicCell &&
+          !clickedInsideHeaderFilter &&
+          !clickedInsideDateFilter
+        ) {
           clearSelection();
         }
       }}
@@ -456,22 +667,6 @@ export default function RecordsTable({
         title={toast.title}
         message={toast.message}
         onClose={() => setToast((t) => ({ ...t, open: false }))}
-      />
-
-      <textarea
-        ref={pasteBoxRef}
-        onPaste={handlePaste}
-        aria-hidden="true"
-        tabIndex={-1}
-        style={{
-          position: "fixed",
-          left: -99999,
-          top: -99999,
-          opacity: 0,
-          width: 1,
-          height: 1,
-          pointerEvents: "none",
-        }}
       />
 
       <table style={S.table}>
@@ -496,19 +691,24 @@ export default function RecordsTable({
                   <button
                     type="button"
                     style={S.headerArrowBtn}
-                    onClick={() => setFsicMenuOpen((prev) => !prev)}
+                    onClick={() => {
+                      setFsicMenuOpen((prev) => !prev);
+                      setDateMenuOpen(false);
+                    }}
                     title="Filter FSIC rows"
                   >
                     ▼
                   </button>
 
                   {fsicMenuOpen && (
-                    <div style={S.headerDropdown}>
+                    <div style={{ ...S.headerDropdown, width: 150 }}>
                       <button
                         type="button"
                         style={{
                           ...S.headerDropdownBtn,
-                          ...(fsicFilterMode === "all" ? S.headerDropdownBtnActive : {}),
+                          ...(fsicFilterMode === "all"
+                            ? S.headerDropdownBtnActive
+                            : {}),
                         }}
                         onClick={() => {
                           setFsicFilterMode("all");
@@ -532,7 +732,8 @@ export default function RecordsTable({
                             setToast({
                               open: true,
                               title: "No Rows Selected",
-                              message: "Highlight rows first before filtering.",
+                              message:
+                                "Highlight rows first before filtering.",
                             });
                             return;
                           }
@@ -548,7 +749,90 @@ export default function RecordsTable({
               </div>
             </th>
 
-            <th style={{ ...S.th, width: "10%" }}>Date</th>
+            <th style={{ ...S.th, width: "10%" }}>
+              <div style={S.headerFilterWrap}>
+                <span style={{ ...wrap, fontWeight: 900 }}>Date</span>
+
+                <div
+                  ref={dateMenuRef}
+                  style={S.headerFilterRight}
+                  data-date-header-filter="true"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    style={S.headerArrowBtn}
+                    onClick={() => {
+                      setDateMenuOpen((prev) => !prev);
+                      setFsicMenuOpen(false);
+                    }}
+                    title="Filter date range"
+                  >
+                    ▼
+                  </button>
+
+                  {dateMenuOpen && (
+                    <div style={S.headerDropdown}>
+                      <div style={S.popupSection}>
+                        <div style={S.popupLabel}>Filter day range</div>
+
+                        <div style={S.popupRow}>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            placeholder="From"
+                            value={dateFromDay}
+                            onChange={(e) =>
+                              setDateFromDay(
+                                sanitizeDayInput(e.target.value)
+                              )
+                            }
+                            style={S.popupInput}
+                          />
+
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            placeholder="To"
+                            value={dateToDay}
+                            onChange={(e) =>
+                              setDateToDay(
+                                sanitizeDayInput(e.target.value)
+                              )
+                            }
+                            style={S.popupInput}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={S.popupActions}>
+                        <button
+                          type="button"
+                          style={S.popupActionBtn}
+                          onClick={() => {
+                            setDateFromDay("");
+                            setDateToDay("");
+                          }}
+                        >
+                          Reset
+                        </button>
+
+                        <button
+                          type="button"
+                          style={S.popupActionBtnPrimary}
+                          onClick={applyDateFilter}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </th>
+
             <th style={{ ...S.th, width: "25%" }}>Generate</th>
           </tr>
         </thead>
@@ -557,15 +841,13 @@ export default function RecordsTable({
           {visibleRows.length === 0 ? (
             <tr>
               <td colSpan={8} style={S.empty}>
-                {fsicFilterMode === "selected"
-                  ? "No selected rows to show"
-                  : "No records found"}
+                No records found
               </td>
             </tr>
           ) : (
             visibleRows.map(({ row: r, originalIndex }, visibleIndex) => {
               const isActive = activeId && r.id === activeId;
-              const isFsicSelected = selectedFsicRows.includes(originalIndex);
+              const isFsicSelected = selectedFsicRows.includes(r.id);
 
               return (
                 <tr
@@ -578,7 +860,9 @@ export default function RecordsTable({
                       : visibleIndex % 2 === 0
                       ? "#fff"
                       : "#fafafa",
-                    boxShadow: isActive ? "inset 0 0 0 2px #b91c1c" : "none",
+                    boxShadow: isActive
+                      ? "inset 0 0 0 2px #b91c1c"
+                      : "none",
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) e.currentTarget.style.background = "#fff1f2";
@@ -618,7 +902,7 @@ export default function RecordsTable({
                       ...S.fsicCell,
                       ...(isFsicSelected ? S.fsicCellSelected : {}),
                     }}
-                    onClick={(e) => handleFsicCellClick(originalIndex, e)}
+                    onClick={(e) => handleFsicCellClick(r.id, e)}
                     title="Click / Ctrl+Click / Shift+Click then paste"
                   >
                     <div style={wrap}>{r.fsicNo || "-"}</div>
@@ -636,7 +920,9 @@ export default function RecordsTable({
                       <select
                         defaultValue=""
                         style={S.select}
-                        onChange={(e) => handleGenerateChange(e.target.value, r, e)}
+                        onChange={(e) =>
+                          handleGenerateChange(e.target.value, r, e)
+                        }
                       >
                         <option value="" disabled>
                           Select template
