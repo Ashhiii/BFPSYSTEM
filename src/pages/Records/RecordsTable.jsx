@@ -31,6 +31,132 @@ const parseDayOnly = (val) => {
   return dayMatch ? Number(dayMatch[1]) : null;
 };
 
+const parseToDate = (val) => {
+  if (!val) return null;
+
+  if (typeof val === "object" && val?.toDate) {
+    const dt = val.toDate();
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+
+  if (val instanceof Date && !Number.isNaN(val.getTime())) {
+    return val;
+  }
+
+  const s = String(val).trim();
+  if (!s) return null;
+
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const dt = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+
+  const dt = new Date(s);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+};
+
+const isSameDate = (a, b) => {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
+
+const getStartOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + diff);
+  return d;
+};
+
+const matchesQuickDateFilter = (date, mode) => {
+  if (!date) return false;
+  if (mode === "all") return true;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const rowDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (mode === "today") {
+    return isSameDate(rowDate, today);
+  }
+
+  if (mode === "earlier-week") {
+    const startOfWeek = getStartOfWeek(today);
+    return rowDate >= startOfWeek && rowDate < today;
+  }
+
+  if (mode === "this-month") {
+    return (
+      rowDate.getFullYear() === today.getFullYear() &&
+      rowDate.getMonth() === today.getMonth()
+    );
+  }
+
+  if (mode === "this-year") {
+    return rowDate.getFullYear() === today.getFullYear();
+  }
+
+  if (mode === "old") {
+    return rowDate.getFullYear() < today.getFullYear();
+  }
+
+  return true;
+};
+
+const DATE_CHECK_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "earlier-week", label: "Earlier This Week" },
+  { value: "this-month", label: "This Month" },
+  { value: "this-year", label: "This Year" },
+  { value: "old", label: "Old" },
+];
+
+const NATURE_OPTIONS = [
+  { value: "ALL", label: "All" },
+  { value: "NEW", label: "NEW" },
+  { value: "RENEW", label: "RENEW" },
+  { value: "RE-INSPECTION", label: "RE-INSPECTION" },
+  { value: "ANNUAL", label: "ANNUAL" },
+  { value: "CLOSED", label: "CLOSED" },
+  { value: "REFUSED", label: "REFUSED" },
+  { value: "TRANSFER", label: "TRANSFER" },
+  { value: "NTC", label: "NTC" },
+];
+
+const normalizeText = (value) => String(value || "").trim().toUpperCase();
+
+const matchesNatureFilter = (value, filter) => {
+  if (filter === "ALL") return true;
+
+  const text = normalizeText(value);
+
+  if (filter === "RE-INSPECTION") {
+    return (
+      text.includes("RE-INSPECTION") ||
+      text.includes("RE INSPECTION") ||
+      text.includes("REINSPECTION")
+    );
+  }
+
+  if (filter === "TRANSFER") return text.includes("TRANSFER");
+  if (filter === "REFUSED") return text.includes("REFUSED");
+  if (filter === "CLOSED") return text.includes("CLOSED");
+  if (filter === "ANNUAL") return text.includes("ANNUAL");
+  if (filter === "RENEW") return text.includes("RENEW");
+  if (filter === "NEW") return text === "NEW" || text.startsWith("NEW ");
+  if (filter === "NTC") return text.includes("NTC");
+
+  return text.includes(filter);
+};
+
+const isNatureNTC = (value) => normalizeText(value).includes("NTC");
+
 export default function RecordsTable({
   records = [],
   onRowClick,
@@ -57,6 +183,9 @@ export default function RecordsTable({
     selectedBg: "#fee2e2",
     selectedBorder: "#dc2626",
     selectedText: "#7f1d1d",
+    ntcBg: "#dc2626",
+    ntcText: "#ffffff",
+    ntcBorder: "#b91c1c",
   };
 
   const S = {
@@ -95,6 +224,7 @@ export default function RecordsTable({
       borderBottom: `1px solid ${C.border}`,
       color: C.text,
       verticalAlign: "middle",
+      background: "transparent",
     },
 
     row: {
@@ -106,6 +236,7 @@ export default function RecordsTable({
       padding: "10px",
       borderBottom: `1px solid ${C.border}`,
       textAlign: "left",
+      background: "transparent",
     },
 
     selectWrap: {
@@ -132,6 +263,24 @@ export default function RecordsTable({
       lineHeight: 1.2,
     },
 
+    ntcSelect: {
+      width: "100%",
+      padding: "8px 34px 8px 12px",
+      borderRadius: 10,
+      fontSize: 12,
+      fontWeight: 800,
+      border: "1px solid rgba(255,255,255,.35)",
+      background: "rgba(255,255,255,.12)",
+      color: "#ffffff",
+      outline: "none",
+      cursor: "pointer",
+      appearance: "none",
+      WebkitAppearance: "none",
+      MozAppearance: "none",
+      boxSizing: "border-box",
+      lineHeight: 1.2,
+    },
+
     selectArrow: {
       position: "absolute",
       right: 12,
@@ -140,6 +289,17 @@ export default function RecordsTable({
       pointerEvents: "none",
       fontSize: 10,
       color: C.muted,
+      fontWeight: 900,
+    },
+
+    ntcSelectArrow: {
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      transform: "translateY(-50%)",
+      pointerEvents: "none",
+      fontSize: 10,
+      color: "#ffffff",
       fontWeight: 900,
     },
 
@@ -156,6 +316,7 @@ export default function RecordsTable({
       borderLeft: "1px solid transparent",
       borderRight: "1px solid transparent",
       transition: "all .12s ease",
+      background: "transparent",
     },
 
     fsicCellSelected: {
@@ -199,7 +360,7 @@ export default function RecordsTable({
       position: "absolute",
       top: "calc(100% + 8px)",
       right: 0,
-      width: 240,
+      width: 260,
       background: "#fff",
       border: `1px solid ${C.border}`,
       borderRadius: 10,
@@ -269,6 +430,7 @@ export default function RecordsTable({
       gap: 8,
       justifyContent: "flex-end",
       background: "#fff",
+      borderBottom: `1px solid ${C.border}`,
     },
 
     popupActionBtn: {
@@ -292,12 +454,61 @@ export default function RecordsTable({
       fontWeight: 800,
       cursor: "pointer",
     },
+
+    checkListWrap: {
+      padding: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      background: "#fff",
+    },
+
+    checkItem: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      fontSize: 12,
+      fontWeight: 800,
+      color: C.text,
+      cursor: "pointer",
+      userSelect: "none",
+    },
+
+    checkInput: {
+      width: 15,
+      height: 15,
+      cursor: "pointer",
+      accentColor: C.primary,
+      flexShrink: 0,
+    },
+
+    helperText: {
+      fontSize: 11,
+      color: C.muted,
+      fontWeight: 700,
+      marginTop: 4,
+    },
+
+    ntcTd: {
+      background: "transparent",
+      color: "#ffffff",
+      borderBottom: `1px solid ${C.ntcBorder}`,
+    },
+
+    ntcGenerateTd: {
+      padding: "10px",
+      textAlign: "left",
+      background: "transparent",
+      color: "#ffffff",
+      borderBottom: `1px solid ${C.ntcBorder}`,
+    },
   };
 
   const activeRowRef = useRef(null);
   const containerRef = useRef(null);
   const fsicMenuRef = useRef(null);
   const dateMenuRef = useRef(null);
+  const natureMenuRef = useRef(null);
 
   const [selectedFsicRows, setSelectedFsicRows] = useState([]);
   const [lastSelectedId, setLastSelectedId] = useState(null);
@@ -307,6 +518,10 @@ export default function RecordsTable({
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const [dateFromDay, setDateFromDay] = useState("");
   const [dateToDay, setDateToDay] = useState("");
+  const [dateQuickFilter, setDateQuickFilter] = useState("all");
+
+  const [natureMenuOpen, setNatureMenuOpen] = useState(false);
+  const [natureFilter, setNatureFilter] = useState("ALL");
 
   const [toast, setToast] = useState({
     open: false,
@@ -340,7 +555,6 @@ export default function RecordsTable({
     }
 
     if (url) window.open(url, "_blank");
-
     e.target.value = "";
   };
 
@@ -387,6 +601,10 @@ export default function RecordsTable({
     }
 
     setDateMenuOpen(false);
+  };
+
+  const handleQuickCheck = (value) => {
+    setDateQuickFilter((prev) => (prev === value ? "all" : value));
   };
 
   const applyPasteValues = useCallback(
@@ -444,12 +662,10 @@ export default function RecordsTable({
         block: "center",
       });
     }
-  }, [activeId, fsicFilterMode, dateFromDay, dateToDay]);
+  }, [activeId, fsicFilterMode, dateFromDay, dateToDay, dateQuickFilter, natureFilter]);
 
   const sortedSelectedRows = useMemo(() => {
-    return [...selectedFsicRows].sort(
-      (a, b) => getIndexById(a) - getIndexById(b)
-    );
+    return [...selectedFsicRows].sort((a, b) => getIndexById(a) - getIndexById(b));
   }, [selectedFsicRows, getIndexById]);
 
   const visibleRows = useMemo(() => {
@@ -457,9 +673,7 @@ export default function RecordsTable({
       fsicFilterMode === "selected"
         ? sortedSelectedRows
             .map((selectedId) => {
-              const originalIndex = records.findIndex(
-                (row) => row?.id === selectedId
-              );
+              const originalIndex = records.findIndex((row) => row?.id === selectedId);
               return {
                 row: records[originalIndex],
                 originalIndex,
@@ -474,18 +688,36 @@ export default function RecordsTable({
     const fromDay = dateFromDay === "" ? null : Number(dateFromDay);
     const toDay = dateToDay === "" ? null : Number(dateToDay);
 
-    if (fromDay !== null || toDay !== null) {
-      baseRows = baseRows.filter(({ row }) => {
-        const day = parseDayOnly(row?.dateInspected);
+    baseRows = baseRows.filter(({ row }) => {
+      const fullDate = parseToDate(row?.dateInspected);
+      const day = parseDayOnly(row?.dateInspected);
+      const natureText = row?.natureOfInspection;
+
+      if (!matchesNatureFilter(natureText, natureFilter)) return false;
+
+      if (dateQuickFilter !== "all") {
+        if (!matchesQuickDateFilter(fullDate, dateQuickFilter)) return false;
+      }
+
+      if (fromDay !== null || toDay !== null) {
         if (day == null) return false;
         if (fromDay !== null && day < fromDay) return false;
         if (toDay !== null && day > toDay) return false;
-        return true;
-      });
-    }
+      }
+
+      return true;
+    });
 
     return baseRows;
-  }, [records, fsicFilterMode, sortedSelectedRows, dateFromDay, dateToDay]);
+  }, [
+    records,
+    fsicFilterMode,
+    sortedSelectedRows,
+    dateFromDay,
+    dateToDay,
+    dateQuickFilter,
+    natureFilter,
+  ]);
 
   const clearSelection = () => {
     setSelectedFsicRows([]);
@@ -576,10 +808,7 @@ export default function RecordsTable({
         }
       }
 
-      if (
-        selectedFsicRows.length &&
-        (e.key === "Delete" || e.key === "Backspace")
-      ) {
+      if (selectedFsicRows.length && (e.key === "Delete" || e.key === "Backspace")) {
         const activeEl = document.activeElement;
         const tag = activeEl?.tagName?.toLowerCase();
         const isContentEditable = activeEl?.isContentEditable;
@@ -617,6 +846,7 @@ export default function RecordsTable({
         clearSelection();
         setFsicMenuOpen(false);
         setDateMenuOpen(false);
+        setNatureMenuOpen(false);
       }
     };
 
@@ -632,6 +862,9 @@ export default function RecordsTable({
       if (dateMenuRef.current && !dateMenuRef.current.contains(e.target)) {
         setDateMenuOpen(false);
       }
+      if (natureMenuRef.current && !natureMenuRef.current.contains(e.target)) {
+        setNatureMenuOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -643,19 +876,16 @@ export default function RecordsTable({
       ref={containerRef}
       style={S.tableWrap}
       onClick={(e) => {
-        const clickedInsideFsicCell =
-          e.target.closest?.("[data-fsic-cell='true']");
-        const clickedInsideHeaderFilter = e.target.closest?.(
-          "[data-fsic-header-filter='true']"
-        );
-        const clickedInsideDateFilter = e.target.closest?.(
-          "[data-date-header-filter='true']"
-        );
+        const clickedInsideFsicCell = e.target.closest?.("[data-fsic-cell='true']");
+        const clickedInsideHeaderFilter = e.target.closest?.("[data-fsic-header-filter='true']");
+        const clickedInsideDateFilter = e.target.closest?.("[data-date-header-filter='true']");
+        const clickedInsideNatureFilter = e.target.closest?.("[data-nature-header-filter='true']");
 
         if (
           !clickedInsideFsicCell &&
           !clickedInsideHeaderFilter &&
-          !clickedInsideDateFilter
+          !clickedInsideDateFilter &&
+          !clickedInsideNatureFilter
         ) {
           clearSelection();
         }
@@ -673,7 +903,58 @@ export default function RecordsTable({
         <thead>
           <tr>
             <th style={{ ...S.th, width: "12%" }}>FSIC App No</th>
-            <th style={{ ...S.th, width: "15%" }}>Nature</th>
+
+            <th style={{ ...S.th, width: "15%" }}>
+              <div style={S.headerFilterWrap}>
+                <span style={{ ...wrap, fontWeight: 900 }}>Nature</span>
+
+                <div
+                  ref={natureMenuRef}
+                  style={S.headerFilterRight}
+                  data-nature-header-filter="true"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    style={S.headerArrowBtn}
+                    onClick={() => {
+                      setNatureMenuOpen((prev) => !prev);
+                      setFsicMenuOpen(false);
+                      setDateMenuOpen(false);
+                    }}
+                    title="Filter nature"
+                  >
+                    ▼
+                  </button>
+
+                  {natureMenuOpen && (
+                    <div style={{ ...S.headerDropdown, width: 190 }}>
+                      {NATURE_OPTIONS.map((item, index) => (
+                        <button
+                          key={item.value}
+                          type="button"
+                          style={{
+                            ...S.headerDropdownBtn,
+                            ...(natureFilter === item.value ? S.headerDropdownBtnActive : {}),
+                            borderBottom:
+                              index === NATURE_OPTIONS.length - 1
+                                ? "none"
+                                : `1px solid ${C.border}`,
+                          }}
+                          onClick={() => {
+                            setNatureFilter(item.value);
+                            setNatureMenuOpen(false);
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </th>
+
             <th style={{ ...S.th, width: "12%" }}>IO No</th>
             <th style={{ ...S.th, width: "15%" }}>Owner</th>
             <th style={{ ...S.th, width: "18%" }}>Establishment</th>
@@ -694,6 +975,7 @@ export default function RecordsTable({
                     onClick={() => {
                       setFsicMenuOpen((prev) => !prev);
                       setDateMenuOpen(false);
+                      setNatureMenuOpen(false);
                     }}
                     title="Filter FSIC rows"
                   >
@@ -706,9 +988,7 @@ export default function RecordsTable({
                         type="button"
                         style={{
                           ...S.headerDropdownBtn,
-                          ...(fsicFilterMode === "all"
-                            ? S.headerDropdownBtnActive
-                            : {}),
+                          ...(fsicFilterMode === "all" ? S.headerDropdownBtnActive : {}),
                         }}
                         onClick={() => {
                           setFsicFilterMode("all");
@@ -732,8 +1012,7 @@ export default function RecordsTable({
                             setToast({
                               open: true,
                               title: "No Rows Selected",
-                              message:
-                                "Highlight rows first before filtering.",
+                              message: "Highlight rows first before filtering.",
                             });
                             return;
                           }
@@ -765,6 +1044,7 @@ export default function RecordsTable({
                     onClick={() => {
                       setDateMenuOpen((prev) => !prev);
                       setFsicMenuOpen(false);
+                      setNatureMenuOpen(false);
                     }}
                     title="Filter date range"
                   >
@@ -783,11 +1063,7 @@ export default function RecordsTable({
                             max="31"
                             placeholder="From"
                             value={dateFromDay}
-                            onChange={(e) =>
-                              setDateFromDay(
-                                sanitizeDayInput(e.target.value)
-                              )
-                            }
+                            onChange={(e) => setDateFromDay(sanitizeDayInput(e.target.value))}
                             style={S.popupInput}
                           />
 
@@ -797,11 +1073,7 @@ export default function RecordsTable({
                             max="31"
                             placeholder="To"
                             value={dateToDay}
-                            onChange={(e) =>
-                              setDateToDay(
-                                sanitizeDayInput(e.target.value)
-                              )
-                            }
+                            onChange={(e) => setDateToDay(sanitizeDayInput(e.target.value))}
                             style={S.popupInput}
                           />
                         </div>
@@ -814,6 +1086,7 @@ export default function RecordsTable({
                           onClick={() => {
                             setDateFromDay("");
                             setDateToDay("");
+                            setDateQuickFilter("all");
                           }}
                         >
                           Reset
@@ -826,6 +1099,30 @@ export default function RecordsTable({
                         >
                           Apply
                         </button>
+                      </div>
+
+                      <div style={S.checkListWrap}>
+                        <div style={S.popupLabel}>Quick date checklist</div>
+
+                        {DATE_CHECK_OPTIONS.map((item) => {
+                          const checked = dateQuickFilter === item.value;
+
+                          return (
+                            <label key={item.value} style={S.checkItem}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => handleQuickCheck(item.value)}
+                                style={S.checkInput}
+                              />
+                              <span>{item.label}</span>
+                            </label>
+                          );
+                        })}
+
+                        <div style={S.helperText}>
+                          Check one option to filter. Uncheck it to go back to normal.
+                        </div>
                       </div>
                     </div>
                   )}
@@ -848,6 +1145,7 @@ export default function RecordsTable({
             visibleRows.map(({ row: r, originalIndex }, visibleIndex) => {
               const isActive = activeId && r.id === activeId;
               const isFsicSelected = selectedFsicRows.includes(r.id);
+              const isNTC = isNatureNTC(r.natureOfInspection);
 
               return (
                 <tr
@@ -855,43 +1153,52 @@ export default function RecordsTable({
                   ref={isActive ? activeRowRef : null}
                   style={{
                     ...S.row,
-                    background: isActive
+                    background: isNTC
+                      ? C.ntcBg
+                      : isActive
                       ? "#ffe4e6"
                       : visibleIndex % 2 === 0
                       ? "#fff"
                       : "#fafafa",
-                    boxShadow: isActive
-                      ? "inset 0 0 0 2px #b91c1c"
-                      : "none",
+                    color: isNTC ? "#ffffff" : C.text,
+                    boxShadow: isActive ? "inset 0 0 0 2px #b91c1c" : "none",
                   }}
                   onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "#fff1f2";
+                    if (!isActive && !isNTC) {
+                      e.currentTarget.style.background = "#fff1f2";
+                    }
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.background =
-                        visibleIndex % 2 === 0 ? "#fff" : "#fafafa";
+                      e.currentTarget.style.background = isNTC
+                        ? C.ntcBg
+                        : visibleIndex % 2 === 0
+                        ? "#fff"
+                        : "#fafafa";
                     }
                   }}
                   onClick={() => onRowClick?.(r)}
                 >
-                  <td style={S.td}>
+                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
                     <div style={wrap}>{r.fsicAppNo || "-"}</div>
                   </td>
 
-                  <td style={S.td}>
+                  <td
+                    style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}
+                    title={isNTC ? "NTC" : undefined}
+                  >
                     <div style={wrap}>{r.natureOfInspection || "-"}</div>
                   </td>
 
-                  <td style={S.td}>
+                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
                     <div style={wrap}>{r.ioNumber || "-"}</div>
                   </td>
 
-                  <td style={S.td}>
+                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
                     <div style={wrap}>{r.ownerName || "-"}</div>
                   </td>
 
-                  <td style={S.td}>
+                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
                     <div style={wrap}>{r.establishmentName || "-"}</div>
                   </td>
 
@@ -900,6 +1207,7 @@ export default function RecordsTable({
                     style={{
                       ...S.td,
                       ...S.fsicCell,
+                      ...(isNTC ? S.ntcTd : {}),
                       ...(isFsicSelected ? S.fsicCellSelected : {}),
                     }}
                     onClick={(e) => handleFsicCellClick(r.id, e)}
@@ -908,21 +1216,16 @@ export default function RecordsTable({
                     <div style={wrap}>{r.fsicNo || "-"}</div>
                   </td>
 
-                  <td style={S.td}>
+                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
                     <div style={wrap}>{r.dateInspected || "-"}</div>
                   </td>
 
-                  <td style={S.actionsTd}>
-                    <div
-                      style={S.selectWrap}
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                  <td style={isNTC ? S.ntcGenerateTd : S.actionsTd}>
+                    <div style={S.selectWrap} onClick={(e) => e.stopPropagation()}>
                       <select
                         defaultValue=""
-                        style={S.select}
-                        onChange={(e) =>
-                          handleGenerateChange(e.target.value, r, e)
-                        }
+                        style={isNTC ? S.ntcSelect : S.select}
+                        onChange={(e) => handleGenerateChange(e.target.value, r, e)}
                       >
                         <option value="" disabled>
                           Select template
@@ -933,7 +1236,7 @@ export default function RecordsTable({
                         <option value="bfp-new">New BFP PDF</option>
                       </select>
 
-                      <span style={S.selectArrow}>▼</span>
+                      <span style={isNTC ? S.ntcSelectArrow : S.selectArrow}>▼</span>
                     </div>
                   </td>
                 </tr>
