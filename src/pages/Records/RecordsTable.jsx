@@ -190,40 +190,39 @@ export default function RecordsTable({
       lineHeight: 1,
     },
 
-headerDropdown: {
-  position: "absolute",
-  top: "calc(100% + 8px)",
-  right: 0,
-  width: 150,
-  background: "#fff",
-  border: `1px solid ${C.border}`,
-  borderRadius: 10,
-  boxShadow: "0 12px 28px rgba(0,0,0,.12)",
-  zIndex: 9999,
-  display: "flex",
-  flexDirection: "column",
-  overflow: "visible",
-},
+    headerDropdown: {
+      position: "absolute",
+      top: "calc(100% + 8px)",
+      right: 0,
+      width: 150,
+      background: "#fff",
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      boxShadow: "0 12px 28px rgba(0,0,0,.12)",
+      zIndex: 9999,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "visible",
+    },
 
-headerDropdownBtn: {
-  display: "block",
-  width: "100%",
-  border: "none",
-  background: "#fff",
-  color: "#000",
-  textAlign: "left",
-  padding: "12px",
-  fontSize: 12,
-  fontWeight: 800,
-  cursor: "pointer",
-  borderBottom: `1px solid ${C.border}`,
-},
+    headerDropdownBtn: {
+      display: "block",
+      width: "100%",
+      border: "none",
+      background: "#fff",
+      color: "#000",
+      textAlign: "left",
+      padding: "12px",
+      fontSize: 12,
+      fontWeight: 800,
+      cursor: "pointer",
+      borderBottom: `1px solid ${C.border}`,
+    },
 
-headerDropdownBtnActive: {
-  background: "#fee2e2",
-  color: "#7f1d1d",
-},
-
+    headerDropdownBtnActive: {
+      background: "#fee2e2",
+      color: "#7f1d1d",
+    },
   };
 
   const activeRowRef = useRef(null);
@@ -243,6 +242,29 @@ headerDropdownBtnActive: {
   });
 
   const [undoStack, setUndoStack] = useState([]);
+
+  const handleGenerateChange = (value, record, e) => {
+    e.stopPropagation();
+    if (!value) return;
+
+    let url = "";
+
+    if (value === "owner") {
+      url = `${API}/records/${record.id}/certificate/owner/pdf`;
+    } else if (value === "bfp") {
+      url = `${API}/records/${record.id}/certificate/bfp/pdf`;
+    } else if (value === "owner-new") {
+      url = `${API}/records/${record.id}/certificate/owner-new/pdf`;
+    } else if (value === "bfp-new") {
+      url = `${API}/records/${record.id}/certificate/bfp-new/pdf`;
+    }
+
+    if (url) {
+      window.open(url, "_blank");
+    }
+
+    e.target.value = "";
+  };
 
   useEffect(() => {
     if (activeRowRef.current) {
@@ -334,11 +356,9 @@ headerDropdownBtnActive: {
       .filter((v) => v !== "");
 
     if (!values.length) return;
-
     if (typeof onBulkUpdate !== "function") return;
 
     const updated = [...records];
-
     setUndoStack((prev) => [...prev, records]);
 
     const targetRows = [...selectedFsicRows].sort((a, b) => a - b);
@@ -368,7 +388,6 @@ headerDropdownBtnActive: {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         if (undoStack.length && typeof onBulkUpdate === "function") {
           const last = undoStack[undoStack.length - 1];
@@ -378,10 +397,7 @@ headerDropdownBtnActive: {
         }
       }
 
-      if (
-        selectedFsicRows.length &&
-        (e.key === "Delete" || e.key === "Backspace")
-      ) {
+      if (selectedFsicRows.length && (e.key === "Delete" || e.key === "Backspace")) {
         const activeEl = document.activeElement;
         const tag = activeEl?.tagName?.toLowerCase();
 
@@ -435,12 +451,12 @@ headerDropdownBtnActive: {
       }}
     >
       <TopRightToast
-  C={C} 
-  open={toast.open}
-  title={toast.title}
-  message={toast.message}
-  onClose={() => setToast((t) => ({ ...t, open: false }))}
-/>
+        C={C}
+        open={toast.open}
+        title={toast.title}
+        message={toast.message}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+      />
 
       <textarea
         ref={pasteBoxRef}
@@ -501,16 +517,17 @@ headerDropdownBtnActive: {
                       >
                         All
                       </button>
-                        <button
-                          type="button"
-                          style={{
-                            ...S.headerDropdownBtn,
-                            ...(fsicFilterMode === "selected"
-                              ? S.headerDropdownBtnActive
-                              : {}),
-                            borderBottom: "none",
-                          }}
-                          onClick={() => {
+
+                      <button
+                        type="button"
+                        style={{
+                          ...S.headerDropdownBtn,
+                          ...(fsicFilterMode === "selected"
+                            ? S.headerDropdownBtnActive
+                            : {}),
+                          borderBottom: "none",
+                        }}
+                        onClick={() => {
                           if (selectedFsicRows.length === 0) {
                             setToast({
                               open: true,
@@ -519,12 +536,12 @@ headerDropdownBtnActive: {
                             });
                             return;
                           }
-                            setFsicFilterMode("selected");
-                            setFsicMenuOpen(false);
-                          }}
-                        >
-                          Highlighted
-                        </button>
+                          setFsicFilterMode("selected");
+                          setFsicMenuOpen(false);
+                        }}
+                      >
+                        Highlighted
+                      </button>
                     </div>
                   )}
                 </div>

@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 const HIGH_RISE_CHOICES = ["YES", "NO"];
 const FSMR_CHOICES = ["YES", "NO"];
 const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
-const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "NEW", "RE-INSPECTION"];
+const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "NEW", "RE-INSPECTION", "CLOSED", "REFUSED", "TRANSFER"];
 
 const OCCUPANCY_OPTIONS = [
   "ASSEMBLY",
@@ -65,7 +65,7 @@ const FIELDS = [
   { key: "ntcDate", label: "NTC Date" },
 
   { key: "fsicNo", label: "FSIC No" },
-  
+
   { key: "fsicValidity", label: "FSIC Validity" },
 
   { key: "teamLeader", label: "Team Leader" },
