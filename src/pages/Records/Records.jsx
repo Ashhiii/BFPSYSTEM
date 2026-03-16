@@ -1,8 +1,3 @@
-// src/pages/Records/Records.jsx
-// ✅ Close Month separated into CloseMonthControl (still connected via props)
-// ✅ Success/Error uses your TopRightToast (open/title/message)
-// ✅ NEW: Month + Year filter based on dateInspected
-
 import React, { useEffect, useMemo, useState } from "react";
 
 import { db } from "../../firebase";
@@ -16,7 +11,7 @@ import injectTableStyles from "./injectTableStyles.jsx";
 import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
 
 import TopRightToast from "../../components/TopRightToast.jsx";
-import CloseMonthControl from "./CloseMonthControl.jsx"; // ✅ NEW
+import CloseMonthControl from "./CloseMonthControl.jsx";
 
 const MONTHS = [
   { value: "ALL", label: "All Months" },
@@ -34,17 +29,14 @@ const MONTHS = [
   { value: "12", label: "December" },
 ];
 
-// ✅ parse month/year from "January 2, 2026" or "2026-02-01" or Date
 const parseMonthYear = (val) => {
   if (!val) return { month: null, year: null };
 
-  // Firestore Timestamp (if ever)
   if (typeof val === "object" && val?.toDate) {
     const dt = val.toDate();
     return { month: dt.getMonth() + 1, year: dt.getFullYear() };
   }
 
-  // Date object
   if (val instanceof Date && !isNaN(val.getTime())) {
     return { month: val.getMonth() + 1, year: val.getFullYear() };
   }
@@ -52,7 +44,6 @@ const parseMonthYear = (val) => {
   const s = String(val).trim();
   if (!s) return { month: null, year: null };
 
-  // format: YYYY-MM-DD
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) {
     const year = Number(iso[1]);
@@ -60,13 +51,11 @@ const parseMonthYear = (val) => {
     return { month: isNaN(month) ? null : month, year: isNaN(year) ? null : year };
   }
 
-  // format: "January 2, 2026"
   const dt = new Date(s);
   if (!isNaN(dt.getTime())) {
     return { month: dt.getMonth() + 1, year: dt.getFullYear() };
   }
 
-  // fallback month-name contains
   const lower = s.toLowerCase();
   const map = {
     january: 1,
@@ -97,17 +86,16 @@ export default function Records({ refresh, setRefresh }) {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [activeId, setActiveId] = useState(null);
 
-  // ✅ FULLSCREEN
   const [showDetails, setShowDetails] = useState(false);
 
-  // ✅ Toast state (matches TopRightToast props)
   const [toastOpen, setToastOpen] = useState(false);
   const [toastTitle, setToastTitle] = useState("Success");
   const [toastMsg, setToastMsg] = useState("");
 
-  // ✅ NEW: Month + Year filters
-  const [monthFilter, setMonthFilter] = useState("ALL"); // "ALL" or 1..12
-  const [yearFilter, setYearFilter] = useState("ALL"); // "ALL" or "2026"
+  const [monthFilter, setMonthFilter] = useState("ALL");
+  const [yearFilter, setYearFilter] = useState("ALL");
+
+  const [visibleCount, setVisibleCount] = useState(0);
 
   const location = useLocation();
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -142,7 +130,6 @@ export default function Records({ refresh, setRefresh }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
-  // ✅ Year options from records dateInspected
   const yearOptions = useMemo(() => {
     const set = new Set();
     (records || []).forEach((r) => {
@@ -160,13 +147,11 @@ export default function Records({ refresh, setRefresh }) {
     const wantYear = yearFilter === "ALL" ? null : Number(yearFilter);
 
     return (records || []).filter((r) => {
-      // ✅ Month/Year filter based on dateInspected
       const { month, year } = parseMonthYear(r.dateInspected);
 
       if (wantMonth && month !== wantMonth) return false;
       if (wantYear && year !== wantYear) return false;
 
-      // ✅ Search filter
       if (!key) return true;
 
       return (
@@ -183,7 +168,7 @@ export default function Records({ refresh, setRefresh }) {
   const onSelectRow = (record) => {
     if (!record) return;
 
-    setActiveId(record.id); // ✅ highlight
+    setActiveId(record.id);
 
     const fixed = {
       ...record,
@@ -193,13 +178,12 @@ export default function Records({ refresh, setRefresh }) {
     setShowDetails(true);
   };
 
-  // ✅ AUTO-OPEN + HIGHLIGHT when navigated from Dashboard
   useEffect(() => {
     const navActiveId = location.state?.activeId;
 
     if (navActiveId && (records || []).length) {
-      setActiveId(navActiveId); // ✅ highlight only (no details)
-      window.history.replaceState({}, document.title); // clear state
+      setActiveId(navActiveId);
+      window.history.replaceState({}, document.title);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, records]);
@@ -216,7 +200,6 @@ export default function Records({ refresh, setRefresh }) {
     setRefresh?.((p) => !p);
   };
 
-  // UI
   const page = {
     height: "calc(100vh - 70px)",
     display: "flex",
@@ -349,7 +332,6 @@ export default function Records({ refresh, setRefresh }) {
 
   return (
     <div style={page}>
-      {/* ✅ YOUR TOP RIGHT TOAST */}
       <TopRightToast
         C={C}
         open={toastOpen}
@@ -365,7 +347,6 @@ export default function Records({ refresh, setRefresh }) {
           <div style={hSub}>View current records + details + close month</div>
         </div>
 
-        {/* ✅ SEPARATED CLOSE MONTH (still connected) */}
         <CloseMonthControl
           C={C}
           buttonStyle={btnRed}
@@ -377,8 +358,9 @@ export default function Records({ refresh, setRefresh }) {
             setShowDetails(false);
             setSearch("");
             setActiveId(null);
-            setMonthFilter("ALL"); // ✅ reset filters too
+            setMonthFilter("ALL");
             setYearFilter("ALL");
+            setVisibleCount(0);
           }}
         />
       </div>
@@ -392,7 +374,7 @@ export default function Records({ refresh, setRefresh }) {
             </div>
           </div>
 
-           <input
+          <input
             placeholder="🔍 Search records..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -433,13 +415,20 @@ export default function Records({ refresh, setRefresh }) {
         <div style={card}>
           <div style={cardHead}>
             <div>Current List</div>
-            <div style={{ opacity: 0.85, color: C.muted }}>Results: {filtered.length}</div>
+            <div style={{ opacity: 0.85, color: C.muted }}>Results: {visibleCount}</div>
           </div>
 
           <div style={scroll}>
-            <RecordsTable records={filtered} onRowClick={onSelectRow} apiBase={API} activeId={activeId} onBulkUpdate={(updatedRecords) => {
-    setRecords(updatedRecords);
-  }} />
+            <RecordsTable
+              records={filtered}
+              onRowClick={onSelectRow}
+              apiBase={API}
+              activeId={activeId}
+              onBulkUpdate={(updatedRecords) => {
+                setRecords(updatedRecords);
+              }}
+              onVisibleCountChange={setVisibleCount}
+            />
           </div>
         </div>
       </div>

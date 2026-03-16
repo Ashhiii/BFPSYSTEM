@@ -84,6 +84,7 @@ export default function RecordsTable({
   apiBase,
   activeId,
   onBulkUpdate,
+  onVisibleCountChange,
 }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
@@ -657,6 +658,10 @@ export default function RecordsTable({
     return baseRows;
   }, [records, fsicFilterMode, sortedSelectedFsicRows, natureFilter, dateFrom, dateTo]);
 
+  useEffect(() => {
+    onVisibleCountChange?.(visibleRows.length);
+  }, [visibleRows.length, onVisibleCountChange]);
+
   const clearSelection = () => {
     setSelectedFsicRows([]);
     setLastSelectedFsicId(null);
@@ -746,10 +751,7 @@ export default function RecordsTable({
 
   useEffect(() => {
     const handleGlobalPaste = (e) => {
-      if (
-        !selectedFsicRows.length &&
-        !selectedNatureRows.length
-      ) {
+      if (!selectedFsicRows.length && !selectedNatureRows.length) {
         return;
       }
 
