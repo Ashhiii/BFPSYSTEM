@@ -1,49 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopRightToast from "../../components/TopRightToast";
 
-const parseDayOnly = (val) => {
-  if (!val) return null;
+const normalizeText = (value) => String(value || "").trim().toUpperCase();
 
-  if (typeof val === "object" && val?.toDate) {
-    const dt = val.toDate();
-    return dt.getDate();
-  }
+const parseToDate = (value) => {
+  if (!value) return null;
 
-  if (val instanceof Date && !isNaN(val.getTime())) {
-    return val.getDate();
-  }
-
-  const s = String(val).trim();
-  if (!s) return null;
-
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (iso) {
-    const day = Number(iso[3]);
-    return Number.isNaN(day) ? null : day;
-  }
-
-  const dt = new Date(s);
-  if (!Number.isNaN(dt.getTime())) {
-    return dt.getDate();
-  }
-
-  const dayMatch = s.match(/\b([1-9]|[12]\d|3[01])\b/);
-  return dayMatch ? Number(dayMatch[1]) : null;
-};
-
-const parseToDate = (val) => {
-  if (!val) return null;
-
-  if (typeof val === "object" && val?.toDate) {
-    const dt = val.toDate();
+  if (typeof value === "object" && value?.toDate) {
+    const dt = value.toDate();
     return Number.isNaN(dt.getTime()) ? null : dt;
   }
 
-  if (val instanceof Date && !Number.isNaN(val.getTime())) {
-    return val;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
   }
 
-  const s = String(val).trim();
+  const s = String(value).trim();
   if (!s) return null;
 
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -56,66 +28,15 @@ const parseToDate = (val) => {
   return Number.isNaN(dt.getTime()) ? null : dt;
 };
 
-const isSameDate = (a, b) => {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+const getStartOfDay = (date) => {
+  if (!date) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
 };
 
-const getStartOfWeek = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + diff);
-  return d;
+const getEndOfDay = (date) => {
+  if (!date) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 };
-
-const matchesQuickDateFilter = (date, mode) => {
-  if (!date) return false;
-  if (mode === "all") return true;
-
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  const rowDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  if (mode === "today") {
-    return isSameDate(rowDate, today);
-  }
-
-  if (mode === "earlier-week") {
-    const startOfWeek = getStartOfWeek(today);
-    return rowDate >= startOfWeek && rowDate < today;
-  }
-
-  if (mode === "this-month") {
-    return (
-      rowDate.getFullYear() === today.getFullYear() &&
-      rowDate.getMonth() === today.getMonth()
-    );
-  }
-
-  if (mode === "this-year") {
-    return rowDate.getFullYear() === today.getFullYear();
-  }
-
-  if (mode === "old") {
-    return rowDate.getFullYear() < today.getFullYear();
-  }
-
-  return true;
-};
-
-const DATE_CHECK_OPTIONS = [
-  { value: "today", label: "Today" },
-  { value: "earlier-week", label: "Earlier This Week" },
-  { value: "this-month", label: "This Month" },
-  { value: "this-year", label: "This Year" },
-  { value: "old", label: "Old" },
-];
 
 const NATURE_OPTIONS = [
   { value: "ALL", label: "All" },
@@ -128,8 +49,6 @@ const NATURE_OPTIONS = [
   { value: "TRANSFER", label: "TRANSFER" },
   { value: "NTC", label: "NTC" },
 ];
-
-const normalizeText = (value) => String(value || "").trim().toUpperCase();
 
 const matchesNatureFilter = (value, filter) => {
   if (filter === "ALL") return true;
@@ -390,47 +309,12 @@ export default function RecordsTable({
       color: "#7f1d1d",
     },
 
-    popupSection: {
-      padding: 12,
-      borderBottom: `1px solid ${C.border}`,
-      display: "flex",
-      flexDirection: "column",
-      gap: 8,
-      background: "#fff",
-    },
-
-    popupLabel: {
-      fontSize: 11,
-      fontWeight: 900,
-      color: C.primaryDark,
-    },
-
-    popupRow: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 8,
-    },
-
-    popupInput: {
-      width: "100%",
-      padding: "8px 10px",
-      borderRadius: 8,
-      border: `1px solid ${C.border}`,
-      background: "#fff",
-      color: C.text,
-      fontSize: 12,
-      fontWeight: 800,
-      outline: "none",
-      boxSizing: "border-box",
-    },
-
     popupActions: {
       padding: 10,
       display: "flex",
       gap: 8,
       justifyContent: "flex-end",
       background: "#fff",
-      borderBottom: `1px solid ${C.border}`,
     },
 
     popupActionBtn: {
@@ -442,51 +326,6 @@ export default function RecordsTable({
       fontSize: 12,
       fontWeight: 800,
       cursor: "pointer",
-    },
-
-    popupActionBtnPrimary: {
-      border: `1px solid ${C.primary}`,
-      background: C.primary,
-      color: "#fff",
-      borderRadius: 8,
-      padding: "8px 10px",
-      fontSize: 12,
-      fontWeight: 800,
-      cursor: "pointer",
-    },
-
-    checkListWrap: {
-      padding: 12,
-      display: "flex",
-      flexDirection: "column",
-      gap: 8,
-      background: "#fff",
-    },
-
-    checkItem: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      fontSize: 12,
-      fontWeight: 800,
-      color: C.text,
-      cursor: "pointer",
-      userSelect: "none",
-    },
-
-    checkInput: {
-      width: 15,
-      height: 15,
-      cursor: "pointer",
-      accentColor: C.primary,
-      flexShrink: 0,
-    },
-
-    helperText: {
-      fontSize: 11,
-      color: C.muted,
-      fontWeight: 700,
-      marginTop: 4,
     },
 
     ntcTd: {
@@ -502,6 +341,42 @@ export default function RecordsTable({
       color: "#ffffff",
       borderBottom: `1px solid ${C.ntcBorder}`,
     },
+
+    dateFilterBody: {
+      padding: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      background: "#fff",
+    },
+
+    dateFilterLabel: {
+      fontSize: 11,
+      fontWeight: 800,
+      color: C.primaryDark,
+      marginBottom: 4,
+      display: "block",
+    },
+
+    dateInput: {
+      width: "100%",
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "8px 10px",
+      fontSize: 12,
+      fontWeight: 700,
+      color: C.text,
+      outline: "none",
+      boxSizing: "border-box",
+      background: "#fff",
+    },
+
+    dateFilterHint: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.muted,
+      lineHeight: 1.3,
+    },
   };
 
   const activeRowRef = useRef(null);
@@ -516,9 +391,8 @@ export default function RecordsTable({
   const [fsicMenuOpen, setFsicMenuOpen] = useState(false);
 
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
-  const [dateFromDay, setDateFromDay] = useState("");
-  const [dateToDay, setDateToDay] = useState("");
-  const [dateQuickFilter, setDateQuickFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [natureMenuOpen, setNatureMenuOpen] = useState(false);
   const [natureFilter, setNatureFilter] = useState("ALL");
@@ -556,55 +430,6 @@ export default function RecordsTable({
 
     if (url) window.open(url, "_blank");
     e.target.value = "";
-  };
-
-  const sanitizeDayInput = (value) => {
-    if (value === "") return "";
-    const digits = String(value).replace(/[^\d]/g, "");
-    if (!digits) return "";
-    const num = Number(digits);
-    if (Number.isNaN(num)) return "";
-    if (num < 1) return "1";
-    if (num > 31) return "31";
-    return String(num);
-  };
-
-  const applyDateFilter = () => {
-    const fromNum = dateFromDay === "" ? null : Number(dateFromDay);
-    const toNum = dateToDay === "" ? null : Number(dateToDay);
-
-    if (fromNum !== null && (fromNum < 1 || fromNum > 31)) {
-      setToast({
-        open: true,
-        title: "Invalid Day",
-        message: "Day From must be between 1 and 31.",
-      });
-      return;
-    }
-
-    if (toNum !== null && (toNum < 1 || toNum > 31)) {
-      setToast({
-        open: true,
-        title: "Invalid Day",
-        message: "Day To must be between 1 and 31.",
-      });
-      return;
-    }
-
-    if (fromNum !== null && toNum !== null && fromNum > toNum) {
-      setToast({
-        open: true,
-        title: "Invalid Range",
-        message: "Day From should not be greater than Day To.",
-      });
-      return;
-    }
-
-    setDateMenuOpen(false);
-  };
-
-  const handleQuickCheck = (value) => {
-    setDateQuickFilter((prev) => (prev === value ? "all" : value));
   };
 
   const applyPasteValues = useCallback(
@@ -662,62 +487,64 @@ export default function RecordsTable({
         block: "center",
       });
     }
-  }, [activeId, fsicFilterMode, dateFromDay, dateToDay, dateQuickFilter, natureFilter]);
+  }, [activeId, fsicFilterMode, natureFilter, dateFrom, dateTo]);
 
   const sortedSelectedRows = useMemo(() => {
     return [...selectedFsicRows].sort((a, b) => getIndexById(a) - getIndexById(b));
   }, [selectedFsicRows, getIndexById]);
 
-  const visibleRows = useMemo(() => {
-    let baseRows =
-      fsicFilterMode === "selected"
-        ? sortedSelectedRows
-            .map((selectedId) => {
-              const originalIndex = records.findIndex((row) => row?.id === selectedId);
-              return {
-                row: records[originalIndex],
-                originalIndex,
-              };
-            })
-            .filter((item) => item.row)
-        : records.map((row, originalIndex) => ({
-            row,
-            originalIndex,
-          }));
+const visibleRows = useMemo(() => {
+  let baseRows =
+    fsicFilterMode === "selected"
+      ? sortedSelectedRows
+          .map((selectedId) => {
+            const originalIndex = records.findIndex((row) => row?.id === selectedId);
+            return {
+              row: records[originalIndex],
+              originalIndex,
+            };
+          })
+          .filter((item) => item.row)
+      : records.map((row, originalIndex) => ({
+          row,
+          originalIndex,
+        }));
 
-    const fromDay = dateFromDay === "" ? null : Number(dateFromDay);
-    const toDay = dateToDay === "" ? null : Number(dateToDay);
+  const fromDate = dateFrom ? getStartOfDay(parseToDate(dateFrom)) : null;
+  const toDate = dateTo ? getEndOfDay(parseToDate(dateTo)) : null;
 
-    baseRows = baseRows.filter(({ row }) => {
-      const fullDate = parseToDate(row?.dateInspected);
-      const day = parseDayOnly(row?.dateInspected);
-      const natureText = row?.natureOfInspection;
+  baseRows = baseRows.filter(({ row }) => {
+    const natureText = row?.natureOfInspection;
+    if (!matchesNatureFilter(natureText, natureFilter)) return false;
 
-      if (!matchesNatureFilter(natureText, natureFilter)) return false;
+    const inspectedDate = parseToDate(row?.dateInspected);
 
-      if (dateQuickFilter !== "all") {
-        if (!matchesQuickDateFilter(fullDate, dateQuickFilter)) return false;
-      }
+    if (fromDate && (!inspectedDate || inspectedDate < fromDate)) return false;
+    if (toDate && (!inspectedDate || inspectedDate > toDate)) return false;
 
-      if (fromDay !== null || toDay !== null) {
-        if (day == null) return false;
-        if (fromDay !== null && day < fromDay) return false;
-        if (toDay !== null && day > toDay) return false;
-      }
+    return true;
+  });
 
-      return true;
+  const hasDateSort = !!fromDate || !!toDate;
+
+  if (hasDateSort) {
+    baseRows.sort((a, b) => {
+      const dateA = parseToDate(a.row?.dateInspected);
+      const dateB = parseToDate(b.row?.dateInspected);
+
+      if (!dateA && !dateB) return a.originalIndex - b.originalIndex;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+
+      const diff = dateA.getTime() - dateB.getTime();
+      if (diff !== 0) return diff;
+
+      return a.originalIndex - b.originalIndex;
     });
+  }
 
-    return baseRows;
-  }, [
-    records,
-    fsicFilterMode,
-    sortedSelectedRows,
-    dateFromDay,
-    dateToDay,
-    dateQuickFilter,
-    natureFilter,
-  ]);
+  return baseRows;
+}, [records, fsicFilterMode, sortedSelectedRows, natureFilter, dateFrom, dateTo]);
 
   const clearSelection = () => {
     setSelectedFsicRows([]);
@@ -1046,36 +873,36 @@ export default function RecordsTable({
                       setFsicMenuOpen(false);
                       setNatureMenuOpen(false);
                     }}
-                    title="Filter date range"
+                    title="Date menu"
                   >
                     ▼
                   </button>
 
                   {dateMenuOpen && (
-                    <div style={S.headerDropdown}>
-                      <div style={S.popupSection}>
-                        <div style={S.popupLabel}>Filter day range</div>
-
-                        <div style={S.popupRow}>
+                    <div style={{ ...S.headerDropdown, width: 230 }}>
+                      <div style={S.dateFilterBody}>
+                        <div>
+                          <label style={S.dateFilterLabel}>From</label>
                           <input
-                            type="number"
-                            min="1"
-                            max="31"
-                            placeholder="From"
-                            value={dateFromDay}
-                            onChange={(e) => setDateFromDay(sanitizeDayInput(e.target.value))}
-                            style={S.popupInput}
+                            type="date"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            style={S.dateInput}
                           />
+                        </div>
 
+                        <div>
+                          <label style={S.dateFilterLabel}>To</label>
                           <input
-                            type="number"
-                            min="1"
-                            max="31"
-                            placeholder="To"
-                            value={dateToDay}
-                            onChange={(e) => setDateToDay(sanitizeDayInput(e.target.value))}
-                            style={S.popupInput}
+                            type="date"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            style={S.dateInput}
                           />
+                        </div>
+
+                        <div style={S.dateFilterHint}>
+                          Leave one side blank if single-ended range lang imong gusto.
                         </div>
                       </div>
 
@@ -1084,45 +911,22 @@ export default function RecordsTable({
                           type="button"
                           style={S.popupActionBtn}
                           onClick={() => {
-                            setDateFromDay("");
-                            setDateToDay("");
-                            setDateQuickFilter("all");
+                            setDateFrom("");
+                            setDateTo("");
                           }}
                         >
-                          Reset
+                          Clear
                         </button>
 
                         <button
                           type="button"
-                          style={S.popupActionBtnPrimary}
-                          onClick={applyDateFilter}
+                          style={S.popupActionBtn}
+                          onClick={() => {
+                            setDateMenuOpen(false);
+                          }}
                         >
-                          Apply
+                          Close
                         </button>
-                      </div>
-
-                      <div style={S.checkListWrap}>
-                        <div style={S.popupLabel}>Quick date checklist</div>
-
-                        {DATE_CHECK_OPTIONS.map((item) => {
-                          const checked = dateQuickFilter === item.value;
-
-                          return (
-                            <label key={item.value} style={S.checkItem}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => handleQuickCheck(item.value)}
-                                style={S.checkInput}
-                              />
-                              <span>{item.label}</span>
-                            </label>
-                          );
-                        })}
-
-                        <div style={S.helperText}>
-                          Check one option to filter. Uncheck it to go back to normal.
-                        </div>
                       </div>
                     </div>
                   )}
