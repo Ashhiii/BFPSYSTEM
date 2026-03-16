@@ -2,11 +2,17 @@ import React from "react";
 import {
   HiOutlineDatabase,
   HiOutlineRefresh,
-  HiOutlineShieldCheck,
-  HiOutlineServer
+  HiOutlineDownload,
+  HiOutlinePrinter,
 } from "react-icons/hi";
 
-export default function InsightCard({ C, totalRecords, renewedCount }) {
+export default function InsightCard({
+  C,
+  totalRecords,
+  renewedCount,
+  onDownloadAll,
+  onPrint,
+}) {
   return (
     <div
       style={{
@@ -19,7 +25,6 @@ export default function InsightCard({ C, totalRecords, renewedCount }) {
         boxShadow: C.shadow,
       }}
     >
-      {/* soft glow blobs */}
       <div
         style={{
           position: "absolute",
@@ -55,19 +60,17 @@ export default function InsightCard({ C, totalRecords, renewedCount }) {
       </div>
 
       <div style={{ position: "relative", zIndex: 2 }}>
-        {/* Header */}
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "space-between",
             gap: 16,
+            flexWrap: "wrap",
           }}
         >
           <div>
-            <div style={{ fontWeight: 900, fontSize: 15 }}>
-               Overview
-            </div>
+            <div style={{ fontWeight: 900, fontSize: 15 }}>Overview</div>
             <div
               style={{
                 marginTop: 6,
@@ -80,13 +83,28 @@ export default function InsightCard({ C, totalRecords, renewedCount }) {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8, opacity: 0.9 }}>
-            <MiniLine />
-            <MiniLine short />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <IconActionBtn
+              title="Download Selected"
+              onClick={onDownloadAll}
+              icon={<HiOutlineDownload size={15} />}
+            />
+
+            <IconActionBtn
+              title="Print"
+              onClick={onPrint}
+              icon={<HiOutlinePrinter size={15} />}
+            />
           </div>
         </div>
 
-        {/* 2x2 Grid */}
         <div
           style={{
             marginTop: 20,
@@ -106,11 +124,45 @@ export default function InsightCard({ C, totalRecords, renewedCount }) {
             value={renewedCount}
             icon={<HiOutlineRefresh size={22} />}
           />
-
-        
         </div>
       </div>
     </div>
+  );
+}
+
+function IconActionBtn({ title, icon, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        border: "1px solid rgba(255,255,255,0.20)",
+        background: "rgba(255,255,255,0.12)",
+        color: "#fff",
+        width: 32,
+        height: 32,
+        borderRadius: 14,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        boxShadow: "0 10px 26px rgba(0,0,0,0.18)",
+        transition: "all .18s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.20)";
+        e.currentTarget.style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+        e.currentTarget.style.transform = "translateY(0)";
+      }}
+    >
+      {icon}
+    </button>
   );
 }
 
@@ -130,7 +182,6 @@ function StatPill({ label, value, small, icon }) {
         alignItems: "center",
       }}
     >
-      {/* LEFT TEXT */}
       <div>
         <div
           style={{
@@ -154,7 +205,6 @@ function StatPill({ label, value, small, icon }) {
         </div>
       </div>
 
-      {/* RIGHT ICON */}
       <div
         style={{
           width: 42,
@@ -169,18 +219,5 @@ function StatPill({ label, value, small, icon }) {
         {icon}
       </div>
     </div>
-  );
-}
-
-function MiniLine({ short }) {
-  return (
-    <div
-      style={{
-        width: short ? 34 : 52,
-        height: 6,
-        borderRadius: 999,
-        background: "rgba(255,255,255,0.28)",
-      }}
-    />
   );
 }

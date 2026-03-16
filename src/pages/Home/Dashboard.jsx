@@ -1,5 +1,3 @@
-// src/pages/Dashboard/Dashboard.jsx (FULL) — Export Choice (All vs Selected) + Recent active highlight FIXED
-
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
@@ -9,22 +7,25 @@ import { useNavigate } from "react-router-dom";
 import InsightCard from "./parts/InsightCard";
 import QuickActions from "./parts/QuickActions";
 import RecentRecords from "./parts/RecentRecords";
-import ExportChoiceModal from "../../components/ExportChoiceModal"; // ✅ NEW
+import ExportChoiceModal from "../../components/ExportChoiceModal";
+import BulkDownloadModal from "../../components/BulkDownloadModal";
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
   const [exporting, setExporting] = useState(false);
-  const [showExport, setShowExport] = useState(false); // ✅ NEW
+  const [showExport, setShowExport] = useState(false);
+
+  const [showBulkDownload, setShowBulkDownload] = useState(false);
+  const [allRecords, setAllRecords] = useState([]);
 
   const [totalRecords, setTotalRecords] = useState(0);
   const [renewedCount, setRenewedCount] = useState(0);
-  const [activeId, setActiveId] = useState(null); // ✅ track active record ID for RecentRecords
+  const [activeId, setActiveId] = useState(null);
 
   const [recent, setRecent] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
 
-  // ✅ pagination for RecentRecords
   const [page, setPage] = useState(1);
   const pageSize = 4;
 
@@ -46,8 +47,6 @@ export default function Dashboard() {
     []
   );
 
-  /* ================= HELPERS ================= */
-
   const parseAnyDate = (x) => {
     if (!x) return null;
     if (typeof x === "object" && typeof x.toDate === "function") return x.toDate();
@@ -65,31 +64,15 @@ export default function Dashboard() {
   const fmtDate = (d) => {
     if (!d) return "";
     try {
-      return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "2-digit" });
+      return d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "2-digit",
+      });
     } catch {
       return "";
     }
   };
-
-  const S = (v) => (v === undefined || v === null ? "" : String(v));
-
-  const dateText = (v) => {
-    const d = parseAnyDate(v);
-    return d ? fmtDate(d) : S(v);
-  };
-
-  // ✅ read canonical + legacy fallback (IMPORT KEY vs OLD KEY)
-  const pick = (r, canon, legacy = []) => {
-    const direct = r?.[canon];
-    if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
-    for (const k of legacy) {
-      const v = r?.[k];
-      if (v !== undefined && v !== null && String(v).trim() !== "") return v;
-    }
-    return "";
-  };
-
-  /* ================= LOAD DASHBOARD ================= */
 
   useEffect(() => {
     const load = async () => {
@@ -102,6 +85,12 @@ export default function Dashboard() {
         setRenewedCount(renSnap.size);
 
         const snap = await getDocs(collection(db, "records"));
+
+        const fullList = snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setAllRecords(fullList);
 
         const list = snap.docs
           .map((d) => {
@@ -137,151 +126,11 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // ✅ slice list for current page (4 per page)
   const total = recent.length;
   const visibleRecent = useMemo(() => {
     const start = (page - 1) * pageSize;
     return recent.slice(start, start + pageSize);
   }, [recent, page]);
-
-  /* ================= EXPORT (REUSE YOUR MAPPING) ================= */
-
-  // ✅ Exports GIVEN LIST (so we can export all OR selected)
-  const exportToExcel = async (list) => {
-    if (!list?.length) {
-      alert("No records to export.");
-      return;
-    }
-
-    const arranged = list.map((r, idx) => {
-      const typeOcc = pick(r, "typeOfOccupancy", ["occupancyType", "OCCUPANCY_TYPE"]);
-      const bdesc = pick(r, "buildingDescription", ["buildingDesc", "BLDG_DESCRIPTION", "BUILDING_DESC"]);
-      const floor = pick(r, "floorAreaSqm", ["floorArea", "FLOOR_AREA", "FLOOR_AREA_SQM"]);
-      const storey = pick(r, "noOfStorey", ["storeyCount", "STOREY_COUNT", "NO_OF_STOREY"]);
-
-      return {
-        "NO.": idx + 1,
-
-        // ✅ DO NOT mix fsicNo into fsicAppNo
-        "FSIC APPLICATION NO.": S(r.fsicAppNo),
-
-        "NATURE OF INSPECTION": S(r.natureOfInspection || r.NATURE_OF_INSPECTION),
-        "NAME OF OWNER": S(r.ownerName || r.OWNERS_NAME || r.NAME_OF_OWNER),
-        "NAME OF ESTABLISHMENT": S(r.establishmentName || r.ESTABLISHMENT_NAME || r.NAME_OF_ESTABLISHMENT),
-        "BUSINESS ADDRESS": S(r.businessAddress || r.BUSSINESS_ADDRESS || r.ADDRESS),
-        "CONTACT #": S(r.contactNumber || r.CONTACT_NUMBER || r.CONTACT_),
-        "DATE INSPECTED": dateText(r.dateInspected || r.DATE_INSPECTED),
-
-        "I.O NUMBER": S(r.ioNumber || r.IO_NUMBER),
-        "I.O DATE": dateText(r.ioDate || r.IO_DATE),
-
-        "NFSI NUMBER": S(r.nfsiNumber || r.NFSI_NUMBER),
-        "NFSI DATE": dateText(r.nfsiDate || r.NFSI_DATE),
-
-        "NTC NUMBER": S(r.ntcNumber || r.NTC_NUMBER),
-        "NTC DATE": dateText(r.ntcDate || r.NTC_DATE),
-
-        // ✅ separate FSIC NO column
-        "FSIC NO": S(r.fsicNo || r.FSIC_NUMBER),
-
-        "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
-        DEFECTS: S(r.defects || r.DEFECTS),
-        INSPECTORS: S(r.inspectors || r.INSPECTORS),
-
-        "TYPE OF OCCUPANCY": S(typeOcc),
-        "BLDG DESCRIPTION": S(bdesc),
-        "FLOOR AREA (SQM)": S(floor),
-        "BUILDING HEIGHT": S(r.buildingHeight || r.BUILDING_HEIGHT),
-        "NO OF STOREY": S(storey),
-        "HIGH RISE (YES/NO)": S(r.highRise || r.HIGH_RISE),
-        "FSMR (YES/NO)": S(r.fsmr || r.FSMR),
-
-        REMARKS: S(r.remarks || r.REMARKS),
-
-        "O.R NUMBER": S(r.orNumber || r.OR_NUMBER),
-        "O.R AMOUNT": S(r.orAmount || r.OR_AMOUNT),
-        "O.R DATE": dateText(r.orDate || r.OR_DATE),
-      };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(arranged);
-
-    worksheet["!cols"] = [
-      { wch: 6 },
-      { wch: 22 }, // FSIC APP
-      { wch: 22 },
-      { wch: 24 },
-      { wch: 28 },
-      { wch: 38 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 }, // FSIC NO
-      { wch: 18 },
-      { wch: 16 },
-      { wch: 26 },
-      { wch: 18 },
-      { wch: 30 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 20 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 16 },
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "BFP Current Records");
-    XLSX.writeFile(workbook, "BFP_Current_Records.xlsx");
-  };
-
-  // ✅ Export ALL (fetch full docs so complete fields are included)
-  const exportAll = async () => {
-    if (exporting) return;
-    setExporting(true);
-    try {
-      const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(qy);
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      await exportToExcel(list);
-    } catch (e) {
-      console.error(e);
-      alert("Export failed.");
-    } finally {
-      setExporting(false);
-      setShowExport(false);
-    }
-  };
-
-  // ✅ Export SELECTED IDs (fetch full docs then filter)
-  const exportSelected = async (ids) => {
-    if (exporting) return;
-    setExporting(true);
-    try {
-      const qy = query(collection(db, "records"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(qy);
-      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      const selected = all.filter((r) => ids.includes(String(r.id)));
-      await exportToExcel(selected);
-    } catch (e) {
-      console.error(e);
-      alert("Export failed.");
-    } finally {
-      setExporting(false);
-      setShowExport(false);
-    }
-  };
-
-  /* ================= UI STYLES ================= */
 
   const pageWrap = {
     padding: 22,
@@ -299,41 +148,36 @@ export default function Dashboard() {
   const leftCol = { display: "flex", flexDirection: "column", gap: 18 };
   const rightCol = { display: "flex", flexDirection: "column", gap: 18 };
 
-  const responsiveCss = `
-    @media (max-width: 980px){
-      .dashLayout{ grid-template-columns: 1fr !important; }
-      .twoCols{ grid-template-columns: 1fr !important; }
-    }
-  `;
-
   return (
     <div style={pageWrap}>
-      <style>{responsiveCss}</style>
-
-      <div style={layout} className="dashLayout">
-        {/* LEFT */}
+      <div style={layout}>
         <div style={leftCol}>
-          <InsightCard C={C} totalRecords={totalRecords} renewedCount={renewedCount} />
+          <InsightCard
+            C={C}
+            totalRecords={totalRecords}
+            renewedCount={renewedCount}
+            onDownloadAll={() => setShowBulkDownload(true)}
+            onPrint={() => window.print()}
+          />
 
           <QuickActions
             C={C}
             exporting={exporting}
             onAdd={() => navigate("/app/add-record")}
             onImport={() => navigate("/app/import")}
-            onExport={() => setShowExport(true)} // ✅ OPEN CHOICE MODAL
+            onExport={() => setShowExport(true)}
             onArchive={() => navigate("/app/archive")}
           />
         </div>
 
-        {/* RIGHT */}
         <div style={rightCol}>
           <RecentRecords
             C={C}
             loading={loadingRecent}
             list={visibleRecent}
-            activeId={activeId} // ✅ FIXED (was setActiveId)
+            activeId={activeId}
             onOpen={(id) => {
-              setActiveId(id); // ✅ highlight clicked
+              setActiveId(id);
               navigate("/app/records", { state: { activeId: id } });
             }}
             page={page}
@@ -344,15 +188,22 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ✅ Export choice modal (All vs Select) */}
       <ExportChoiceModal
         open={showExport}
         onClose={() => !exporting && setShowExport(false)}
-        onExportAll={exportAll}
-        onExportSelected={exportSelected}
-        rows={recent} // ✅ list shown in selector (fast). Change to full list if you want.
+        onExportAll={() => {}}
+        onExportSelected={() => {}}
+        rows={recent}
         busy={exporting}
         C={C}
+      />
+
+      <BulkDownloadModal
+        open={showBulkDownload}
+        onClose={() => setShowBulkDownload(false)}
+        records={allRecords}
+          apiBase={import.meta.env.VITE_API_URL}
+        showToast={(title, message) => alert(`${title}\n${message}`)}
       />
     </div>
   );

@@ -433,6 +433,8 @@ export default function Records({ refresh, setRefresh }) {
         </div>
       </div>
 
+      
+
       <DetailsFullScreen open={showDetails} title={fullTitle} onClose={() => setShowDetails(false)}>
         <RecordDetailsPanel
           styles={panelStyles}
