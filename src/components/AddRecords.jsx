@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  getDocs,
+  query,
+  where,
+  limit,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { useLocation } from "react-router-dom";
 
@@ -151,7 +159,16 @@ const UPPER_KEYS = new Set([
   "orAmount",
 ]);
 
-const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "NEW", "RE-INSPECTION", "CLOSED", "REFUSED", "TRANSFER", "NTC"];
+const NATURE_SUGGESTIONS = [
+  "ANNUAL",
+  "RENEW",
+  "NEW",
+  "RE-INSPECTION",
+  "CLOSED",
+  "REFUSED",
+  "TRANSFER",
+  "NTC",
+];
 
 const OCCUPANCY_OPTIONS = [
   "ASSEMBLY",
@@ -176,6 +193,14 @@ const OCCUPANCY_OPTIONS = [
 const HIGH_RISE_CHOICES = ["YES", "NO"];
 const FSMR_CHOICES = ["YES", "NO"];
 const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
+
+const DUPLICATE_CHECK_FIELDS = {
+  fsicAppNo: "FSIC App No",
+  fsicNo: "FSIC No",
+  ioNumber: "IO Number",
+  ntcNumber: "NTC Number",
+  nfsiNumber: "NFSI Number",
+};
 
 const FIELDS = [
   { key: "fsicAppNo", label: "FSIC App No", placeholder: "2026-00123", required: true, type: "text", span: 1 },
@@ -250,8 +275,10 @@ export default function AddRecord({ setRefresh }) {
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
   const [toastOpen, setToastOpen] = useState(false);
+  const [duplicateErrors, setDuplicateErrors] = useState({});
 
   const topRef = useRef(null);
+  const fieldRefs = useRef({});
 
   const scrollToTop = () => {
     if (topRef.current?.scrollIntoView) {
@@ -261,11 +288,26 @@ export default function AddRecord({ setRefresh }) {
     }
   };
 
+  const scrollToField = (fieldKey) => {
+    const el = fieldRefs.current[fieldKey];
+    if (el?.scrollIntoView) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => {
+        if (el?.focus) el.focus();
+      }, 250);
+    } else {
+      scrollToTop();
+    }
+  };
+
   const [history, setHistory] = useState(() => ({
     natureOfInspection: [...NATURE_SUGGESTIONS],
   }));
 
-  const requiredKeys = useMemo(() => FIELDS.filter((f) => f.required).map((f) => f.key), []);
+  const requiredKeys = useMemo(
+    () => FIELDS.filter((f) => f.required).map((f) => f.key),
+    []
+  );
 
   const missingRequired = useMemo(() => {
     const miss = {};
@@ -277,7 +319,13 @@ export default function AddRecord({ setRefresh }) {
   }, [form, requiredKeys]);
 
   const combineInspectors = (state) => {
-    return [state.inspector1, state.inspector2, state.inspector3, state.inspector4, state.inspector5]
+    return [
+      state.inspector1,
+      state.inspector2,
+      state.inspector3,
+      state.inspector4,
+      state.inspector5,
+    ]
       .map((x) => String(x ?? "").trim())
       .filter(Boolean)
       .join(", ");
@@ -309,6 +357,7 @@ export default function AddRecord({ setRefresh }) {
     });
 
     setTouched({});
+    setDuplicateErrors({});
     scrollToTop();
     window.history.replaceState({}, document.title);
   }, [location.state]);
@@ -329,8 +378,18 @@ export default function AddRecord({ setRefresh }) {
       flexWrap: "wrap",
       alignItems: "center",
     },
-    title: { fontSize: 18, fontWeight: 950, color: "#0f172a", textTransform: "uppercase" },
-    sub: { fontSize: 12, fontWeight: 700, color: "#64748b", marginTop: 6 },
+    title: {
+      fontSize: 18,
+      fontWeight: 950,
+      color: "#0f172a",
+      textTransform: "uppercase",
+    },
+    sub: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#64748b",
+      marginTop: 6,
+    },
     grid: {
       marginTop: 14,
       display: "grid",
@@ -379,6 +438,12 @@ export default function AddRecord({ setRefresh }) {
       boxSizing: "border-box",
       textTransform: "none",
     },
+    errorText: {
+      marginTop: 6,
+      fontSize: 12,
+      fontWeight: 800,
+      color: "#dc2626",
+    },
     footerBar: {
       marginTop: 14,
       paddingTop: 12,
@@ -418,14 +483,21 @@ export default function AddRecord({ setRefresh }) {
     const v = String(rawValue ?? "").trim();
     if (!v) return;
 
-    if (fieldKey === "inspectors" || fieldKey === "fsicValidity" || fieldKey === "occupancyType") return;
+    if (
+      fieldKey === "inspectors" ||
+      fieldKey === "fsicValidity" ||
+      fieldKey === "occupancyType"
+    )
+      return;
 
     setHistory((prev) => {
       const cur = Array.isArray(prev[fieldKey]) ? prev[fieldKey] : [];
       const next = [v, ...cur.filter((x) => String(x) !== v)].slice(0, 10);
 
       if (fieldKey === "natureOfInspection") {
-        const merged = [...NATURE_SUGGESTIONS, ...next].filter((x, i, arr) => arr.indexOf(x) === i);
+        const merged = [...NATURE_SUGGESTIONS, ...next].filter(
+          (x, i, arr) => arr.indexOf(x) === i
+        );
         return { ...prev, [fieldKey]: merged.slice(0, 10) };
       }
 
@@ -433,9 +505,88 @@ export default function AddRecord({ setRefresh }) {
     });
   };
 
-  const onBlur = (k) => {
+  const checkDuplicateField = async (fieldKey, value) => {
+    const cleanValue = String(value ?? "").trim();
+
+    if (!DUPLICATE_CHECK_FIELDS[fieldKey]) return false;
+
+    if (!cleanValue) {
+      setDuplicateErrors((prev) => ({
+        ...prev,
+        [fieldKey]: "",
+      }));
+      return false;
+    }
+
+    try {
+      const q = query(
+        collection(db, "records"),
+        where(fieldKey, "==", cleanValue),
+        limit(1)
+      );
+
+      const snap = await getDocs(q);
+      const exists = !snap.empty;
+
+      setDuplicateErrors((prev) => ({
+        ...prev,
+        [fieldKey]: exists
+          ? `This ${DUPLICATE_CHECK_FIELDS[fieldKey]} already exists.`
+          : "",
+      }));
+
+      return exists;
+    } catch (error) {
+      console.error(`Duplicate check failed for ${fieldKey}:`, error);
+      return false;
+    }
+  };
+
+  const checkAllDuplicates = async () => {
+    const keys = Object.keys(DUPLICATE_CHECK_FIELDS);
+    const foundErrors = {};
+
+    const results = await Promise.all(
+      keys.map(async (key) => {
+        const value = String(form[key] ?? "").trim();
+
+        if (!value) {
+          foundErrors[key] = "";
+          return { key, exists: false };
+        }
+
+        const q = query(
+          collection(db, "records"),
+          where(key, "==", value),
+          limit(1)
+        );
+
+        const snap = await getDocs(q);
+        const exists = !snap.empty;
+
+        foundErrors[key] = exists
+          ? `This ${DUPLICATE_CHECK_FIELDS[key]} already exists.`
+          : "";
+
+        return { key, exists };
+      })
+    );
+
+    setDuplicateErrors((prev) => ({
+      ...prev,
+      ...foundErrors,
+    }));
+
+    return results;
+  };
+
+  const onBlur = async (k) => {
     setTouched((p) => ({ ...p, [k]: true }));
     pushHistory(k, form[k]);
+
+    if (DUPLICATE_CHECK_FIELDS[k]) {
+      await checkDuplicateField(k, form[k]);
+    }
   };
 
   const onChange = (e) => {
@@ -464,6 +615,13 @@ export default function AddRecord({ setRefresh }) {
 
       return updated;
     });
+
+    if (DUPLICATE_CHECK_FIELDS[name]) {
+      setDuplicateErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
   };
 
   const buildPayload = (state) => {
@@ -481,9 +639,20 @@ export default function AddRecord({ setRefresh }) {
   };
 
   const submit = async () => {
-    if (!form.fsicAppNo?.trim() || !form.ownerName?.trim()) {
-      setTouched((p) => ({ ...p, fsicAppNo: true, ownerName: true }));
-      scrollToTop();
+    const firstRequiredError = requiredKeys.find(
+      (key) => !String(form[key] ?? "").trim()
+    );
+
+    if (firstRequiredError) {
+      setTouched((p) => {
+        const next = { ...p };
+        requiredKeys.forEach((key) => {
+          next[key] = true;
+        });
+        return next;
+      });
+
+      scrollToField(firstRequiredError);
       return;
     }
 
@@ -491,7 +660,28 @@ export default function AddRecord({ setRefresh }) {
 
     setSaving(true);
     try {
-      const withCombined = { ...form, inspectors: combineInspectors(form) };
+      const duplicateResults = await checkAllDuplicates();
+      const hasDuplicate = duplicateResults.some((item) => item.exists);
+
+      if (hasDuplicate) {
+        const firstDuplicateField = duplicateResults.find(
+          (item) => item.exists
+        )?.key;
+
+        if (firstDuplicateField) {
+          scrollToField(firstDuplicateField);
+        } else {
+          scrollToTop();
+        }
+
+        return;
+      }
+
+      const withCombined = {
+        ...form,
+        inspectors: combineInspectors(form),
+      };
+
       const payload = buildPayload(withCombined);
 
       await addDoc(collection(db, "records"), payload);
@@ -499,6 +689,7 @@ export default function AddRecord({ setRefresh }) {
       setToastOpen(true);
       setForm(INITIAL_FORM);
       setTouched({});
+      setDuplicateErrors({});
       setRefresh?.((p) => !p);
 
       scrollToTop();
@@ -509,6 +700,8 @@ export default function AddRecord({ setRefresh }) {
       setSaving(false);
     }
   };
+
+  const hasAnyDuplicateError = Object.values(duplicateErrors).some(Boolean);
 
   return (
     <>
@@ -529,6 +722,7 @@ export default function AddRecord({ setRefresh }) {
         <div style={styles.grid}>
           {FIELDS.map((f) => {
             const showError = f.required && touched[f.key] && missingRequired[f.key];
+            const duplicateError = duplicateErrors[f.key];
             const isValidity = f.key === "fsicValidity";
             const isCombinedInspectors = f.key === "inspectors";
 
@@ -547,7 +741,10 @@ export default function AddRecord({ setRefresh }) {
                 style={{
                   ...styles.card,
                   gridColumn: f.span === 2 ? "1 / -1" : "auto",
-                  border: showError ? "1px solid #fecdd3" : styles.card.border,
+                  border:
+                    showError || duplicateError
+                      ? "1px solid #fecdd3"
+                      : styles.card.border,
                 }}
               >
                 <div style={styles.cardTop}>
@@ -556,39 +753,58 @@ export default function AddRecord({ setRefresh }) {
                 </div>
 
                 {f.type === "select" ? (
-                  <select
-                    name={f.key}
-                    value={form[f.key] ?? ""}
-                    onChange={onChange}
-                    onBlur={() => onBlur(f.key)}
-                    style={{
-                      ...styles.input,
-                      border: showError ? "1px solid #dc2626" : styles.input.border,
-                      textTransform: UPPER_KEYS.has(f.key) ? "uppercase" : "none",
-                      background: "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="">-- SELECT --</option>
-                    {(
-                      f.key === "occupancyType"
-                        ? OCCUPANCY_OPTIONS
-                        : f.key === "highRise"
-                        ? HIGH_RISE_CHOICES
-                        : f.key === "fsmr"
-                        ? FSMR_CHOICES
-                        : f.key === "remarks"
-                        ? REMARKS_CHOICES
-                        : []
-                    ).map((opt) => (
-                      <option key={`${f.key}-${opt}`} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      ref={(el) => {
+                        fieldRefs.current[f.key] = el;
+                      }}
+                      name={f.key}
+                      value={form[f.key] ?? ""}
+                      onChange={onChange}
+                      onBlur={() => onBlur(f.key)}
+                      style={{
+                        ...styles.input,
+                        border:
+                          showError || duplicateError
+                            ? "1px solid #dc2626"
+                            : styles.input.border,
+                        textTransform: UPPER_KEYS.has(f.key) ? "uppercase" : "none",
+                        background: "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="">-- SELECT --</option>
+                      {(
+                        f.key === "occupancyType"
+                          ? OCCUPANCY_OPTIONS
+                          : f.key === "highRise"
+                          ? HIGH_RISE_CHOICES
+                          : f.key === "fsmr"
+                          ? FSMR_CHOICES
+                          : f.key === "remarks"
+                          ? REMARKS_CHOICES
+                          : []
+                      ).map((opt) => (
+                        <option key={`${f.key}-${opt}`} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+
+                    {showError && (
+                      <div style={styles.errorText}>This field is required.</div>
+                    )}
+
+                    {duplicateError && (
+                      <div style={styles.errorText}>{duplicateError}</div>
+                    )}
+                  </>
                 ) : (
                   <>
                     <input
+                      ref={(el) => {
+                        fieldRefs.current[f.key] = el;
+                      }}
                       name={f.key}
                       value={form[f.key] ?? ""}
                       onChange={onChange}
@@ -600,11 +816,24 @@ export default function AddRecord({ setRefresh }) {
                       list={hasDatalist ? dlId : undefined}
                       style={{
                         ...styles.input,
-                        border: showError ? "1px solid #dc2626" : styles.input.border,
+                        border:
+                          showError || duplicateError
+                            ? "1px solid #dc2626"
+                            : styles.input.border,
                         textTransform:
-                          f.type === "date" ? "none" : UPPER_KEYS.has(f.key) ? "uppercase" : "none",
-                        background: isValidity || isCombinedInspectors ? "#f1f5f9" : styles.input.background,
-                        cursor: isValidity || isCombinedInspectors ? "not-allowed" : "text",
+                          f.type === "date"
+                            ? "none"
+                            : UPPER_KEYS.has(f.key)
+                            ? "uppercase"
+                            : "none",
+                        background:
+                          isValidity || isCombinedInspectors
+                            ? "#f1f5f9"
+                            : styles.input.background,
+                        cursor:
+                          isValidity || isCombinedInspectors
+                            ? "not-allowed"
+                            : "text",
                       }}
                     />
 
@@ -614,6 +843,14 @@ export default function AddRecord({ setRefresh }) {
                           <option key={`${f.key}-${opt}`} value={opt} />
                         ))}
                       </datalist>
+                    )}
+
+                    {showError && (
+                      <div style={styles.errorText}>This field is required.</div>
+                    )}
+
+                    {duplicateError && (
+                      <div style={styles.errorText}>{duplicateError}</div>
                     )}
                   </>
                 )}
@@ -626,6 +863,8 @@ export default function AddRecord({ setRefresh }) {
           <div style={styles.footerLeft}>
             {Object.keys(missingRequired).length > 0
               ? "Please fill required fields before saving."
+              : hasAnyDuplicateError
+              ? "Please fix duplicate entries before saving."
               : "Ready to save."}
           </div>
 
@@ -634,6 +873,7 @@ export default function AddRecord({ setRefresh }) {
             onClick={() => {
               setForm(INITIAL_FORM);
               setTouched({});
+              setDuplicateErrors({});
               scrollToTop();
             }}
             disabled={saving}
@@ -641,7 +881,11 @@ export default function AddRecord({ setRefresh }) {
             Clear
           </button>
 
-          <button style={styles.primary} onClick={submit} disabled={saving}>
+          <button
+            style={styles.primary}
+            onClick={submit}
+            disabled={saving}
+          >
             {saving ? "Saving..." : "Save Record"}
           </button>
         </div>

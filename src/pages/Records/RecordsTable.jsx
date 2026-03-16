@@ -3,6 +3,8 @@ import TopRightToast from "../../components/TopRightToast";
 
 const normalizeText = (value) => String(value || "").trim().toUpperCase();
 
+const normalizeDuplicateKey = (value) => normalizeText(value);
+
 const parseToDate = (value) => {
   if (!value) return null;
 
@@ -105,6 +107,13 @@ export default function RecordsTable({
     ntcBg: "#dc2626",
     ntcText: "#ffffff",
     ntcBorder: "#b91c1c",
+
+    duplicateRowBg: "#fff7ed",
+    duplicateRowAltBg: "#ffedd5",
+    duplicateBorder: "#fb923c",
+    duplicateText: "#9a3412",
+    duplicateBadgeBg: "#fed7aa",
+    duplicateBadgeText: "#9a3412",
   };
 
   const S = {
@@ -377,6 +386,31 @@ export default function RecordsTable({
       color: C.muted,
       lineHeight: 1.3,
     },
+
+    duplicateBadge: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 6,
+      padding: "4px 8px",
+      borderRadius: 999,
+      background: C.duplicateBadgeBg,
+      color: C.duplicateBadgeText,
+      fontSize: 11,
+      fontWeight: 900,
+      border: `1px solid ${C.duplicateBorder}`,
+      maxWidth: "100%",
+    },
+
+    duplicateHint: {
+      marginTop: 6,
+      fontSize: 11,
+      fontWeight: 800,
+      color: C.duplicateText,
+      lineHeight: 1.35,
+      whiteSpace: "normal",
+      wordBreak: "break-word",
+    },
   };
 
   const activeRowRef = useRef(null);
@@ -406,6 +440,57 @@ export default function RecordsTable({
   const [undoStack, setUndoStack] = useState([]);
 
   const recordIds = useMemo(() => records.map((r) => r?.id), [records]);
+
+  const duplicateMap = useMemo(() => {
+    const fieldConfig = [
+      { key: "fsicAppNo", label: "FSIC App No" },
+      { key: "fsicNo", label: "FSIC No" },
+      { key: "ioNumber", label: "IO Number" },
+      { key: "ntcNumber", label: "NTC Number" },
+      { key: "nfsiNumber", label: "NFSI Number" },
+    ];
+
+    const counters = {};
+
+    fieldConfig.forEach(({ key }) => {
+      counters[key] = new Map();
+    });
+
+    records.forEach((row) => {
+      fieldConfig.forEach(({ key }) => {
+        const normalized = normalizeDuplicateKey(row?.[key]);
+        if (!normalized) return;
+
+        const current = counters[key].get(normalized) || 0;
+        counters[key].set(normalized, current + 1);
+      });
+    });
+
+    const result = {};
+
+    records.forEach((row) => {
+      const rowWarnings = [];
+
+      fieldConfig.forEach(({ key, label }) => {
+        const normalized = normalizeDuplicateKey(row?.[key]);
+        if (!normalized) return;
+
+        const count = counters[key].get(normalized) || 0;
+        if (count > 1) {
+          rowWarnings.push({
+            key,
+            label,
+            value: row?.[key],
+            count,
+          });
+        }
+      });
+
+      result[row?.id] = rowWarnings;
+    });
+
+    return result;
+  }, [records]);
 
   const getIndexById = useCallback(
     (id) => recordIds.findIndex((x) => x === id),
@@ -493,58 +578,58 @@ export default function RecordsTable({
     return [...selectedFsicRows].sort((a, b) => getIndexById(a) - getIndexById(b));
   }, [selectedFsicRows, getIndexById]);
 
-const visibleRows = useMemo(() => {
-  let baseRows =
-    fsicFilterMode === "selected"
-      ? sortedSelectedRows
-          .map((selectedId) => {
-            const originalIndex = records.findIndex((row) => row?.id === selectedId);
-            return {
-              row: records[originalIndex],
-              originalIndex,
-            };
-          })
-          .filter((item) => item.row)
-      : records.map((row, originalIndex) => ({
-          row,
-          originalIndex,
-        }));
+  const visibleRows = useMemo(() => {
+    let baseRows =
+      fsicFilterMode === "selected"
+        ? sortedSelectedRows
+            .map((selectedId) => {
+              const originalIndex = records.findIndex((row) => row?.id === selectedId);
+              return {
+                row: records[originalIndex],
+                originalIndex,
+              };
+            })
+            .filter((item) => item.row)
+        : records.map((row, originalIndex) => ({
+            row,
+            originalIndex,
+          }));
 
-  const fromDate = dateFrom ? getStartOfDay(parseToDate(dateFrom)) : null;
-  const toDate = dateTo ? getEndOfDay(parseToDate(dateTo)) : null;
+    const fromDate = dateFrom ? getStartOfDay(parseToDate(dateFrom)) : null;
+    const toDate = dateTo ? getEndOfDay(parseToDate(dateTo)) : null;
 
-  baseRows = baseRows.filter(({ row }) => {
-    const natureText = row?.natureOfInspection;
-    if (!matchesNatureFilter(natureText, natureFilter)) return false;
+    baseRows = baseRows.filter(({ row }) => {
+      const natureText = row?.natureOfInspection;
+      if (!matchesNatureFilter(natureText, natureFilter)) return false;
 
-    const inspectedDate = parseToDate(row?.dateInspected);
+      const inspectedDate = parseToDate(row?.dateInspected);
 
-    if (fromDate && (!inspectedDate || inspectedDate < fromDate)) return false;
-    if (toDate && (!inspectedDate || inspectedDate > toDate)) return false;
+      if (fromDate && (!inspectedDate || inspectedDate < fromDate)) return false;
+      if (toDate && (!inspectedDate || inspectedDate > toDate)) return false;
 
-    return true;
-  });
-
-  const hasDateSort = !!fromDate || !!toDate;
-
-  if (hasDateSort) {
-    baseRows.sort((a, b) => {
-      const dateA = parseToDate(a.row?.dateInspected);
-      const dateB = parseToDate(b.row?.dateInspected);
-
-      if (!dateA && !dateB) return a.originalIndex - b.originalIndex;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-
-      const diff = dateA.getTime() - dateB.getTime();
-      if (diff !== 0) return diff;
-
-      return a.originalIndex - b.originalIndex;
+      return true;
     });
-  }
 
-  return baseRows;
-}, [records, fsicFilterMode, sortedSelectedRows, natureFilter, dateFrom, dateTo]);
+    const hasDateSort = !!fromDate || !!toDate;
+
+    if (hasDateSort) {
+      baseRows.sort((a, b) => {
+        const dateA = parseToDate(a.row?.dateInspected);
+        const dateB = parseToDate(b.row?.dateInspected);
+
+        if (!dateA && !dateB) return a.originalIndex - b.originalIndex;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+
+        const diff = dateA.getTime() - dateB.getTime();
+        if (diff !== 0) return diff;
+
+        return a.originalIndex - b.originalIndex;
+      });
+    }
+
+    return baseRows;
+  }, [records, fsicFilterMode, sortedSelectedRows, natureFilter, dateFrom, dateTo]);
 
   const clearSelection = () => {
     setSelectedFsicRows([]);
@@ -950,6 +1035,24 @@ const visibleRows = useMemo(() => {
               const isActive = activeId && r.id === activeId;
               const isFsicSelected = selectedFsicRows.includes(r.id);
               const isNTC = isNatureNTC(r.natureOfInspection);
+              const duplicateWarnings = duplicateMap[r.id] || [];
+              const hasDuplicate = duplicateWarnings.length > 0;
+
+              const duplicateSummary = duplicateWarnings
+                .map((item) => `${item.label}: ${item.value}`)
+                .join(" • ");
+
+              const baseRowBg = isNTC
+                ? C.ntcBg
+                : hasDuplicate
+                ? visibleIndex % 2 === 0
+                  ? C.duplicateRowBg
+                  : C.duplicateRowAltBg
+                : isActive
+                ? "#ffe4e6"
+                : visibleIndex % 2 === 0
+                ? "#fff"
+                : "#fafafa";
 
               return (
                 <tr
@@ -957,34 +1060,33 @@ const visibleRows = useMemo(() => {
                   ref={isActive ? activeRowRef : null}
                   style={{
                     ...S.row,
-                    background: isNTC
-                      ? C.ntcBg
-                      : isActive
-                      ? "#ffe4e6"
-                      : visibleIndex % 2 === 0
-                      ? "#fff"
-                      : "#fafafa",
-                    color: isNTC ? "#ffffff" : C.text,
-                    boxShadow: isActive ? "inset 0 0 0 2px #b91c1c" : "none",
+                    background: baseRowBg,
+                    color: isNTC ? "#ffffff" : hasDuplicate ? C.duplicateText : C.text,
+                    boxShadow: isActive
+                      ? "inset 0 0 0 2px #b91c1c"
+                      : hasDuplicate
+                      ? `inset 4px 0 0 0 ${C.duplicateBorder}`
+                      : "none",
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive && !isNTC) {
-                      e.currentTarget.style.background = "#fff1f2";
+                      e.currentTarget.style.background = hasDuplicate
+                        ? "#fdba74"
+                        : "#fff1f2";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.background = isNTC
-                        ? C.ntcBg
-                        : visibleIndex % 2 === 0
-                        ? "#fff"
-                        : "#fafafa";
+                      e.currentTarget.style.background = baseRowBg;
                     }
                   }}
                   onClick={() => onRowClick?.(r)}
                 >
                   <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
                     <div style={wrap}>{r.fsicAppNo || "-"}</div>
+                    {hasDuplicate && (
+                      <div style={S.duplicateBadge}>⚠ Duplicate record</div>
+                    )}
                   </td>
 
                   <td
@@ -992,6 +1094,9 @@ const visibleRows = useMemo(() => {
                     title={isNTC ? "NTC" : undefined}
                   >
                     <div style={wrap}>{r.natureOfInspection || "-"}</div>
+                    {hasDuplicate && (
+                      <div style={S.duplicateHint}>{duplicateSummary}</div>
+                    )}
                   </td>
 
                   <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
@@ -1013,6 +1118,15 @@ const visibleRows = useMemo(() => {
                       ...S.fsicCell,
                       ...(isNTC ? S.ntcTd : {}),
                       ...(isFsicSelected ? S.fsicCellSelected : {}),
+                      ...(hasDuplicate && !isNTC
+                        ? {
+                            background: "#ffedd5",
+                            boxShadow: isFsicSelected
+                              ? `inset 0 0 0 2px ${C.selectedBorder}`
+                              : `inset 0 0 0 1px ${C.duplicateBorder}`,
+                            color: C.duplicateText,
+                          }
+                        : {}),
                     }}
                     onClick={(e) => handleFsicCellClick(r.id, e)}
                     title="Click / Ctrl+Click / Shift+Click then paste"
