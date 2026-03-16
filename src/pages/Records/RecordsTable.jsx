@@ -101,9 +101,11 @@ export default function RecordsTable({
     text: "#111827",
     muted: "#6b7280",
     white: "#ffffff",
+
     selectedBg: "#fee2e2",
     selectedBorder: "#dc2626",
     selectedText: "#7f1d1d",
+
     ntcBg: "#dc2626",
     ntcText: "#ffffff",
     ntcBorder: "#b91c1c",
@@ -114,6 +116,10 @@ export default function RecordsTable({
     duplicateText: "#9a3412",
     duplicateBadgeBg: "#fed7aa",
     duplicateBadgeText: "#9a3412",
+
+    natureSelectedBg: "#fee2e2",
+    natureSelectedBorder: "#dc2626",
+    natureSelectedText: "#7f1d1d",
   };
 
   const S = {
@@ -251,6 +257,21 @@ export default function RecordsTable({
       background: C.selectedBg,
       boxShadow: `inset 0 0 0 2px ${C.selectedBorder}`,
       color: C.selectedText,
+    },
+
+    natureCell: {
+      cursor: "cell",
+      position: "relative",
+      borderLeft: "1px solid transparent",
+      borderRight: "1px solid transparent",
+      transition: "all .12s ease",
+      background: "transparent",
+    },
+
+    natureCellSelected: {
+      background: C.natureSelectedBg,
+      boxShadow: `inset 0 0 0 2px ${C.natureSelectedBorder}`,
+      color: C.natureSelectedText,
     },
 
     headerFilterWrap: {
@@ -420,7 +441,11 @@ export default function RecordsTable({
   const natureMenuRef = useRef(null);
 
   const [selectedFsicRows, setSelectedFsicRows] = useState([]);
-  const [lastSelectedId, setLastSelectedId] = useState(null);
+  const [lastSelectedFsicId, setLastSelectedFsicId] = useState(null);
+
+  const [selectedNatureRows, setSelectedNatureRows] = useState([]);
+  const [lastSelectedNatureId, setLastSelectedNatureId] = useState(null);
+
   const [fsicFilterMode, setFsicFilterMode] = useState("all");
   const [fsicMenuOpen, setFsicMenuOpen] = useState(false);
 
@@ -460,7 +485,6 @@ export default function RecordsTable({
       fieldConfig.forEach(({ key }) => {
         const normalized = normalizeDuplicateKey(row?.[key]);
         if (!normalized) return;
-
         const current = counters[key].get(normalized) || 0;
         counters[key].set(normalized, current + 1);
       });
@@ -517,9 +541,13 @@ export default function RecordsTable({
     e.target.value = "";
   };
 
-  const applyPasteValues = useCallback(
-    (text) => {
-      if (!selectedFsicRows.length) return;
+  const pushUndoSnapshot = useCallback(() => {
+    setUndoStack((prev) => [...prev, records]);
+  }, [records]);
+
+  const applyPasteValuesToField = useCallback(
+    (text, rowIds, fieldName) => {
+      if (!rowIds.length) return;
       if (typeof onBulkUpdate !== "function") return;
       if (!text) return;
 
@@ -532,11 +560,9 @@ export default function RecordsTable({
       if (!values.length) return;
 
       const updated = [...records];
-      setUndoStack((prev) => [...prev, records]);
+      pushUndoSnapshot();
 
-      const targetRows = [...selectedFsicRows].sort(
-        (a, b) => getIndexById(a) - getIndexById(b)
-      );
+      const targetRows = [...rowIds].sort((a, b) => getIndexById(a) - getIndexById(b));
 
       if (values.length === 1) {
         targetRows.forEach((rowId) => {
@@ -544,7 +570,7 @@ export default function RecordsTable({
           if (updated[rowIndex]) {
             updated[rowIndex] = {
               ...updated[rowIndex],
-              fsicNo: values[0],
+              [fieldName]: values[0],
             };
           }
         });
@@ -554,7 +580,7 @@ export default function RecordsTable({
           if (updated[rowIndex] && values[i] !== undefined) {
             updated[rowIndex] = {
               ...updated[rowIndex],
-              fsicNo: values[i],
+              [fieldName]: values[i],
             };
           }
         });
@@ -562,7 +588,7 @@ export default function RecordsTable({
 
       onBulkUpdate(updated);
     },
-    [selectedFsicRows, onBulkUpdate, records, getIndexById]
+    [getIndexById, onBulkUpdate, pushUndoSnapshot, records]
   );
 
   useEffect(() => {
@@ -574,14 +600,14 @@ export default function RecordsTable({
     }
   }, [activeId, fsicFilterMode, natureFilter, dateFrom, dateTo]);
 
-  const sortedSelectedRows = useMemo(() => {
+  const sortedSelectedFsicRows = useMemo(() => {
     return [...selectedFsicRows].sort((a, b) => getIndexById(a) - getIndexById(b));
   }, [selectedFsicRows, getIndexById]);
 
   const visibleRows = useMemo(() => {
     let baseRows =
       fsicFilterMode === "selected"
-        ? sortedSelectedRows
+        ? sortedSelectedFsicRows
             .map((selectedId) => {
               const originalIndex = records.findIndex((row) => row?.id === selectedId);
               return {
@@ -629,11 +655,39 @@ export default function RecordsTable({
     }
 
     return baseRows;
-  }, [records, fsicFilterMode, sortedSelectedRows, natureFilter, dateFrom, dateTo]);
+  }, [records, fsicFilterMode, sortedSelectedFsicRows, natureFilter, dateFrom, dateTo]);
 
   const clearSelection = () => {
     setSelectedFsicRows([]);
-    setLastSelectedId(null);
+    setLastSelectedFsicId(null);
+    setSelectedNatureRows([]);
+    setLastSelectedNatureId(null);
+  };
+
+  const handleRangeSelection = (rowId, prev, lastSelectedId, isCtrl) => {
+    let next = [...prev];
+
+    const currentIndex = getIndexById(rowId);
+    const lastIndex = lastSelectedId ? getIndexById(lastSelectedId) : null;
+
+    if (lastIndex !== null && currentIndex !== -1) {
+      const start = Math.min(lastIndex, currentIndex);
+      const end = Math.max(lastIndex, currentIndex);
+
+      const rangeIds = records
+        .slice(start, end + 1)
+        .map((r) => r?.id)
+        .filter(Boolean);
+
+      if (isCtrl) {
+        const set = new Set([...prev, ...rangeIds]);
+        next = [...set];
+      } else {
+        next = rangeIds;
+      }
+    }
+
+    return next;
   };
 
   const handleFsicCellClick = (rowId, e) => {
@@ -645,24 +699,8 @@ export default function RecordsTable({
     setSelectedFsicRows((prev) => {
       let next = [...prev];
 
-      const currentIndex = getIndexById(rowId);
-      const lastIndex = lastSelectedId ? getIndexById(lastSelectedId) : null;
-
-      if (isShift && lastIndex !== null && currentIndex !== -1) {
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-
-        const rangeIds = records
-          .slice(start, end + 1)
-          .map((r) => r?.id)
-          .filter(Boolean);
-
-        if (isCtrl) {
-          const set = new Set([...prev, ...rangeIds]);
-          next = [...set];
-        } else {
-          next = rangeIds;
-        }
+      if (isShift) {
+        next = handleRangeSelection(rowId, prev, lastSelectedFsicId, isCtrl);
       } else if (isCtrl) {
         if (next.includes(rowId)) {
           next = next.filter((id) => id !== rowId);
@@ -676,12 +714,45 @@ export default function RecordsTable({
       return next;
     });
 
-    setLastSelectedId(rowId);
+    setLastSelectedFsicId(rowId);
+  };
+
+  const handleNatureCellClick = (rowId, e) => {
+    e.stopPropagation();
+
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const isShift = e.shiftKey;
+
+    setSelectedNatureRows((prev) => {
+      let next = [...prev];
+
+      if (isShift) {
+        next = handleRangeSelection(rowId, prev, lastSelectedNatureId, isCtrl);
+      } else if (isCtrl) {
+        if (next.includes(rowId)) {
+          next = next.filter((id) => id !== rowId);
+        } else {
+          next.push(rowId);
+        }
+      } else {
+        next = [rowId];
+      }
+
+      return next;
+    });
+
+    setLastSelectedNatureId(rowId);
   };
 
   useEffect(() => {
     const handleGlobalPaste = (e) => {
-      if (!selectedFsicRows.length) return;
+      if (
+        !selectedFsicRows.length &&
+        !selectedNatureRows.length
+      ) {
+        return;
+      }
+
       if (typeof onBulkUpdate !== "function") return;
 
       const activeEl = document.activeElement;
@@ -701,12 +772,20 @@ export default function RecordsTable({
       if (!text) return;
 
       e.preventDefault();
-      applyPasteValues(text);
+
+      if (selectedNatureRows.length) {
+        applyPasteValuesToField(text, selectedNatureRows, "natureOfInspection");
+        return;
+      }
+
+      if (selectedFsicRows.length) {
+        applyPasteValuesToField(text, selectedFsicRows, "fsicNo");
+      }
     };
 
     window.addEventListener("paste", handleGlobalPaste);
     return () => window.removeEventListener("paste", handleGlobalPaste);
-  }, [selectedFsicRows, onBulkUpdate, applyPasteValues]);
+  }, [selectedFsicRows, selectedNatureRows, onBulkUpdate, applyPasteValuesToField]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -720,7 +799,10 @@ export default function RecordsTable({
         }
       }
 
-      if (selectedFsicRows.length && (e.key === "Delete" || e.key === "Backspace")) {
+      if (
+        (selectedFsicRows.length || selectedNatureRows.length) &&
+        (e.key === "Delete" || e.key === "Backspace")
+      ) {
         const activeEl = document.activeElement;
         const tag = activeEl?.tagName?.toLowerCase();
         const isContentEditable = activeEl?.isContentEditable;
@@ -737,17 +819,29 @@ export default function RecordsTable({
         e.preventDefault();
 
         const updated = [...records];
-        setUndoStack((prev) => [...prev, records]);
+        pushUndoSnapshot();
 
-        selectedFsicRows.forEach((rowId) => {
-          const rowIndex = updated.findIndex((row) => row?.id === rowId);
-          if (updated[rowIndex]) {
-            updated[rowIndex] = {
-              ...updated[rowIndex],
-              fsicNo: "",
-            };
-          }
-        });
+        if (selectedNatureRows.length) {
+          selectedNatureRows.forEach((rowId) => {
+            const rowIndex = updated.findIndex((row) => row?.id === rowId);
+            if (updated[rowIndex]) {
+              updated[rowIndex] = {
+                ...updated[rowIndex],
+                natureOfInspection: "",
+              };
+            }
+          });
+        } else {
+          selectedFsicRows.forEach((rowId) => {
+            const rowIndex = updated.findIndex((row) => row?.id === rowId);
+            if (updated[rowIndex]) {
+              updated[rowIndex] = {
+                ...updated[rowIndex],
+                fsicNo: "",
+              };
+            }
+          });
+        }
 
         if (typeof onBulkUpdate === "function") {
           onBulkUpdate(updated);
@@ -764,7 +858,14 @@ export default function RecordsTable({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedFsicRows, records, onBulkUpdate, undoStack]);
+  }, [
+    selectedFsicRows,
+    selectedNatureRows,
+    records,
+    onBulkUpdate,
+    undoStack,
+    pushUndoSnapshot,
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -789,12 +890,14 @@ export default function RecordsTable({
       style={S.tableWrap}
       onClick={(e) => {
         const clickedInsideFsicCell = e.target.closest?.("[data-fsic-cell='true']");
+        const clickedInsideNatureCell = e.target.closest?.("[data-nature-cell='true']");
         const clickedInsideHeaderFilter = e.target.closest?.("[data-fsic-header-filter='true']");
         const clickedInsideDateFilter = e.target.closest?.("[data-date-header-filter='true']");
         const clickedInsideNatureFilter = e.target.closest?.("[data-nature-header-filter='true']");
 
         if (
           !clickedInsideFsicCell &&
+          !clickedInsideNatureCell &&
           !clickedInsideHeaderFilter &&
           !clickedInsideDateFilter &&
           !clickedInsideNatureFilter
@@ -920,7 +1023,12 @@ export default function RecordsTable({
                           borderBottom: "none",
                         }}
                         onClick={() => {
-                          if (selectedFsicRows.length === 0) {
+                          const combinedSelected = [
+                            ...selectedFsicRows,
+                            ...selectedNatureRows.filter((id) => !selectedFsicRows.includes(id)),
+                          ];
+
+                          if (combinedSelected.length === 0) {
                             setToast({
                               open: true,
                               title: "No Rows Selected",
@@ -928,6 +1036,8 @@ export default function RecordsTable({
                             });
                             return;
                           }
+
+                          setSelectedFsicRows(combinedSelected);
                           setFsicFilterMode("selected");
                           setFsicMenuOpen(false);
                         }}
@@ -1034,6 +1144,7 @@ export default function RecordsTable({
             visibleRows.map(({ row: r, originalIndex }, visibleIndex) => {
               const isActive = activeId && r.id === activeId;
               const isFsicSelected = selectedFsicRows.includes(r.id);
+              const isNatureSelected = selectedNatureRows.includes(r.id);
               const isNTC = isNatureNTC(r.natureOfInspection);
               const duplicateWarnings = duplicateMap[r.id] || [];
               const hasDuplicate = duplicateWarnings.length > 0;
@@ -1084,19 +1195,31 @@ export default function RecordsTable({
                 >
                   <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
                     <div style={wrap}>{r.fsicAppNo || "-"}</div>
-                    {hasDuplicate && (
-                      <div style={S.duplicateBadge}>⚠ Duplicate record</div>
-                    )}
+                    {hasDuplicate && <div style={S.duplicateBadge}>⚠ Duplicate record</div>}
                   </td>
 
                   <td
-                    style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}
-                    title={isNTC ? "NTC" : undefined}
+                    data-nature-cell="true"
+                    style={{
+                      ...S.td,
+                      ...S.natureCell,
+                      ...(isNTC ? S.ntcTd : {}),
+                      ...(isNatureSelected ? S.natureCellSelected : {}),
+                      ...(hasDuplicate && !isNTC
+                        ? {
+                            background: isNatureSelected ? C.selectedBg : "#ffedd5",
+                            boxShadow: isNatureSelected
+                              ? `inset 0 0 0 2px ${C.natureSelectedBorder}`
+                              : `inset 0 0 0 1px ${C.duplicateBorder}`,
+                            color: isNatureSelected ? C.natureSelectedText : C.duplicateText,
+                          }
+                        : {}),
+                    }}
+                    onClick={(e) => handleNatureCellClick(r.id, e)}
+                    title="Click / Ctrl+Click / Shift+Click then paste Nature of Inspection"
                   >
                     <div style={wrap}>{r.natureOfInspection || "-"}</div>
-                    {hasDuplicate && (
-                      <div style={S.duplicateHint}>{duplicateSummary}</div>
-                    )}
+                    {hasDuplicate && <div style={S.duplicateHint}>{duplicateSummary}</div>}
                   </td>
 
                   <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
@@ -1120,16 +1243,16 @@ export default function RecordsTable({
                       ...(isFsicSelected ? S.fsicCellSelected : {}),
                       ...(hasDuplicate && !isNTC
                         ? {
-                            background: "#ffedd5",
+                            background: isFsicSelected ? C.selectedBg : "#ffedd5",
                             boxShadow: isFsicSelected
                               ? `inset 0 0 0 2px ${C.selectedBorder}`
                               : `inset 0 0 0 1px ${C.duplicateBorder}`,
-                            color: C.duplicateText,
+                            color: isFsicSelected ? C.selectedText : C.duplicateText,
                           }
                         : {}),
                     }}
                     onClick={(e) => handleFsicCellClick(r.id, e)}
-                    title="Click / Ctrl+Click / Shift+Click then paste"
+                    title="Click / Ctrl+Click / Shift+Click then paste FSIC No"
                   >
                     <div style={wrap}>{r.fsicNo || "-"}</div>
                   </td>
