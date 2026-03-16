@@ -217,6 +217,103 @@ export default function Dashboard() {
     }
   };
 
+  const sanitizeSheetValue = (value) => {
+    if (value == null) return "";
+    if (typeof value === "object") {
+      if (typeof value.toDate === "function") {
+        const d = value.toDate();
+        return Number.isNaN(d.getTime()) ? "" : fmtDate(d);
+      }
+      if (Array.isArray(value)) return value.join(", ");
+      return JSON.stringify(value);
+    }
+    return value;
+  };
+
+  const mapRowsForExcel = (rows) => {
+    return rows.map((r, index) => ({
+      "#": index + 1,
+      "Record ID": sanitizeSheetValue(r.id),
+      "FSIC APP NO": sanitizeSheetValue(r.fsicAppNo),
+      "FSIC NO": sanitizeSheetValue(r.fsicNo),
+      "IO NUMBER": sanitizeSheetValue(r.ioNumber),
+      "Establishment Name": sanitizeSheetValue(r.establishmentName),
+      "Owner Name": sanitizeSheetValue(r.ownerName),
+      "Business Address": sanitizeSheetValue(r.businessAddress),
+      "Nature Of Inspection": sanitizeSheetValue(r.natureOfInspection),
+      "Date Inspected": sanitizeSheetValue(r.dateInspected),
+      "Created At": sanitizeSheetValue(r.createdAt),
+      "Updated At": sanitizeSheetValue(r.updatedAt),
+      "Date Text": sanitizeSheetValue(r.dateText),
+    }));
+  };
+
+  const exportRowsToExcel = (rows, fileName) => {
+    const safeRows = Array.isArray(rows) ? rows : [];
+
+    if (!safeRows.length) {
+      alert("Walay record nga ma-export.");
+      return;
+    }
+
+    const excelData = mapRowsForExcel(safeRows);
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+
+    worksheet["!cols"] = [
+      { wch: 6 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 26 },
+      { wch: 40 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 18 },
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Records");
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const handleExportAll = async (rowsToExport) => {
+    try {
+      setExporting(true);
+      exportRowsToExcel(rowsToExport || recent, "BFP-Records.xlsx");
+      setShowExport(false);
+    } catch (err) {
+      console.error("Export all failed:", err);
+      alert("Naay problem sa pag-export sa Excel.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportSelected = async (selectedRows, selectedIds) => {
+    try {
+      setExporting(true);
+
+      let finalRows = selectedRows;
+
+      if ((!finalRows || !finalRows.length) && selectedIds?.length) {
+        finalRows = recent.filter((r) => selectedIds.includes(String(r.id)));
+      }
+
+      exportRowsToExcel(finalRows || [], "selected-records.xlsx");
+      setShowExport(false);
+    } catch (err) {
+      console.error("Export selected failed:", err);
+      alert("Naay problem sa pag-export sa selected records.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const pageWrap = {
     padding: 22,
     background: `radial-gradient(1200px 600px at 12% 0%, rgba(185,28,28,0.12), transparent 55%), ${C.bg}`,
@@ -276,8 +373,8 @@ export default function Dashboard() {
       <ExportChoiceModal
         open={showExport}
         onClose={() => !exporting && setShowExport(false)}
-        onExportAll={() => {}}
-        onExportSelected={() => {}}
+        onExportAll={handleExportAll}
+        onExportSelected={handleExportSelected}
         rows={recent}
         busy={exporting}
         C={C}

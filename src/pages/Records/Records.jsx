@@ -48,11 +48,14 @@ const parseMonthYear = (val) => {
   if (iso) {
     const year = Number(iso[1]);
     const month = Number(iso[2]);
-    return { month: isNaN(month) ? null : month, year: isNaN(year) ? null : year };
+    return {
+      month: Number.isNaN(month) ? null : month,
+      year: Number.isNaN(year) ? null : year,
+    };
   }
 
   const dt = new Date(s);
-  if (!isNaN(dt.getTime())) {
+  if (!Number.isNaN(dt.getTime())) {
     return { month: dt.getMonth() + 1, year: dt.getFullYear() };
   }
 
@@ -78,6 +81,28 @@ const parseMonthYear = (val) => {
     month: found ? map[found] : null,
     year: yearMatch ? Number(yearMatch[1]) : null,
   };
+};
+
+const normalizeText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tokensOf = (value) => normalizeText(value).split(" ").filter(Boolean);
+
+const fieldMatchesCombinedSearch = (fieldValue, combinedSearch) => {
+  const field = normalizeText(fieldValue);
+  if (!field) return false;
+
+  if (field.includes(combinedSearch)) return true;
+  if (combinedSearch.includes(field)) return true;
+
+  const fieldTokens = tokensOf(field);
+  if (!fieldTokens.length) return false;
+
+  return fieldTokens.every((token) => combinedSearch.includes(token));
 };
 
 export default function Records({ refresh, setRefresh }) {
@@ -141,7 +166,7 @@ export default function Records({ refresh, setRefresh }) {
   }, [records]);
 
   const filtered = useMemo(() => {
-    const key = search.toLowerCase().trim();
+    const combinedSearch = normalizeText(search);
 
     const wantMonth = monthFilter === "ALL" ? null : Number(monthFilter);
     const wantYear = yearFilter === "ALL" ? null : Number(yearFilter);
@@ -152,15 +177,24 @@ export default function Records({ refresh, setRefresh }) {
       if (wantMonth && month !== wantMonth) return false;
       if (wantYear && year !== wantYear) return false;
 
-      if (!key) return true;
+      if (!combinedSearch) return true;
 
-      return (
-        (r.ownerName || "").toLowerCase().includes(key) ||
-        (r.establishmentName || "").toLowerCase().includes(key) ||
-        (r.ioNumber || "").toLowerCase().includes(key) ||
-        (r.fsicAppNo || "").toLowerCase().includes(key) ||
-        (r.natureOfInspection || "").toLowerCase().includes(key) ||
-        (r.inspectors || "").toLowerCase().includes(key)
+      const searchableFields = [
+        r.fsicAppNo,
+        r.fsicNo,
+        r.establishmentName,
+        r.ownerName,
+        r.ioNumber,
+        r.natureOfInspection,
+        r.inspectors,
+      ];
+
+      const rowCombined = normalizeText(searchableFields.join(" "));
+
+      if (rowCombined.includes(combinedSearch)) return true;
+
+      return searchableFields.some((field) =>
+        fieldMatchesCombinedSearch(field, combinedSearch)
       );
     });
   }, [records, search, monthFilter, yearFilter]);
@@ -328,7 +362,8 @@ export default function Records({ refresh, setRefresh }) {
     },
   };
 
-  const fullTitle = selectedRecord?.establishmentName || selectedRecord?.fsicAppNo || "Record Details";
+  const fullTitle =
+    selectedRecord?.establishmentName || selectedRecord?.fsicAppNo || "Record Details";
 
   return (
     <div style={page}>
@@ -368,14 +403,16 @@ export default function Records({ refresh, setRefresh }) {
       <div style={topbar}>
         <div style={topbarInner}>
           <div style={{ minWidth: 220 }}>
-            <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>Current Records</div>
+            <div style={{ fontSize: 16, fontWeight: 950, color: C.primaryDark }}>
+              Current Records
+            </div>
             <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginTop: 4 }}>
               Click a row → details opens full screen
             </div>
           </div>
 
           <input
-            placeholder="🔍 Search records..."
+            placeholder="🔍 Search many names / FSIC App / FSIC No..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={input}
@@ -400,6 +437,7 @@ export default function Records({ refresh, setRefresh }) {
           <button
             style={btn}
             onClick={() => {
+              setSearch("");
               setMonthFilter("ALL");
               setYearFilter("ALL");
             }}
@@ -432,8 +470,6 @@ export default function Records({ refresh, setRefresh }) {
           </div>
         </div>
       </div>
-
-      
 
       <DetailsFullScreen open={showDetails} title={fullTitle} onClose={() => setShowDetails(false)}>
         <RecordDetailsPanel
