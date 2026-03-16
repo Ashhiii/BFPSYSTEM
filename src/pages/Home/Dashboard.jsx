@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 
@@ -9,6 +9,7 @@ import QuickActions from "./parts/QuickActions";
 import RecentRecords from "./parts/RecentRecords";
 import ExportChoiceModal from "../../components/ExportChoiceModal";
 import BulkDownloadModal from "../../components/BulkDownloadModal";
+import PrintSelectionModal from "../../components/PrintSelectionModal";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ export default function Dashboard() {
   const [showBulkDownload, setShowBulkDownload] = useState(false);
   const [allRecords, setAllRecords] = useState([]);
 
+  const [showPrintModal, setShowPrintModal] = useState(false);
+
   const [totalRecords, setTotalRecords] = useState(0);
   const [renewedCount, setRenewedCount] = useState(0);
   const [activeId, setActiveId] = useState(null);
@@ -28,6 +31,8 @@ export default function Dashboard() {
 
   const [page, setPage] = useState(1);
   const pageSize = 4;
+
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const C = useMemo(
     () => ({
@@ -108,8 +113,13 @@ export default function Dashboard() {
               establishmentName: data.establishmentName || "",
               ownerName: data.ownerName || "",
               natureOfInspection: data.natureOfInspection || "",
+              createdAt: data.createdAt || null,
+              updatedAt: data.updatedAt || null,
+              createdAtMs: data.createdAtMs || null,
+              updatedAtMs: data.updatedAtMs || null,
               _dt: dt ? dt.getTime() : 0,
               dateText: dt ? fmtDate(dt) : "-",
+              ...data,
             };
           })
           .sort((a, b) => (b._dt || 0) - (a._dt || 0));
@@ -127,10 +137,85 @@ export default function Dashboard() {
   }, []);
 
   const total = recent.length;
+
   const visibleRecent = useMemo(() => {
     const start = (page - 1) * pageSize;
     return recent.slice(start, start + pageSize);
   }, [recent, page]);
+
+  const activeRecord = useMemo(() => {
+    return allRecords.find((r) => r.id === activeId) || null;
+  }, [allRecords, activeId]);
+
+  const getCertificateUrl = (recordId, value) => {
+    if (value === "owner") return `${API}/records/${recordId}/certificate/owner/pdf`;
+    if (value === "bfp") return `${API}/records/${recordId}/certificate/bfp/pdf`;
+    if (value === "owner-new") return `${API}/records/${recordId}/certificate/owner-new/pdf`;
+    if (value === "bfp-new") return `${API}/records/${recordId}/certificate/bfp-new/pdf`;
+    return "";
+  };
+
+  const printPdfBlob = async (blob) => {
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.src = blobUrl;
+
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Print iframe error:", err);
+        window.open(blobUrl, "_blank");
+      }
+
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch {}
+        window.URL.revokeObjectURL(blobUrl);
+      }, 5000);
+    };
+  };
+
+  const handlePrintSelected = async ({ selectedIds, template }) => {
+    if (!selectedIds?.length) {
+      alert("Pili una ug record(s) para ma-print.");
+      return;
+    }
+
+    if (!template) {
+      alert("Pili una ug template.");
+      return;
+    }
+
+    try {
+      for (const recordId of selectedIds) {
+        const url = getCertificateUrl(recordId, template);
+        if (!url) continue;
+
+        const res = await fetch(url, { method: "GET" });
+        if (!res.ok) {
+          throw new Error(`Failed to load printable PDF for record ${recordId}`);
+        }
+
+        const blob = await res.blob();
+        await printPdfBlob(blob);
+      }
+    } catch (err) {
+      console.error("Print failed:", err);
+      alert("Naay problem sa pag-print. Check backend endpoint or popup/print permissions.");
+    }
+  };
 
   const pageWrap = {
     padding: 22,
@@ -157,7 +242,7 @@ export default function Dashboard() {
             totalRecords={totalRecords}
             renewedCount={renewedCount}
             onDownloadAll={() => setShowBulkDownload(true)}
-            onPrint={() => window.print()}
+            onPrint={() => setShowPrintModal(true)}
           />
 
           <QuickActions
@@ -202,8 +287,20 @@ export default function Dashboard() {
         open={showBulkDownload}
         onClose={() => setShowBulkDownload(false)}
         records={allRecords}
-          apiBase={import.meta.env.VITE_API_URL}
-        showToast={(title, message) => alert(`${title}\n${message}`)}
+        apiBase={API}
+        C={C}
+      />
+
+      <PrintSelectionModal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        records={allRecords}
+        apiBase={API}
+        C={C}
+        onPrint={async (payload) => {
+          await handlePrintSelected(payload);
+          setShowPrintModal(false);
+        }}
       />
     </div>
   );

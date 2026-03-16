@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import InfoModal from "../components/InfoModal.jsx";
+import InfoModal from "./InfoModal";
 
 export default function BulkDownloadModal({
   open,
@@ -18,6 +18,8 @@ export default function BulkDownloadModal({
   const [feedbackTitle, setFeedbackTitle] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackType, setFeedbackType] = useState("info");
+
+  const [downloading, setDownloading] = useState(false);
 
   const options = useMemo(
     () => [
@@ -85,7 +87,18 @@ export default function BulkDownloadModal({
     return "";
   };
 
-  const handleDownload = () => {
+  const getDownloadFileName = (record, chosenTemplate) => {
+    const safeName = String(
+      record.establishmentName || record.fsicAppNo || record.id || "certificate"
+    )
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "_");
+
+    return `${safeName}_${chosenTemplate}.pdf`;
+  };
+
+  const handleDownload = async () => {
     if (!selectedRecords.length) {
       openFeedback("No Selected Rows", "Pili una ug records sa modal.", "warning");
       return;
@@ -96,28 +109,58 @@ export default function BulkDownloadModal({
       return;
     }
 
-    selectedRecords.forEach((record, index) => {
-      const url = getCertificateUrl(record.id, template);
-      if (!url) return;
+    setDownloading(true);
 
-      setTimeout(() => {
-        window.open(url, "_blank");
-      }, index * 250);
-    });
+    try {
+      for (const record of selectedRecords) {
+        const url = getCertificateUrl(record.id, template);
+        if (!url) continue;
 
-    openFeedback(
-      "Download Started",
-      `${selectedRecords.length} file(s) gi-open na base sa selected template.`,
-      "success"
-    );
+        const res = await fetch(url, {
+          method: "GET",
+        });
 
-    setTemplate("");
-    setSearch("");
-    setSelectedIds([]);
-    onClose?.();
+        if (!res.ok) {
+          throw new Error(`Failed to download record ${record.id}`);
+        }
+
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = getDownloadFileName(record, template);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(blobUrl);
+      }
+
+      setTemplate("");
+      setSearch("");
+      setSelectedIds([]);
+      onClose?.();
+
+      openFeedback(
+        "Download Started",
+        `${selectedRecords.length} file(s) Downloaded base on selected template.`,
+        "success"
+      );
+    } catch (err) {
+      console.error("Bulk download failed:", err);
+      openFeedback(
+        "Download Failed",
+        "There's a problem downloading the selected files. Check backend endpoint or network.",
+        "error"
+      );
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleClose = () => {
+    if (downloading) return;
     setTemplate("");
     setSearch("");
     setSelectedIds([]);
@@ -162,8 +205,15 @@ export default function BulkDownloadModal({
             <div style={{ fontSize: 18, fontWeight: 900 }}>
               Download Certificates
             </div>
-            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.92, fontWeight: 700 }}>
-              Pili ug records ug template para bulk download
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 12,
+                opacity: 0.92,
+                fontWeight: 700,
+              }}
+            >
+              Select records and template for bulk download
             </div>
           </div>
 
@@ -194,7 +244,7 @@ export default function BulkDownloadModal({
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by FSIC App No, establishment, owner..."
                   style={{
-                    width: "100%",
+                    width: "90%",
                     padding: "12px 14px",
                     borderRadius: 12,
                     border: "1px solid #e5e7eb",
@@ -221,15 +271,18 @@ export default function BulkDownloadModal({
                 <select
                   value={template}
                   onChange={(e) => setTemplate(e.target.value)}
+                  disabled={downloading}
                   style={{
                     width: "100%",
-                    padding: "12px 14px",
+                    padding: "8px 15px",
                     borderRadius: 12,
                     border: "1px solid #e5e7eb",
                     outline: "none",
                     fontWeight: 800,
                     color: "#111827",
                     background: "#fff",
+                    cursor: downloading ? "not-allowed" : "pointer",
+                    opacity: downloading ? 0.7 : 1,
                   }}
                 >
                   <option value="">Select template</option>
@@ -256,6 +309,7 @@ export default function BulkDownloadModal({
                 <button
                   type="button"
                   onClick={toggleSelectAllVisible}
+                  disabled={downloading}
                   style={{
                     padding: "10px 12px",
                     borderRadius: 10,
@@ -263,7 +317,8 @@ export default function BulkDownloadModal({
                     background: "#fff",
                     color: "#111827",
                     fontWeight: 900,
-                    cursor: "pointer",
+                    cursor: downloading ? "not-allowed" : "pointer",
+                    opacity: downloading ? 0.7 : 1,
                   }}
                 >
                   {allVisibleSelected ? "Unselect Visible" : "Select Visible"}
@@ -272,6 +327,7 @@ export default function BulkDownloadModal({
                 <button
                   type="button"
                   onClick={clearAll}
+                  disabled={downloading}
                   style={{
                     padding: "10px 12px",
                     borderRadius: 10,
@@ -279,7 +335,8 @@ export default function BulkDownloadModal({
                     background: "#fff",
                     color: "#111827",
                     fontWeight: 900,
-                    cursor: "pointer",
+                    cursor: downloading ? "not-allowed" : "pointer",
+                    opacity: downloading ? 0.7 : 1,
                   }}
                 >
                   Clear All
@@ -344,15 +401,17 @@ export default function BulkDownloadModal({
                             i === filteredRecords.length - 1
                               ? "none"
                               : "1px solid #f1f5f9",
-                          cursor: "pointer",
+                          cursor: downloading ? "not-allowed" : "pointer",
                           background: checked ? "#fef2f2" : "#fff",
                           alignItems: "center",
+                          opacity: downloading ? 0.75 : 1,
                         }}
                       >
                         <div>
                           <input
                             type="checkbox"
                             checked={checked}
+                            disabled={downloading}
                             onChange={() => toggleOne(r.id)}
                           />
                         </div>
@@ -408,6 +467,7 @@ export default function BulkDownloadModal({
             <button
               type="button"
               onClick={handleClose}
+              disabled={downloading}
               style={{
                 padding: "10px 14px",
                 borderRadius: 12,
@@ -415,7 +475,8 @@ export default function BulkDownloadModal({
                 background: "#fff",
                 color: "#111827",
                 fontWeight: 900,
-                cursor: "pointer",
+                cursor: downloading ? "not-allowed" : "pointer",
+                opacity: downloading ? 0.7 : 1,
               }}
             >
               Cancel
@@ -424,6 +485,7 @@ export default function BulkDownloadModal({
             <button
               type="button"
               onClick={handleDownload}
+              disabled={downloading}
               style={{
                 padding: "10px 14px",
                 borderRadius: 12,
@@ -431,10 +493,11 @@ export default function BulkDownloadModal({
                 background: "#b91c1c",
                 color: "#fff",
                 fontWeight: 900,
-                cursor: "pointer",
+                cursor: downloading ? "not-allowed" : "pointer",
+                opacity: downloading ? 0.8 : 1,
               }}
             >
-              Download Selected
+              {downloading ? "Downloading..." : "Download Selected"}
             </button>
           </div>
         </div>
