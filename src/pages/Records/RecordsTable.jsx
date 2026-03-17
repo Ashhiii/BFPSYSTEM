@@ -138,24 +138,18 @@ export default function RecordsTable({
     selectedBorder: "#dc2626",
     selectedText: "#7f1d1d",
 
-    ntcBg: "#dc2626",
-    ntcText: "#ffffff",
-    ntcBorder: "#b91c1c",
+    ntcText: "#dc2626",
+    ntcBorder: "#dc2626",
 
-    closedBg: "#fff7ed",
-    closedAltBg: "#ffedd5",
-    closedText: "#9a3412",
-    closedBorder: "#f59e0b",
+    closedText: "#ea580c",
+    closedBorder: "#f97316",
 
-    duplicateRowBg: "#fff7ed",
-    duplicateBorder: "#fb923c",
-    duplicateText: "#9a3412",
-    duplicateBadgeBg: "#fed7aa",
-    duplicateBadgeText: "#9a3412",
+    duplicateText: "#d97706",
+    duplicateBorder: "#f59e0b",
+    duplicateBadgeBg: "#fff7ed",
+    duplicateBadgeText: "#c2410c",
 
-    warningBg: "#fff7ed",
-    warningBorder: "#f59e0b",
-    warningText: "#9a3412",
+    warningText: "#d97706",
 
     natureSelectedBg: "#fee2e2",
     natureSelectedBorder: "#dc2626",
@@ -230,8 +224,9 @@ export default function RecordsTable({
       borderRadius: 10,
       color: C.warningText,
       fontSize: 14,
-      fontWeight: 500,
+      fontWeight: 700,
       cursor: "help",
+      flexShrink: 0,
     },
 
     ntcWarningIcon: {
@@ -242,17 +237,15 @@ export default function RecordsTable({
       alignItems: "center",
       justifyContent: "center",
       borderRadius: 10,
-      border: "1px solid rgba(255,255,255,.35)",
-      background: "rgba(255,255,255,.14)",
-      color: "#ffffff",
-      fontSize: 16,
-      fontWeight: 900,
+      color: C.ntcText,
+      fontSize: 14,
+      fontWeight: 700,
       cursor: "help",
-      boxSizing: "border-box",
+      flexShrink: 0,
     },
 
     closedWarningIcon: {
-      width: 32,
+      width: 12,
       minWidth: 32,
       height: 32,
       display: "inline-flex",
@@ -261,9 +254,9 @@ export default function RecordsTable({
       borderRadius: 10,
       color: C.closedText,
       fontSize: 14,
-      fontWeight: 500,
+      fontWeight: 700,
       cursor: "help",
-      boxSizing: "border-box",
+      flexShrink: 0,
     },
 
     selectWrap: {
@@ -271,6 +264,7 @@ export default function RecordsTable({
       width: "100%",
       maxWidth: 180,
       flex: 1,
+      minWidth: 0,
     },
 
     select: {
@@ -297,9 +291,9 @@ export default function RecordsTable({
       borderRadius: 10,
       fontSize: 12,
       fontWeight: 800,
-      border: "1px solid rgba(255,255,255,.35)",
-      background: "rgba(255,255,255,.12)",
-      color: "#ffffff",
+      border: `1px solid ${C.border}`,
+      background: "#fff",
+      color: C.ntcText,
       outline: "none",
       cursor: "pointer",
       appearance: "none",
@@ -315,8 +309,8 @@ export default function RecordsTable({
       borderRadius: 10,
       fontSize: 12,
       fontWeight: 800,
-      border: `1px solid ${C.closedBorder}`,
-      background: "#fffaf0",
+      border: `1px solid ${C.border}`,
+      background: "#fff",
       color: C.closedText,
       outline: "none",
       cursor: "pointer",
@@ -345,7 +339,7 @@ export default function RecordsTable({
       transform: "translateY(-50%)",
       pointerEvents: "none",
       fontSize: 10,
-      color: "#ffffff",
+      color: C.ntcText,
       fontWeight: 900,
     },
 
@@ -442,15 +436,16 @@ export default function RecordsTable({
       flexDirection: "column",
       overflow: "hidden",
     },
+
     headerDropdownSection: {
-    padding: "30px 12px 6px",
-    fontSize: 11,
-    fontWeight: 900,
-    color: C.muted,
-    textTransform: "uppercase",
-    letterSpacing: ".04em",
-    color: "orange"
-  },
+      padding: "10px 12px 6px",
+      fontSize: 11,
+      fontWeight: 900,
+      textTransform: "uppercase",
+      letterSpacing: ".04em",
+      color: "#f97316",
+      background: "#fff",
+    },
 
     headerDropdownBtn: {
       display: "block",
@@ -492,22 +487,22 @@ export default function RecordsTable({
 
     ntcTd: {
       background: "transparent",
-      color: "#ffffff",
-      borderBottom: `1px solid ${C.ntcBorder}`,
+      color: C.ntcText,
+      borderBottom: `1px solid ${C.border}`,
     },
 
     closedTd: {
       background: "transparent",
       color: C.closedText,
-      borderBottom: `1px solid ${C.closedBorder}`,
+      borderBottom: `1px solid ${C.border}`,
     },
 
     ntcGenerateTd: {
       padding: "10px",
       textAlign: "left",
       background: "transparent",
-      color: "#ffffff",
-      borderBottom: `1px solid ${C.ntcBorder}`,
+      color: C.ntcText,
+      borderBottom: `1px solid ${C.border}`,
     },
 
     closedGenerateTd: {
@@ -515,7 +510,7 @@ export default function RecordsTable({
       textAlign: "left",
       background: "transparent",
       color: C.closedText,
-      borderBottom: `1px solid ${C.closedBorder}`,
+      borderBottom: `1px solid ${C.border}`,
     },
 
     dateFilterBody: {
@@ -1091,38 +1086,36 @@ export default function RecordsTable({
 
                   {natureMenuOpen && (
                     <div style={{ ...S.headerDropdown, width: 190 }}>
-{NATURE_OPTIONS.map((item, index) => {
-  if (item.type === "section") {
-    return (
-      <div key={`section-${index}`} style={S.headerDropdownSection}>
-        {item.label}
-      </div>
-    );
-  }
+                      {NATURE_OPTIONS.map((item, index) => {
+                        if (item.type === "section") {
+                          return (
+                            <div key={`section-${index}`} style={S.headerDropdownSection}>
+                              {item.label}
+                            </div>
+                          );
+                        }
 
-  const nextItem = NATURE_OPTIONS[index + 1];
-  const isLastOption =
-    index === NATURE_OPTIONS.length - 1 ||
-    !nextItem;
+                        const nextItem = NATURE_OPTIONS[index + 1];
+                        const isLastOption = index === NATURE_OPTIONS.length - 1 || !nextItem;
 
-  return (
-    <button
-      key={item.value}
-      type="button"
-      style={{
-        ...S.headerDropdownBtn,
-        ...(natureFilter === item.value ? S.headerDropdownBtnActive : {}),
-        borderBottom: isLastOption ? "none" : `1px solid ${C.border}`,
-      }}
-      onClick={() => {
-        setNatureFilter(item.value);
-        setNatureMenuOpen(false);
-      }}
-    >
-      {item.label}
-    </button>
-  );
-})}
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            style={{
+                              ...S.headerDropdownBtn,
+                              ...(natureFilter === item.value ? S.headerDropdownBtnActive : {}),
+                              borderBottom: isLastOption ? "none" : `1px solid ${C.border}`,
+                            }}
+                            onClick={() => {
+                              setNatureFilter(item.value);
+                              setNatureMenuOpen(false);
+                            }}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1176,9 +1169,7 @@ export default function RecordsTable({
                         type="button"
                         style={{
                           ...S.headerDropdownBtn,
-                          ...(fsicFilterMode === "selected"
-                            ? S.headerDropdownBtnActive
-                            : {}),
+                          ...(fsicFilterMode === "selected" ? S.headerDropdownBtnActive : {}),
                           borderBottom: "none",
                         }}
                         onClick={() => {
@@ -1316,17 +1307,7 @@ export default function RecordsTable({
                 .map((item) => `${item.label}: ${item.value}`)
                 .join(" • ");
 
-              const baseRowBg = isNTC
-                ? C.ntcBg
-                : isClosed
-                ? visibleIndex % 2 === 0
-                  ? C.closedBg
-                  : C.closedAltBg
-                : hasDuplicate
-                ? visibleIndex % 2 === 0
-                  ? C.duplicateRowBg
-                  : C.duplicateRowAltBg
-                : isActive
+              const baseRowBg = isActive
                 ? "#ffe4e6"
                 : visibleIndex % 2 === 0
                 ? "#fff"
@@ -1340,7 +1321,7 @@ export default function RecordsTable({
                     ...S.row,
                     background: baseRowBg,
                     color: isNTC
-                      ? "#ffffff"
+                      ? C.ntcText
                       : isClosed
                       ? C.closedText
                       : hasDuplicate
@@ -1348,6 +1329,8 @@ export default function RecordsTable({
                       : C.text,
                     boxShadow: isActive
                       ? "inset 0 0 0 2px #b91c1c"
+                      : isNTC
+                      ? `inset 4px 0 0 0 ${C.ntcBorder}`
                       : isClosed
                       ? `inset 4px 0 0 0 ${C.closedBorder}`
                       : hasDuplicate
@@ -1355,12 +1338,8 @@ export default function RecordsTable({
                       : "none",
                   }}
                   onMouseEnter={(e) => {
-                    if (!isActive && !isNTC) {
-                      e.currentTarget.style.background = isClosed
-                        ? "#fde68a"
-                        : hasDuplicate
-                        ? "#fdba74"
-                        : "#fff1f2";
+                    if (!isActive) {
+                      e.currentTarget.style.background = "#fff7f7";
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -1391,10 +1370,9 @@ export default function RecordsTable({
                       ...(isNatureSelected ? S.natureCellSelected : {}),
                       ...(hasDuplicate && !isNTC && !isClosed
                         ? {
-                            background: isNatureSelected ? C.selectedBg : "#ffedd5",
                             boxShadow: isNatureSelected
                               ? `inset 0 0 0 2px ${C.natureSelectedBorder}`
-                              : `inset 0 0 0 1px ${C.duplicateBorder}`,
+                              : "none",
                             color: isNatureSelected ? C.natureSelectedText : C.duplicateText,
                           }
                         : {}),
@@ -1446,10 +1424,9 @@ export default function RecordsTable({
                       ...(isFsicSelected ? S.fsicCellSelected : {}),
                       ...(hasDuplicate && !isNTC && !isClosed
                         ? {
-                            background: isFsicSelected ? C.selectedBg : "#ffedd5",
                             boxShadow: isFsicSelected
                               ? `inset 0 0 0 2px ${C.selectedBorder}`
-                              : `inset 0 0 0 1px ${C.duplicateBorder}`,
+                              : "none",
                             color: isFsicSelected ? C.selectedText : C.duplicateText,
                           }
                         : {}),
@@ -1480,8 +1457,6 @@ export default function RecordsTable({
                     }
                   >
                     <div style={S.generateRowWrap} onClick={(e) => e.stopPropagation()}>
-
-
                       <div style={S.selectWrap}>
                         <select
                           defaultValue=""
@@ -1515,7 +1490,8 @@ export default function RecordsTable({
                           ▼
                         </span>
                       </div>
-                        {hasMissingTemplateFields && (
+
+                      {hasMissingTemplateFields && (
                         <span
                           style={
                             isNTC
