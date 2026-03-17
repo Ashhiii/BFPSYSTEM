@@ -252,7 +252,7 @@ const COMMON_FIELDS = [
   },
   {
     key: "marshalName",
-    label: "City / Municipal Fire Marshal",
+    label: "DFM",
     type: "text",
     required: false,
     span: 1,
@@ -273,7 +273,7 @@ const COMMON_FIELDS = [
     type: "text",
     required: false,
     span: 1,
-    placeholder: "CITY / MUNICIPAL FIRE MARSHAL",
+    placeholder: "FIRE MARSHAL",
   },
 ];
 

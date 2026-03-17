@@ -46,6 +46,9 @@ const NATURE_OPTIONS = [
   { value: "RENEW", label: "RENEW" },
   { value: "RE-INSPECTION", label: "RE-INSPECTION" },
   { value: "ANNUAL", label: "ANNUAL" },
+
+  { type: "section", label: "Remarks" },
+
   { value: "CLOSED", label: "CLOSED" },
   { value: "REFUSED", label: "REFUSED" },
   { value: "TRANSFER", label: "TRANSFER" },
@@ -77,6 +80,34 @@ const matchesNatureFilter = (value, filter) => {
 };
 
 const isNatureNTC = (value) => normalizeText(value).includes("NTC");
+const isNatureClosed = (value) => normalizeText(value).includes("CLOSED");
+
+const isEmptyValue = (value) => {
+  if (value === null || value === undefined) return true;
+  if (typeof value === "string") return value.trim() === "";
+  return false;
+};
+
+const getFirstExistingValue = (row, keys = []) => {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(row || {}, key)) continue;
+    return row?.[key];
+  }
+  return undefined;
+};
+
+const getMissingTemplateFields = (row) => {
+  const requiredFields = [
+    { label: "Height", keys: ["height", "buildingHeight"] },
+    { label: "High Rise", keys: ["highRise", "highrise"] },
+    { label: "No. of Storey", keys: ["noOfStorey", "noOfStoreys", "numberOfStorey"] },
+    { label: "FSMR", keys: ["fsmr"] },
+  ];
+
+  return requiredFields
+    .filter((field) => isEmptyValue(getFirstExistingValue(row, field.keys)))
+    .map((field) => field.label);
+};
 
 export default function RecordsTable({
   records = [],
@@ -111,12 +142,20 @@ export default function RecordsTable({
     ntcText: "#ffffff",
     ntcBorder: "#b91c1c",
 
+    closedBg: "#fff7ed",
+    closedAltBg: "#ffedd5",
+    closedText: "#9a3412",
+    closedBorder: "#f59e0b",
+
     duplicateRowBg: "#fff7ed",
-    duplicateRowAltBg: "#ffedd5",
     duplicateBorder: "#fb923c",
     duplicateText: "#9a3412",
     duplicateBadgeBg: "#fed7aa",
     duplicateBadgeText: "#9a3412",
+
+    warningBg: "#fff7ed",
+    warningBorder: "#f59e0b",
+    warningText: "#9a3412",
 
     natureSelectedBg: "#fee2e2",
     natureSelectedBorder: "#dc2626",
@@ -174,10 +213,64 @@ export default function RecordsTable({
       background: "transparent",
     },
 
+    generateRowWrap: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      width: "100%",
+    },
+
+    warningIcon: {
+      width: 12,
+      minWidth: 32,
+      height: 32,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 10,
+      color: C.warningText,
+      fontSize: 14,
+      fontWeight: 500,
+      cursor: "help",
+    },
+
+    ntcWarningIcon: {
+      width: 12,
+      minWidth: 32,
+      height: 32,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 10,
+      border: "1px solid rgba(255,255,255,.35)",
+      background: "rgba(255,255,255,.14)",
+      color: "#ffffff",
+      fontSize: 16,
+      fontWeight: 900,
+      cursor: "help",
+      boxSizing: "border-box",
+    },
+
+    closedWarningIcon: {
+      width: 32,
+      minWidth: 32,
+      height: 32,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 10,
+      color: C.closedText,
+      fontSize: 14,
+      fontWeight: 500,
+      cursor: "help",
+      boxSizing: "border-box",
+    },
+
     selectWrap: {
       position: "relative",
       width: "100%",
       maxWidth: 180,
+      flex: 1,
     },
 
     select: {
@@ -216,6 +309,24 @@ export default function RecordsTable({
       lineHeight: 1.2,
     },
 
+    closedSelect: {
+      width: "100%",
+      padding: "8px 34px 8px 12px",
+      borderRadius: 10,
+      fontSize: 12,
+      fontWeight: 800,
+      border: `1px solid ${C.closedBorder}`,
+      background: "#fffaf0",
+      color: C.closedText,
+      outline: "none",
+      cursor: "pointer",
+      appearance: "none",
+      WebkitAppearance: "none",
+      MozAppearance: "none",
+      boxSizing: "border-box",
+      lineHeight: 1.2,
+    },
+
     selectArrow: {
       position: "absolute",
       right: 12,
@@ -235,6 +346,17 @@ export default function RecordsTable({
       pointerEvents: "none",
       fontSize: 10,
       color: "#ffffff",
+      fontWeight: 900,
+    },
+
+    closedSelectArrow: {
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      transform: "translateY(-50%)",
+      pointerEvents: "none",
+      fontSize: 10,
+      color: C.closedText,
       fontWeight: 900,
     },
 
@@ -320,6 +442,15 @@ export default function RecordsTable({
       flexDirection: "column",
       overflow: "hidden",
     },
+    headerDropdownSection: {
+    padding: "30px 12px 6px",
+    fontSize: 11,
+    fontWeight: 900,
+    color: C.muted,
+    textTransform: "uppercase",
+    letterSpacing: ".04em",
+    color: "orange"
+  },
 
     headerDropdownBtn: {
       display: "block",
@@ -365,12 +496,26 @@ export default function RecordsTable({
       borderBottom: `1px solid ${C.ntcBorder}`,
     },
 
+    closedTd: {
+      background: "transparent",
+      color: C.closedText,
+      borderBottom: `1px solid ${C.closedBorder}`,
+    },
+
     ntcGenerateTd: {
       padding: "10px",
       textAlign: "left",
       background: "transparent",
       color: "#ffffff",
       borderBottom: `1px solid ${C.ntcBorder}`,
+    },
+
+    closedGenerateTd: {
+      padding: "10px",
+      textAlign: "left",
+      background: "transparent",
+      color: C.closedText,
+      borderBottom: `1px solid ${C.closedBorder}`,
     },
 
     dateFilterBody: {
@@ -946,26 +1091,38 @@ export default function RecordsTable({
 
                   {natureMenuOpen && (
                     <div style={{ ...S.headerDropdown, width: 190 }}>
-                      {NATURE_OPTIONS.map((item, index) => (
-                        <button
-                          key={item.value}
-                          type="button"
-                          style={{
-                            ...S.headerDropdownBtn,
-                            ...(natureFilter === item.value ? S.headerDropdownBtnActive : {}),
-                            borderBottom:
-                              index === NATURE_OPTIONS.length - 1
-                                ? "none"
-                                : `1px solid ${C.border}`,
-                          }}
-                          onClick={() => {
-                            setNatureFilter(item.value);
-                            setNatureMenuOpen(false);
-                          }}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
+{NATURE_OPTIONS.map((item, index) => {
+  if (item.type === "section") {
+    return (
+      <div key={`section-${index}`} style={S.headerDropdownSection}>
+        {item.label}
+      </div>
+    );
+  }
+
+  const nextItem = NATURE_OPTIONS[index + 1];
+  const isLastOption =
+    index === NATURE_OPTIONS.length - 1 ||
+    !nextItem;
+
+  return (
+    <button
+      key={item.value}
+      type="button"
+      style={{
+        ...S.headerDropdownBtn,
+        ...(natureFilter === item.value ? S.headerDropdownBtnActive : {}),
+        borderBottom: isLastOption ? "none" : `1px solid ${C.border}`,
+      }}
+      onClick={() => {
+        setNatureFilter(item.value);
+        setNatureMenuOpen(false);
+      }}
+    >
+      {item.label}
+    </button>
+  );
+})}
                     </div>
                   )}
                 </div>
@@ -1148,8 +1305,12 @@ export default function RecordsTable({
               const isFsicSelected = selectedFsicRows.includes(r.id);
               const isNatureSelected = selectedNatureRows.includes(r.id);
               const isNTC = isNatureNTC(r.natureOfInspection);
+              const isClosed = isNatureClosed(r.natureOfInspection);
               const duplicateWarnings = duplicateMap[r.id] || [];
               const hasDuplicate = duplicateWarnings.length > 0;
+
+              const missingFields = getMissingTemplateFields(r);
+              const hasMissingTemplateFields = missingFields.length > 0;
 
               const duplicateSummary = duplicateWarnings
                 .map((item) => `${item.label}: ${item.value}`)
@@ -1157,6 +1318,10 @@ export default function RecordsTable({
 
               const baseRowBg = isNTC
                 ? C.ntcBg
+                : isClosed
+                ? visibleIndex % 2 === 0
+                  ? C.closedBg
+                  : C.closedAltBg
                 : hasDuplicate
                 ? visibleIndex % 2 === 0
                   ? C.duplicateRowBg
@@ -1174,16 +1339,26 @@ export default function RecordsTable({
                   style={{
                     ...S.row,
                     background: baseRowBg,
-                    color: isNTC ? "#ffffff" : hasDuplicate ? C.duplicateText : C.text,
+                    color: isNTC
+                      ? "#ffffff"
+                      : isClosed
+                      ? C.closedText
+                      : hasDuplicate
+                      ? C.duplicateText
+                      : C.text,
                     boxShadow: isActive
                       ? "inset 0 0 0 2px #b91c1c"
+                      : isClosed
+                      ? `inset 4px 0 0 0 ${C.closedBorder}`
                       : hasDuplicate
                       ? `inset 4px 0 0 0 ${C.duplicateBorder}`
                       : "none",
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive && !isNTC) {
-                      e.currentTarget.style.background = hasDuplicate
+                      e.currentTarget.style.background = isClosed
+                        ? "#fde68a"
+                        : hasDuplicate
                         ? "#fdba74"
                         : "#fff1f2";
                     }
@@ -1195,7 +1370,13 @@ export default function RecordsTable({
                   }}
                   onClick={() => onRowClick?.(r)}
                 >
-                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
+                  <td
+                    style={{
+                      ...S.td,
+                      ...(isNTC ? S.ntcTd : {}),
+                      ...(isClosed ? S.closedTd : {}),
+                    }}
+                  >
                     <div style={wrap}>{r.fsicAppNo || "-"}</div>
                     {hasDuplicate && <div style={S.duplicateBadge}>⚠ Duplicate record</div>}
                   </td>
@@ -1206,8 +1387,9 @@ export default function RecordsTable({
                       ...S.td,
                       ...S.natureCell,
                       ...(isNTC ? S.ntcTd : {}),
+                      ...(isClosed ? S.closedTd : {}),
                       ...(isNatureSelected ? S.natureCellSelected : {}),
-                      ...(hasDuplicate && !isNTC
+                      ...(hasDuplicate && !isNTC && !isClosed
                         ? {
                             background: isNatureSelected ? C.selectedBg : "#ffedd5",
                             boxShadow: isNatureSelected
@@ -1224,15 +1406,33 @@ export default function RecordsTable({
                     {hasDuplicate && <div style={S.duplicateHint}>{duplicateSummary}</div>}
                   </td>
 
-                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
+                  <td
+                    style={{
+                      ...S.td,
+                      ...(isNTC ? S.ntcTd : {}),
+                      ...(isClosed ? S.closedTd : {}),
+                    }}
+                  >
                     <div style={wrap}>{r.ioNumber || "-"}</div>
                   </td>
 
-                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
+                  <td
+                    style={{
+                      ...S.td,
+                      ...(isNTC ? S.ntcTd : {}),
+                      ...(isClosed ? S.closedTd : {}),
+                    }}
+                  >
                     <div style={wrap}>{r.ownerName || "-"}</div>
                   </td>
 
-                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
+                  <td
+                    style={{
+                      ...S.td,
+                      ...(isNTC ? S.ntcTd : {}),
+                      ...(isClosed ? S.closedTd : {}),
+                    }}
+                  >
                     <div style={wrap}>{r.establishmentName || "-"}</div>
                   </td>
 
@@ -1242,8 +1442,9 @@ export default function RecordsTable({
                       ...S.td,
                       ...S.fsicCell,
                       ...(isNTC ? S.ntcTd : {}),
+                      ...(isClosed ? S.closedTd : {}),
                       ...(isFsicSelected ? S.fsicCellSelected : {}),
-                      ...(hasDuplicate && !isNTC
+                      ...(hasDuplicate && !isNTC && !isClosed
                         ? {
                             background: isFsicSelected ? C.selectedBg : "#ffedd5",
                             boxShadow: isFsicSelected
@@ -1259,27 +1460,75 @@ export default function RecordsTable({
                     <div style={wrap}>{r.fsicNo || "-"}</div>
                   </td>
 
-                  <td style={{ ...S.td, ...(isNTC ? S.ntcTd : {}) }}>
+                  <td
+                    style={{
+                      ...S.td,
+                      ...(isNTC ? S.ntcTd : {}),
+                      ...(isClosed ? S.closedTd : {}),
+                    }}
+                  >
                     <div style={wrap}>{r.dateInspected || "-"}</div>
                   </td>
 
-                  <td style={isNTC ? S.ntcGenerateTd : S.actionsTd}>
-                    <div style={S.selectWrap} onClick={(e) => e.stopPropagation()}>
-                      <select
-                        defaultValue=""
-                        style={isNTC ? S.ntcSelect : S.select}
-                        onChange={(e) => handleGenerateChange(e.target.value, r, e)}
-                      >
-                        <option value="" disabled>
-                          Select template
-                        </option>
-                        <option value="owner">Renew Owner PDF</option>
-                        <option value="bfp">Renew BFP PDF</option>
-                        <option value="owner-new">New Owner PDF</option>
-                        <option value="bfp-new">New BFP PDF</option>
-                      </select>
+                  <td
+                    style={
+                      isNTC
+                        ? S.ntcGenerateTd
+                        : isClosed
+                        ? S.closedGenerateTd
+                        : S.actionsTd
+                    }
+                  >
+                    <div style={S.generateRowWrap} onClick={(e) => e.stopPropagation()}>
 
-                      <span style={isNTC ? S.ntcSelectArrow : S.selectArrow}>▼</span>
+
+                      <div style={S.selectWrap}>
+                        <select
+                          defaultValue=""
+                          style={
+                            isNTC
+                              ? S.ntcSelect
+                              : isClosed
+                              ? S.closedSelect
+                              : S.select
+                          }
+                          onChange={(e) => handleGenerateChange(e.target.value, r, e)}
+                        >
+                          <option value="" disabled>
+                            Select template
+                          </option>
+                          <option value="owner">Renew Owner PDF</option>
+                          <option value="bfp">Renew BFP PDF</option>
+                          <option value="owner-new">New Owner PDF</option>
+                          <option value="bfp-new">New BFP PDF</option>
+                        </select>
+
+                        <span
+                          style={
+                            isNTC
+                              ? S.ntcSelectArrow
+                              : isClosed
+                              ? S.closedSelectArrow
+                              : S.selectArrow
+                          }
+                        >
+                          ▼
+                        </span>
+                      </div>
+                        {hasMissingTemplateFields && (
+                        <span
+                          style={
+                            isNTC
+                              ? S.ntcWarningIcon
+                              : isClosed
+                              ? S.closedWarningIcon
+                              : S.warningIcon
+                          }
+                          title={`Missing fields:\n${missingFields.join("\n")}`}
+                        >
+                          ⚠
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>

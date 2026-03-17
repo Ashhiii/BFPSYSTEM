@@ -49,6 +49,9 @@ export default function PrintSelectionModal({
       { value: "bfp", label: "Renew BFP PDF" },
       { value: "owner-new", label: "New Owner PDF" },
       { value: "bfp-new", label: "New BFP PDF" },
+      { value: "io", label: "IO PDF" },
+      { value: "reinspection", label: "Reinspection PDF" },
+      { value: "nfsi", label: "NFSI PDF" },
     ],
     []
   );

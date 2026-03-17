@@ -152,6 +152,9 @@ export default function Dashboard() {
     if (value === "bfp") return `${API}/records/${recordId}/certificate/bfp/pdf`;
     if (value === "owner-new") return `${API}/records/${recordId}/certificate/owner-new/pdf`;
     if (value === "bfp-new") return `${API}/records/${recordId}/certificate/bfp-new/pdf`;
+    if (value === "io") return `${API}/records/${recordId}/io/pdf`;
+    if (value === "reinspection") return `${API}/records/${recordId}/reinspection/pdf`;
+    if (value === "nfsi") return `${API}/records/${recordId}/nfsi/pdf`;
     return "";
   };
 
