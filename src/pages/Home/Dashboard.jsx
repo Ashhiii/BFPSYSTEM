@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
@@ -8,35 +7,31 @@ import { useNavigate } from "react-router-dom";
 import InsightCard from "./parts/InsightCard";
 import QuickActions from "./parts/QuickActions";
 import RecentRecords from "./parts/RecentRecords";
-import ExportChoiceModal from "../../components/ExportChoiceModal"; // ✅ NEW
+import ExportChoiceModal from "../../components/ExportChoiceModal";
 import BulkDownloadModal from "../../components/BulkDownloadModal";
 import PrintSelectionModal from "../../components/PrintSelectionModal";
-
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
   const [exporting, setExporting] = useState(false);
-  const [showExport, setShowExport] = useState(false); // ✅ NEW
+  const [showExport, setShowExport] = useState(false);
 
   const [totalRecords, setTotalRecords] = useState(0);
   const [renewedCount, setRenewedCount] = useState(0);
-  const [activeId, setActiveId] = useState(null); // ✅ track active record ID for RecentRecords
+  const [activeId, setActiveId] = useState(null);
+
   const [allRecords, setAllRecords] = useState([]);
-
   const [showBulkDownload, setShowBulkDownload] = useState(false);
-    const [showPrintModal, setShowPrintModal] = useState(false);
-
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const [recent, setRecent] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
 
-  // ✅ pagination for RecentRecords
   const [page, setPage] = useState(1);
   const pageSize = 4;
 
-    const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
-
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const C = useMemo(
     () => ({
@@ -56,8 +51,6 @@ export default function Dashboard() {
     []
   );
 
-  /* ================= HELPERS ================= */
-
   const parseAnyDate = (x) => {
     if (!x) return null;
     if (typeof x === "object" && typeof x.toDate === "function") return x.toDate();
@@ -75,7 +68,11 @@ export default function Dashboard() {
   const fmtDate = (d) => {
     if (!d) return "";
     try {
-      return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "2-digit" });
+      return d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "2-digit",
+      });
     } catch {
       return "";
     }
@@ -88,53 +85,61 @@ export default function Dashboard() {
     return d ? fmtDate(d) : S(v);
   };
 
-  // ✅ read canonical + legacy fallback (IMPORT KEY vs OLD KEY)
   const pick = (r, canon, legacy = []) => {
     const direct = r?.[canon];
     if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
+
     for (const k of legacy) {
       const v = r?.[k];
       if (v !== undefined && v !== null && String(v).trim() !== "") return v;
     }
+
     return "";
   };
-
 
   useEffect(() => {
     const load = async () => {
       setLoadingRecent(true);
       try {
-        const recSnap = await getDocs(collection(db, "records"));
+        const recQuery = query(collection(db, "records"), orderBy("createdAt", "desc"));
+        const recSnap = await getDocs(recQuery);
         setTotalRecords(recSnap.size);
 
         const renSnap = await getDocs(collection(db, "renewals"));
         setRenewedCount(renSnap.size);
 
-        const snap = await getDocs(collection(db, "records"));
+        const fullList = recSnap.docs.map((d) => {
+          const data = d.data() || {};
+          const dt =
+            (data.createdAtMs ? new Date(data.createdAtMs) : null) ||
+            parseAnyDate(data.createdAt) ||
+            (data.updatedAtMs ? new Date(data.updatedAtMs) : null) ||
+            parseAnyDate(data.updatedAt) ||
+            null;
 
-        const list = snap.docs
-          .map((d) => {
-            const data = d.data() || {};
-            const dt =
-              (data.createdAtMs ? new Date(data.createdAtMs) : null) ||
-              parseAnyDate(data.createdAt) ||
-              (data.updatedAtMs ? new Date(data.updatedAtMs) : null) ||
-              parseAnyDate(data.updatedAt) ||
-              null;
+          return {
+            id: d.id,
+            ...data,
+            _dt: dt ? dt.getTime() : 0,
+            dateText: dt ? fmtDate(dt) : "-",
+          };
+        });
 
-            return {
-              id: d.id,
-              fsicAppNo: data.fsicAppNo || "",
-              establishmentName: data.establishmentName || "",
-              ownerName: data.ownerName || "",
-              natureOfInspection: data.natureOfInspection || "",
-              _dt: dt ? dt.getTime() : 0,
-              dateText: dt ? fmtDate(dt) : "-",
-            };
-          })
-          .sort((a, b) => (b._dt || 0) - (a._dt || 0));
+        setAllRecords(fullList);
 
-        setRecent(list);
+        const recentList = [...fullList]
+          .sort((a, b) => (b._dt || 0) - (a._dt || 0))
+          .map((r) => ({
+            id: r.id,
+            fsicAppNo: r.fsicAppNo || "",
+            establishmentName: r.establishmentName || "",
+            ownerName: r.ownerName || "",
+            natureOfInspection: r.natureOfInspection || "",
+            _dt: r._dt || 0,
+            dateText: r.dateText || "-",
+          }));
+
+        setRecent(recentList);
         setPage(1);
       } catch (e) {
         console.error("Dashboard load error:", e);
@@ -146,13 +151,12 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // ✅ slice list for current page (4 per page)
   const total = recent.length;
+
   const visibleRecent = useMemo(() => {
     const start = (page - 1) * pageSize;
     return recent.slice(start, start + pageSize);
   }, [recent, page]);
-
 
   const activeRecord = useMemo(() => {
     return allRecords.find((r) => r.id === activeId) || null;
@@ -244,7 +248,7 @@ export default function Dashboard() {
     return value;
   };
 
-   const exportToExcel = async (list) => {
+  const exportToExcel = async (list) => {
     if (!list?.length) {
       alert("No records to export.");
       return;
@@ -258,10 +262,7 @@ export default function Dashboard() {
 
       return {
         "NO.": idx + 1,
-
-        // ✅ DO NOT mix fsicNo into fsicAppNo
         "FSIC APPLICATION NO.": S(r.fsicAppNo),
-
         "NATURE OF INSPECTION": S(r.natureOfInspection || r.NATURE_OF_INSPECTION),
         "NAME OF OWNER": S(r.ownerName || r.OWNERS_NAME || r.NAME_OF_OWNER),
         "NAME OF ESTABLISHMENT": S(r.establishmentName || r.ESTABLISHMENT_NAME || r.NAME_OF_ESTABLISHMENT),
@@ -278,9 +279,7 @@ export default function Dashboard() {
         "NTC NUMBER": S(r.ntcNumber || r.NTC_NUMBER),
         "NTC DATE": dateText(r.ntcDate || r.NTC_DATE),
 
-        // ✅ separate FSIC NO column
         "FSIC NO": S(r.fsicNo || r.FSIC_NUMBER),
-
         "FSIC VALIDITY": S(r.fsicValidity || r.FSIC_VALIDITY),
         DEFECTS: S(r.defects || r.DEFECTS),
         INSPECTORS: S(r.inspectors || r.INSPECTORS),
@@ -305,7 +304,7 @@ export default function Dashboard() {
 
     worksheet["!cols"] = [
       { wch: 6 },
-      { wch: 22 }, // FSIC APP
+      { wch: 22 },
       { wch: 22 },
       { wch: 24 },
       { wch: 28 },
@@ -317,7 +316,7 @@ export default function Dashboard() {
       { wch: 16 },
       { wch: 16 },
       { wch: 16 },
-      { wch: 16 }, // FSIC NO
+      { wch: 16 },
       { wch: 18 },
       { wch: 16 },
       { wch: 26 },
@@ -339,7 +338,6 @@ export default function Dashboard() {
     XLSX.writeFile(workbook, "BFP_Current_Records.xlsx");
   };
 
-  // ✅ Export ALL (fetch full docs so complete fields are included)
   const exportAll = async () => {
     if (exporting) return;
     setExporting(true);
@@ -358,7 +356,6 @@ export default function Dashboard() {
     }
   };
 
-  // ✅ Export SELECTED IDs (fetch full docs then filter)
   const exportSelected = async (ids) => {
     if (exporting) return;
     setExporting(true);
