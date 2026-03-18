@@ -124,37 +124,38 @@ export default function RecordsTable({
     overflow: "hidden",
     textOverflow: "ellipsis",
   };
+const C = {
+  primary: "#b91c1c",
+  primaryDark: "#7f1d1d",
+  softBg: "#fef2f2",
+  border: "#e5e7eb",
+  text: "#111827",
+  muted: "#6b7280",
+  white: "#ffffff",
 
-  const C = {
-    primary: "#b91c1c",
-    primaryDark: "#7f1d1d",
-    softBg: "#fef2f2",
-    border: "#e5e7eb",
-    text: "#111827",
-    muted: "#6b7280",
-    white: "#ffffff",
+  selectedBg: "#fee2e2",
+  selectedBorder: "#dc2626",
+  selectedText: "#7f1d1d",
 
-    selectedBg: "#fee2e2",
-    selectedBorder: "#dc2626",
-    selectedText: "#7f1d1d",
+  ntcText: "#ffffff",
+  ntcBorder: "#dc2626",
+  ntcRowBg: "#d13737",
+  ntcRowHoverBg: "#fecaca",
 
-    ntcText: "#dc2626",
-    ntcBorder: "#dc2626",
+  closedText: "#ea580c",
+  closedBorder: "#f97316",
 
-    closedText: "#ea580c",
-    closedBorder: "#f97316",
+  duplicateText: "#d97706",
+  duplicateBorder: "#f59e0b",
+  duplicateBadgeBg: "#fff7ed",
+  duplicateBadgeText: "#c2410c",
 
-    duplicateText: "#d97706",
-    duplicateBorder: "#f59e0b",
-    duplicateBadgeBg: "#fff7ed",
-    duplicateBadgeText: "#c2410c",
+  warningText: "#d97706",
 
-    warningText: "#d97706",
-
-    natureSelectedBg: "#fee2e2",
-    natureSelectedBorder: "#dc2626",
-    natureSelectedText: "#7f1d1d",
-  };
+  natureSelectedBg: "#fee2e2",
+  natureSelectedBorder: "#dc2626",
+  natureSelectedText: "#7f1d1d",
+};
 
   const S = {
     tableWrap: {
@@ -237,7 +238,7 @@ export default function RecordsTable({
       alignItems: "center",
       justifyContent: "center",
       borderRadius: 10,
-      color: C.ntcText,
+      color: C.ntcRowBg,
       fontSize: 14,
       fontWeight: 700,
       cursor: "help",
@@ -292,8 +293,8 @@ export default function RecordsTable({
       fontSize: 12,
       fontWeight: 800,
       border: `1px solid ${C.border}`,
-      background: "#fff",
-      color: C.ntcText,
+      background: "#d86a6a",
+      color: "white",
       outline: "none",
       cursor: "pointer",
       appearance: "none",
@@ -486,7 +487,7 @@ export default function RecordsTable({
     },
 
     ntcTd: {
-      background: "transparent",
+      background: C.ntcRowBg,
       color: C.ntcText,
       borderBottom: `1px solid ${C.border}`,
     },
@@ -1307,48 +1308,50 @@ export default function RecordsTable({
                 .map((item) => `${item.label}: ${item.value}`)
                 .join(" • ");
 
-              const baseRowBg = isActive
-                ? "#ffe4e6"
-                : visibleIndex % 2 === 0
-                ? "#fff"
-                : "#fafafa";
+const baseRowBg = isActive
+  ? "#ffe4e6"
+  : isNTC
+  ? C.ntcRowBg
+  : visibleIndex % 2 === 0
+  ? "#fff"
+  : "#fafafa";
 
-              return (
-                <tr
-                  key={r.id || originalIndex}
-                  ref={isActive ? activeRowRef : null}
-                  style={{
-                    ...S.row,
-                    background: baseRowBg,
-                    color: isNTC
-                      ? C.ntcText
-                      : isClosed
-                      ? C.closedText
-                      : hasDuplicate
-                      ? C.duplicateText
-                      : C.text,
-                    boxShadow: isActive
-                      ? "inset 0 0 0 2px #b91c1c"
-                      : isNTC
-                      ? `inset 4px 0 0 0 ${C.ntcBorder}`
-                      : isClosed
-                      ? `inset 4px 0 0 0 ${C.closedBorder}`
-                      : hasDuplicate
-                      ? `inset 4px 0 0 0 ${C.duplicateBorder}`
-                      : "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = "#fff7f7";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = baseRowBg;
-                    }
-                  }}
-                  onClick={() => onRowClick?.(r)}
-                >
+return (
+  <tr
+    key={r.id || originalIndex}
+    ref={isActive ? activeRowRef : null}
+    style={{
+      ...S.row,
+      background: baseRowBg,
+      color: isNTC
+        ? C.ntcText
+        : isClosed
+        ? C.closedText
+        : hasDuplicate
+        ? C.duplicateText
+        : C.text,
+      boxShadow: isActive
+        ? "inset 0 0 0 2px #b91c1c"
+        : isNTC
+        ? `inset 4px 0 0 0 ${C.ntcBorder}`
+        : isClosed
+        ? `inset 4px 0 0 0 ${C.closedBorder}`
+        : hasDuplicate
+        ? `inset 4px 0 0 0 ${C.duplicateBorder}`
+        : "none",
+    }}
+onMouseEnter={(e) => {
+  if (!isActive) {
+    e.currentTarget.style.background = isNTC ? C.ntcRowBg : "#fff7f7";
+  }
+}}
+    onMouseLeave={(e) => {
+      if (!isActive) {
+        e.currentTarget.style.background = baseRowBg;
+      }
+    }}
+    onClick={() => onRowClick?.(r)}
+  >
                   <td
                     style={{
                       ...S.td,

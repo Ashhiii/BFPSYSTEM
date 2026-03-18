@@ -412,7 +412,7 @@ export default function Records({ refresh, setRefresh }) {
           </div>
 
           <input
-            placeholder="🔍 Search many names / FSIC App / FSIC No..."
+            placeholder="🔍 Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={input}

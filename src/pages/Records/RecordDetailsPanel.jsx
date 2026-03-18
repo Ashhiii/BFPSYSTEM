@@ -13,7 +13,16 @@ import { useNavigate } from "react-router-dom";
 const HIGH_RISE_CHOICES = ["YES", "NO"];
 const FSMR_CHOICES = ["YES", "NO"];
 const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
-const NATURE_SUGGESTIONS = ["ANNUAL", "RENEW", "NEW", "RE-INSPECTION", "CLOSED", "REFUSED", "TRANSFER", "NTC"];
+const NATURE_SUGGESTIONS = [
+  "ANNUAL",
+  "RENEW",
+  "NEW",
+  "RE-INSPECTION",
+  "CLOSED",
+  "REFUSED",
+  "TRANSFER",
+  "NTC",
+];
 
 const OCCUPANCY_OPTIONS = [
   "ASSEMBLY",
@@ -414,7 +423,6 @@ export default function RecordDetailsPanel({
       });
 
       payload.updatedAt = serverTimestamp();
-
       payload.typeOfOccupancy = payload.occupancyType;
       payload.buildingDesc = payload.buildingDescription;
       payload.floorArea = payload.floorAreaSqm;
@@ -426,9 +434,16 @@ export default function RecordDetailsPanel({
 
       await setDoc(targetDocRef, payload, { merge: true });
 
+      const updatedRecord = {
+        ...record,
+        ...payload,
+        id: record.id,
+        _editedAt: Date.now(),
+      };
+
       setEditing(false);
-      setForm(buildFormFromRecord({ ...record, ...payload }));
-      onUpdated?.({ ...record, ...payload, id: record.id });
+      setForm(buildFormFromRecord(updatedRecord));
+      onUpdated?.(updatedRecord);
     } catch (e) {
       alert(`❌ SAVE ERROR: ${e.message}`);
     } finally {
