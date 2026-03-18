@@ -1,7 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 
 import { db } from "../../firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  writeBatch,
+  doc,
+} from "firebase/firestore";
 
 import { useLocation } from "react-router-dom";
 
@@ -154,6 +161,50 @@ export default function Records({ refresh, setRefresh }) {
     fetchCurrent().catch(() => setRecords([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
+
+  const saveChangedRows = useCallback(
+    async (changedRows = [], allUpdatedRecords = []) => {
+      if (!Array.isArray(changedRows) || !changedRows.length) {
+        if (Array.isArray(allUpdatedRecords) && allUpdatedRecords.length) {
+          setRecords(allUpdatedRecords);
+        }
+        return;
+      }
+
+      const batch = writeBatch(db);
+
+      changedRows.forEach((row) => {
+        if (!row?.id) return;
+
+        const { id, ...payload } = row;
+        const ref = doc(db, "records", id);
+        batch.set(ref, payload, { merge: true });
+      });
+
+      await batch.commit();
+
+      if (Array.isArray(allUpdatedRecords) && allUpdatedRecords.length) {
+        setRecords(allUpdatedRecords);
+      } else {
+        setRecords((prev) =>
+          prev.map((item) => {
+            const updated = changedRows.find((r) => String(r.id) === String(item.id));
+            return updated ? updated : item;
+          })
+        );
+      }
+
+      if (selectedRecord?.id) {
+        const freshSelected = changedRows.find(
+          (r) => String(r.id) === String(selectedRecord.id)
+        );
+        if (freshSelected) {
+          setSelectedRecord(freshSelected);
+        }
+      }
+    },
+    [selectedRecord]
+  );
 
   const yearOptions = useMemo(() => {
     const set = new Set();
@@ -466,6 +517,7 @@ export default function Records({ refresh, setRefresh }) {
                 setRecords(updatedRecords);
               }}
               onVisibleCountChange={setVisibleCount}
+              onAutoSave={saveChangedRows}
             />
           </div>
         </div>

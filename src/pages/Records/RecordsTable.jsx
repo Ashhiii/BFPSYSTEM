@@ -116,6 +116,7 @@ export default function RecordsTable({
   activeId,
   onBulkUpdate,
   onVisibleCountChange,
+  onAutoSave,
 }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
@@ -124,38 +125,39 @@ export default function RecordsTable({
     overflow: "hidden",
     textOverflow: "ellipsis",
   };
-const C = {
-  primary: "#b91c1c",
-  primaryDark: "#7f1d1d",
-  softBg: "#fef2f2",
-  border: "#e5e7eb",
-  text: "#111827",
-  muted: "#6b7280",
-  white: "#ffffff",
 
-  selectedBg: "#fee2e2",
-  selectedBorder: "#dc2626",
-  selectedText: "#7f1d1d",
+  const C = {
+    primary: "#b91c1c",
+    primaryDark: "#7f1d1d",
+    softBg: "#fef2f2",
+    border: "#e5e7eb",
+    text: "#111827",
+    muted: "#6b7280",
+    white: "#ffffff",
 
-  ntcText: "#ffffff",
-  ntcBorder: "#dc2626",
-  ntcRowBg: "#d13737",
-  ntcRowHoverBg: "#fecaca",
+    selectedBg: "#fee2e2",
+    selectedBorder: "#dc2626",
+    selectedText: "#7f1d1d",
 
-  closedText: "#ea580c",
-  closedBorder: "#f97316",
+    ntcText: "#ffffff",
+    ntcBorder: "#dc2626",
+    ntcRowBg: "#d13737",
+    ntcRowHoverBg: "#d13737",
 
-  duplicateText: "#d97706",
-  duplicateBorder: "#f59e0b",
-  duplicateBadgeBg: "#fff7ed",
-  duplicateBadgeText: "#c2410c",
+    closedText: "#ea580c",
+    closedBorder: "#f97316",
 
-  warningText: "#d97706",
+    duplicateText: "#d97706",
+    duplicateBorder: "#f59e0b",
+    duplicateBadgeBg: "#fff7ed",
+    duplicateBadgeText: "#c2410c",
 
-  natureSelectedBg: "#fee2e2",
-  natureSelectedBorder: "#dc2626",
-  natureSelectedText: "#7f1d1d",
-};
+    warningText: "#d97706",
+
+    natureSelectedBg: "#fee2e2",
+    natureSelectedBorder: "#dc2626",
+    natureSelectedText: "#7f1d1d",
+  };
 
   const S = {
     tableWrap: {
@@ -238,7 +240,7 @@ const C = {
       alignItems: "center",
       justifyContent: "center",
       borderRadius: 10,
-      color: C.ntcRowBg,
+      color: C.ntcText,
       fontSize: 14,
       fontWeight: 700,
       cursor: "help",
@@ -294,7 +296,7 @@ const C = {
       fontWeight: 800,
       border: `1px solid ${C.border}`,
       background: "#d86a6a",
-      color: "white",
+      color: "#fff",
       outline: "none",
       cursor: "pointer",
       appearance: "none",
@@ -501,7 +503,7 @@ const C = {
     ntcGenerateTd: {
       padding: "10px",
       textAlign: "left",
-      background: "transparent",
+      background: C.ntcRowBg,
       color: C.ntcText,
       borderBottom: `1px solid ${C.border}`,
     },
@@ -663,6 +665,20 @@ const C = {
     [recordIds]
   );
 
+  const pushUndoSnapshot = useCallback(() => {
+    setUndoStack((prev) => [...prev, records]);
+  }, [records]);
+
+  const saveUpdatedRows = useCallback(
+    async (updatedRecords, changedRowIds) => {
+      if (typeof onAutoSave !== "function") return;
+
+      const changedRows = updatedRecords.filter((row) => changedRowIds.includes(row?.id));
+      await onAutoSave(changedRows, updatedRecords);
+    },
+    [onAutoSave]
+  );
+
   const handleGenerateChange = (value, record, e) => {
     e.stopPropagation();
     if (!value) return;
@@ -683,12 +699,8 @@ const C = {
     e.target.value = "";
   };
 
-  const pushUndoSnapshot = useCallback(() => {
-    setUndoStack((prev) => [...prev, records]);
-  }, [records]);
-
   const applyPasteValuesToField = useCallback(
-    (text, rowIds, fieldName) => {
+    async (text, rowIds, fieldName) => {
       if (!rowIds.length) return;
       if (typeof onBulkUpdate !== "function") return;
       if (!text) return;
@@ -705,6 +717,7 @@ const C = {
       pushUndoSnapshot();
 
       const targetRows = [...rowIds].sort((a, b) => getIndexById(a) - getIndexById(b));
+      const changedIds = [];
 
       if (values.length === 1) {
         targetRows.forEach((rowId) => {
@@ -714,6 +727,7 @@ const C = {
               ...updated[rowIndex],
               [fieldName]: values[0],
             };
+            changedIds.push(rowId);
           }
         });
       } else {
@@ -724,13 +738,30 @@ const C = {
               ...updated[rowIndex],
               [fieldName]: values[i],
             };
+            changedIds.push(rowId);
           }
         });
       }
 
       onBulkUpdate(updated);
+
+      try {
+        await saveUpdatedRows(updated, changedIds);
+        setToast({
+          open: true,
+          title: "Auto-saved",
+          message: `${changedIds.length} row(s) saved successfully.`,
+        });
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+        setToast({
+          open: true,
+          title: "Auto-save failed",
+          message: "Na update ang table pero wala na-save sa database.",
+        });
+      }
     },
-    [getIndexById, onBulkUpdate, pushUndoSnapshot, records]
+    [getIndexById, onBulkUpdate, pushUndoSnapshot, records, saveUpdatedRows]
   );
 
   useEffect(() => {
@@ -799,6 +830,11 @@ const C = {
     return baseRows;
   }, [records, fsicFilterMode, sortedSelectedFsicRows, natureFilter, dateFrom, dateTo]);
 
+  const visibleRowIds = useMemo(
+    () => visibleRows.map((item) => item?.row?.id).filter(Boolean),
+    [visibleRows]
+  );
+
   useEffect(() => {
     onVisibleCountChange?.(visibleRows.length);
   }, [visibleRows.length, onVisibleCountChange]);
@@ -810,31 +846,27 @@ const C = {
     setLastSelectedNatureId(null);
   };
 
-  const handleRangeSelection = (rowId, prev, lastSelectedId, isCtrl) => {
-    let next = [...prev];
+  const handleRangeSelection = useCallback((rowId, prev, lastSelectedId, isCtrl, orderedIds) => {
+    if (!orderedIds?.length) return [rowId];
 
-    const currentIndex = getIndexById(rowId);
-    const lastIndex = lastSelectedId ? getIndexById(lastSelectedId) : null;
+    const currentIndex = orderedIds.indexOf(rowId);
+    const lastIndex = lastSelectedId ? orderedIds.indexOf(lastSelectedId) : -1;
 
-    if (lastIndex !== null && currentIndex !== -1) {
-      const start = Math.min(lastIndex, currentIndex);
-      const end = Math.max(lastIndex, currentIndex);
-
-      const rangeIds = records
-        .slice(start, end + 1)
-        .map((r) => r?.id)
-        .filter(Boolean);
-
-      if (isCtrl) {
-        const set = new Set([...prev, ...rangeIds]);
-        next = [...set];
-      } else {
-        next = rangeIds;
-      }
+    if (currentIndex === -1) return [rowId];
+    if (lastIndex === -1) {
+      return isCtrl ? Array.from(new Set([...prev, rowId])) : [rowId];
     }
 
-    return next;
-  };
+    const start = Math.min(lastIndex, currentIndex);
+    const end = Math.max(lastIndex, currentIndex);
+    const rangeIds = orderedIds.slice(start, end + 1);
+
+    if (isCtrl) {
+      return Array.from(new Set([...prev, ...rangeIds]));
+    }
+
+    return rangeIds;
+  }, []);
 
   const handleFsicCellClick = (rowId, e) => {
     e.stopPropagation();
@@ -846,7 +878,13 @@ const C = {
       let next = [...prev];
 
       if (isShift) {
-        next = handleRangeSelection(rowId, prev, lastSelectedFsicId, isCtrl);
+        next = handleRangeSelection(
+          rowId,
+          prev,
+          lastSelectedFsicId,
+          isCtrl,
+          visibleRowIds
+        );
       } else if (isCtrl) {
         if (next.includes(rowId)) {
           next = next.filter((id) => id !== rowId);
@@ -873,7 +911,13 @@ const C = {
       let next = [...prev];
 
       if (isShift) {
-        next = handleRangeSelection(rowId, prev, lastSelectedNatureId, isCtrl);
+        next = handleRangeSelection(
+          rowId,
+          prev,
+          lastSelectedNatureId,
+          isCtrl,
+          visibleRowIds
+        );
       } else if (isCtrl) {
         if (next.includes(rowId)) {
           next = next.filter((id) => id !== rowId);
@@ -891,7 +935,7 @@ const C = {
   };
 
   useEffect(() => {
-    const handleGlobalPaste = (e) => {
+    const handleGlobalPaste = async (e) => {
       if (!selectedFsicRows.length && !selectedNatureRows.length) {
         return;
       }
@@ -917,12 +961,12 @@ const C = {
       e.preventDefault();
 
       if (selectedNatureRows.length) {
-        applyPasteValuesToField(text, selectedNatureRows, "natureOfInspection");
+        await applyPasteValuesToField(text, selectedNatureRows, "natureOfInspection");
         return;
       }
 
       if (selectedFsicRows.length) {
-        applyPasteValuesToField(text, selectedFsicRows, "fsicNo");
+        await applyPasteValuesToField(text, selectedFsicRows, "fsicNo");
       }
     };
 
@@ -988,6 +1032,27 @@ const C = {
 
         if (typeof onBulkUpdate === "function") {
           onBulkUpdate(updated);
+
+          const changedIds = selectedNatureRows.length
+            ? [...selectedNatureRows]
+            : [...selectedFsicRows];
+
+          saveUpdatedRows(updated, changedIds)
+            .then(() => {
+              setToast({
+                open: true,
+                title: "Auto-saved",
+                message: `${changedIds.length} row(s) saved successfully.`,
+              });
+            })
+            .catch((err) => {
+              console.error("Auto-save failed:", err);
+              setToast({
+                open: true,
+                title: "Auto-save failed",
+                message: "Na update ang table pero wala na-save sa database.",
+              });
+            });
         }
       }
 
@@ -1008,6 +1073,7 @@ const C = {
     onBulkUpdate,
     undoStack,
     pushUndoSnapshot,
+    saveUpdatedRows,
   ]);
 
   useEffect(() => {
@@ -1308,50 +1374,50 @@ const C = {
                 .map((item) => `${item.label}: ${item.value}`)
                 .join(" • ");
 
-const baseRowBg = isActive
-  ? "#ffe4e6"
-  : isNTC
-  ? C.ntcRowBg
-  : visibleIndex % 2 === 0
-  ? "#fff"
-  : "#fafafa";
+              const baseRowBg = isActive
+                ? "#ffe4e6"
+                : isNTC
+                ? C.ntcRowBg
+                : visibleIndex % 2 === 0
+                ? "#fff"
+                : "#fafafa";
 
-return (
-  <tr
-    key={r.id || originalIndex}
-    ref={isActive ? activeRowRef : null}
-    style={{
-      ...S.row,
-      background: baseRowBg,
-      color: isNTC
-        ? C.ntcText
-        : isClosed
-        ? C.closedText
-        : hasDuplicate
-        ? C.duplicateText
-        : C.text,
-      boxShadow: isActive
-        ? "inset 0 0 0 2px #b91c1c"
-        : isNTC
-        ? `inset 4px 0 0 0 ${C.ntcBorder}`
-        : isClosed
-        ? `inset 4px 0 0 0 ${C.closedBorder}`
-        : hasDuplicate
-        ? `inset 4px 0 0 0 ${C.duplicateBorder}`
-        : "none",
-    }}
-onMouseEnter={(e) => {
-  if (!isActive) {
-    e.currentTarget.style.background = isNTC ? C.ntcRowBg : "#fff7f7";
-  }
-}}
-    onMouseLeave={(e) => {
-      if (!isActive) {
-        e.currentTarget.style.background = baseRowBg;
-      }
-    }}
-    onClick={() => onRowClick?.(r)}
-  >
+              return (
+                <tr
+                  key={r.id || originalIndex}
+                  ref={isActive ? activeRowRef : null}
+                  style={{
+                    ...S.row,
+                    background: baseRowBg,
+                    color: isNTC
+                      ? C.ntcText
+                      : isClosed
+                      ? C.closedText
+                      : hasDuplicate
+                      ? C.duplicateText
+                      : C.text,
+                    boxShadow: isActive
+                      ? "inset 0 0 0 2px #b91c1c"
+                      : isNTC
+                      ? `inset 4px 0 0 0 ${C.ntcBorder}`
+                      : isClosed
+                      ? `inset 4px 0 0 0 ${C.closedBorder}`
+                      : hasDuplicate
+                      ? `inset 4px 0 0 0 ${C.duplicateBorder}`
+                      : "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = isNTC ? C.ntcRowBg : "#fff7f7";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = baseRowBg;
+                    }
+                  }}
+                  onClick={() => onRowClick?.(r)}
+                >
                   <td
                     style={{
                       ...S.td,
