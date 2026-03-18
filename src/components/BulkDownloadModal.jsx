@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import InfoModal from "./InfoModal";
 
 export default function BulkDownloadModal({
@@ -21,12 +21,101 @@ export default function BulkDownloadModal({
 
   const [downloading, setDownloading] = useState(false);
 
-  const normalizeSearchText = (value) =>
-    String(value || "")
+  useEffect(() => {
+    if (!open) {
+      setTemplate("");
+      setSearch("");
+      setSelectedIds([]);
+      setDownloading(false);
+    }
+  }, [open]);
+
+  const normalizeText = useCallback((value) => {
+    return String(value || "")
       .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[\n\r\t]+/g, " ")
+      .replace(/[_/\\|,-]+/g, " ")
       .replace(/[^a-z0-9\s]/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
+  }, []);
+
+  const getSearchLines = useCallback(
+    (value) => {
+      return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => normalizeText(line))
+        .filter(Boolean);
+    },
+    [normalizeText]
+  );
+
+  const tokenizeSearch = useCallback(
+    (value) => {
+      return normalizeText(value)
+        .split(" ")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .filter((item) => item.length >= 2);
+    },
+    [normalizeText]
+  );
+
+  const getRecordSearchBlob = useCallback(
+    (record) => {
+      return normalizeText(
+        [
+          record.fsicAppNo,
+          record.establishmentName,
+          record.ownerName,
+          record.fsicNo,
+          record.ioNumber,
+          record.natureOfInspection,
+          record.address,
+          record.barangay,
+          record.contactNumber,
+          record.businessName,
+        ].join(" ")
+      );
+    },
+    [normalizeText]
+  );
+
+  const matchesSinglePhrase = useCallback(
+    (record, phrase) => {
+      const q = normalizeText(phrase);
+      if (!q) return true;
+
+      const blob = getRecordSearchBlob(record);
+      if (!blob) return false;
+
+      if (blob.includes(q)) return true;
+
+      const tokens = tokenizeSearch(q);
+      if (!tokens.length) return false;
+
+      return tokens.every((token) => blob.includes(token));
+    },
+    [normalizeText, getRecordSearchBlob, tokenizeSearch]
+  );
+
+  const matchesRecord = useCallback(
+    (record, rawSearch) => {
+      const raw = String(rawSearch || "").trim();
+      if (!raw) return true;
+
+      const lines = getSearchLines(raw);
+
+      if (lines.length > 1) {
+        return lines.some((line) => matchesSinglePhrase(record, line));
+      }
+
+      return matchesSinglePhrase(record, raw);
+    },
+    [getSearchLines, matchesSinglePhrase]
+  );
 
   const options = useMemo(
     () => [
@@ -39,26 +128,8 @@ export default function BulkDownloadModal({
   );
 
   const filteredRecords = useMemo(() => {
-    const q = normalizeSearchText(search);
-    if (!q) return records;
-
-    const terms = q.split(" ").filter(Boolean);
-
-    return records.filter((r) => {
-      const combined = normalizeSearchText(
-        [
-          r.fsicAppNo,
-          r.establishmentName,
-          r.ownerName,
-          r.fsicNo,
-          r.ioNumber,
-          r.natureOfInspection,
-        ].join(" ")
-      );
-
-      return terms.some((term) => combined.includes(term));
-    });
-  }, [records, search]);
+    return records.filter((record) => matchesRecord(record, search));
+  }, [records, search, matchesRecord]);
 
   const selectedRecords = useMemo(() => {
     return records.filter((r) => selectedIds.includes(String(r.id)));
@@ -154,16 +225,20 @@ export default function BulkDownloadModal({
         window.URL.revokeObjectURL(blobUrl);
       }
 
+      const count = selectedRecords.length;
+
       setTemplate("");
       setSearch("");
       setSelectedIds([]);
       onClose?.();
 
-      openFeedback(
-        "Download Started",
-        `${selectedRecords.length} file(s) downloaded based on selected template.`,
-        "success"
-      );
+      setTimeout(() => {
+        openFeedback(
+          "Download Started",
+          `${count} file(s) downloaded based on selected template.`,
+          "success"
+        );
+      }, 150);
     } catch (err) {
       console.error("Bulk download failed:", err);
       openFeedback(
@@ -255,11 +330,11 @@ export default function BulkDownloadModal({
                   Search records
                 </div>
 
-                <input
-                  type="text"
+                <textarea
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search"
+                  placeholder="Paste owner, establishment, FSIC, IO... one per line"
+                  rows={5}
                   style={{
                     width: "90%",
                     padding: "12px 14px",
@@ -269,6 +344,8 @@ export default function BulkDownloadModal({
                     fontWeight: 700,
                     color: "#111827",
                     background: "#fff",
+                    resize: "vertical",
+                    fontFamily: "inherit",
                   }}
                 />
               </div>
@@ -361,7 +438,7 @@ export default function BulkDownloadModal({
               </div>
 
               <div style={{ fontSize: 13, fontWeight: 900, color: "#6b7280" }}>
-                Selected: {selectedRecords.length}
+                Showing: {filteredRecords.length} | Selected: {selectedRecords.length}
               </div>
             </div>
 
@@ -398,7 +475,7 @@ export default function BulkDownloadModal({
                       padding: 20,
                       fontSize: 13,
                       fontWeight: 700,
-                      color: "#6b7280", 
+                      color: "#6b7280",
                     }}
                   >
                     No Records Found.

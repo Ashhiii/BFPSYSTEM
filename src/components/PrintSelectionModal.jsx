@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 
 export default function PrintSelectionModal({
   open,
@@ -43,12 +43,98 @@ export default function PrintSelectionModal({
     setDialog({ open: false, title: "", message: "" });
   };
 
-  const normalizeSearchText = (value) =>
-    String(value || "")
+  const normalizeText = useCallback((value) => {
+    return String(value || "")
       .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[\n\r\t]+/g, " ")
+      .replace(/[_/\\|,-]+/g, " ")
       .replace(/[^a-z0-9\s]/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
+  }, []);
+
+  const getSearchLines = useCallback(
+    (value) => {
+      return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => normalizeText(line))
+        .filter(Boolean);
+    },
+    [normalizeText]
+  );
+
+  const tokenizeSearch = useCallback(
+    (value) => {
+      return normalizeText(value)
+        .split(" ")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .filter((item) => item.length >= 2);
+    },
+    [normalizeText]
+  );
+
+  const getRecordSearchBlob = useCallback(
+    (record) => {
+      return normalizeText(
+        [
+          record.fsicAppNo,
+          record.establishmentName,
+          record.ownerName,
+          record.fsicNo,
+          record.ioNumber,
+          record.natureOfInspection,
+          record.address,
+          record.barangay,
+          record.contactNumber,
+          record.businessName,
+        ].join(" ")
+      );
+    },
+    [normalizeText]
+  );
+
+  const matchesSinglePhrase = useCallback(
+    (record, phrase) => {
+      const q = normalizeText(phrase);
+      if (!q) return true;
+
+      const blob = getRecordSearchBlob(record);
+      if (!blob) return false;
+
+      // Exact phrase / direct contains first
+      if (blob.includes(q)) return true;
+
+      // Fallback only for single typed query, but STRICT:
+      // all tokens in the phrase must exist in the record
+      const tokens = tokenizeSearch(q);
+      if (!tokens.length) return false;
+
+      return tokens.every((token) => blob.includes(token));
+    },
+    [normalizeText, getRecordSearchBlob, tokenizeSearch]
+  );
+
+  const matchesRecord = useCallback(
+    (record, rawSearch) => {
+      const raw = String(rawSearch || "").trim();
+      if (!raw) return true;
+
+      const lines = getSearchLines(raw);
+
+      // If pasted multiple lines:
+      // row matches if ANY one complete line matches
+      if (lines.length > 1) {
+        return lines.some((line) => matchesSinglePhrase(record, line));
+      }
+
+      // Single line search
+      return matchesSinglePhrase(record, raw);
+    },
+    [getSearchLines, matchesSinglePhrase]
+  );
 
   const options = useMemo(
     () => [
@@ -64,26 +150,8 @@ export default function PrintSelectionModal({
   );
 
   const filteredRecords = useMemo(() => {
-    const q = normalizeSearchText(search);
-    if (!q) return records;
-
-    const terms = q.split(" ").filter(Boolean);
-
-    return records.filter((r) => {
-      const combined = normalizeSearchText(
-        [
-          r.fsicAppNo,
-          r.establishmentName,
-          r.ownerName,
-          r.fsicNo,
-          r.ioNumber,
-          r.natureOfInspection,
-        ].join(" ")
-      );
-
-      return terms.some((term) => combined.includes(term));
-    });
-  }, [records, search]);
+    return records.filter((record) => matchesRecord(record, search));
+  }, [records, search, matchesRecord]);
 
   const selectedRecords = useMemo(() => {
     return records.filter((r) => selectedIds.includes(String(r.id)));
@@ -228,11 +296,11 @@ export default function PrintSelectionModal({
                   Search records
                 </div>
 
-                <input
-                  type="text"
+                <textarea
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search"
+                  placeholder="Paste owner, establishment, FSIC, IO... one per line"
+                  rows={5}
                   style={{
                     width: "90%",
                     padding: "12px 14px",
@@ -242,6 +310,8 @@ export default function PrintSelectionModal({
                     fontWeight: 700,
                     color: "#111827",
                     background: "#fff",
+                    resize: "vertical",
+                    fontFamily: "inherit",
                   }}
                 />
               </div>
@@ -334,7 +404,7 @@ export default function PrintSelectionModal({
               </div>
 
               <div style={{ fontSize: 13, fontWeight: 900, color: "#6b7280" }}>
-                Selected: {selectedRecords.length}
+                Showing: {filteredRecords.length} | Selected: {selectedRecords.length}
               </div>
             </div>
 
