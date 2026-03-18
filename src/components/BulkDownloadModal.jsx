@@ -21,6 +21,13 @@ export default function BulkDownloadModal({
 
   const [downloading, setDownloading] = useState(false);
 
+  const normalizeSearchText = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
   const options = useMemo(
     () => [
       { value: "owner", label: "Renew Owner PDF" },
@@ -32,14 +39,24 @@ export default function BulkDownloadModal({
   );
 
   const filteredRecords = useMemo(() => {
-    const q = String(search || "").trim().toLowerCase();
+    const q = normalizeSearchText(search);
     if (!q) return records;
 
+    const terms = q.split(" ").filter(Boolean);
+
     return records.filter((r) => {
-      const fsic = String(r.fsicAppNo || "").toLowerCase();
-      const est = String(r.establishmentName || "").toLowerCase();
-      const owner = String(r.ownerName || "").toLowerCase();
-      return fsic.includes(q) || est.includes(q) || owner.includes(q);
+      const combined = normalizeSearchText(
+        [
+          r.fsicAppNo,
+          r.establishmentName,
+          r.ownerName,
+          r.fsicNo,
+          r.ioNumber,
+          r.natureOfInspection,
+        ].join(" ")
+      );
+
+      return terms.some((term) => combined.includes(term));
     });
   }, [records, search]);
 
@@ -144,7 +161,7 @@ export default function BulkDownloadModal({
 
       openFeedback(
         "Download Started",
-        `${selectedRecords.length} file(s) Downloaded base on selected template.`,
+        `${selectedRecords.length} file(s) downloaded based on selected template.`,
         "success"
       );
     } catch (err) {
@@ -242,7 +259,7 @@ export default function BulkDownloadModal({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by FSIC App No, establishment, owner..."
+                  placeholder="Search"
                   style={{
                     width: "90%",
                     padding: "12px 14px",
@@ -381,10 +398,10 @@ export default function BulkDownloadModal({
                       padding: 20,
                       fontSize: 13,
                       fontWeight: 700,
-                      color: "#6b7280",
+                      color: "#6b7280", 
                     }}
                   >
-                    Walay records nakita.
+                    No Records Found.
                   </div>
                 ) : (
                   filteredRecords.map((r, i) => {

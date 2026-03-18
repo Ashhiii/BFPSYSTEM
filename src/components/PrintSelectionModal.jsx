@@ -43,6 +43,13 @@ export default function PrintSelectionModal({
     setDialog({ open: false, title: "", message: "" });
   };
 
+  const normalizeSearchText = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
   const options = useMemo(
     () => [
       { value: "owner", label: "Renew Owner PDF" },
@@ -57,14 +64,24 @@ export default function PrintSelectionModal({
   );
 
   const filteredRecords = useMemo(() => {
-    const q = String(search || "").trim().toLowerCase();
+    const q = normalizeSearchText(search);
     if (!q) return records;
 
+    const terms = q.split(" ").filter(Boolean);
+
     return records.filter((r) => {
-      const fsic = String(r.fsicAppNo || "").toLowerCase();
-      const est = String(r.establishmentName || "").toLowerCase();
-      const owner = String(r.ownerName || "").toLowerCase();
-      return fsic.includes(q) || est.includes(q) || owner.includes(q);
+      const combined = normalizeSearchText(
+        [
+          r.fsicAppNo,
+          r.establishmentName,
+          r.ownerName,
+          r.fsicNo,
+          r.ioNumber,
+          r.natureOfInspection,
+        ].join(" ")
+      );
+
+      return terms.some((term) => combined.includes(term));
     });
   }, [records, search]);
 
@@ -215,7 +232,7 @@ export default function PrintSelectionModal({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by FSIC App No, establishment, owner..."
+                  placeholder="Search"
                   style={{
                     width: "90%",
                     padding: "12px 14px",

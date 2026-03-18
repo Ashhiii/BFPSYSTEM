@@ -144,8 +144,8 @@ export default function RecordsTable({
     ntcRowBg: "#d13737",
     ntcRowHoverBg: "#d13737",
 
-    closedText: "#ea580c",
-    closedBorder: "#f97316",
+    closedText: "#ff1616",
+    closedBorder: "#ff1616",
 
     duplicateText: "#d97706",
     duplicateBorder: "#f59e0b",
@@ -699,80 +699,6 @@ export default function RecordsTable({
     e.target.value = "";
   };
 
-  const applyPasteValuesToField = useCallback(
-    async (text, rowIds, fieldName) => {
-      if (!rowIds.length) return;
-      if (typeof onBulkUpdate !== "function") return;
-      if (!text) return;
-
-      const values = text
-        .replace(/\r/g, "")
-        .split(/\n|\t/)
-        .map((v) => v.trim())
-        .filter((v) => v !== "");
-
-      if (!values.length) return;
-
-      const updated = [...records];
-      pushUndoSnapshot();
-
-      const targetRows = [...rowIds].sort((a, b) => getIndexById(a) - getIndexById(b));
-      const changedIds = [];
-
-      if (values.length === 1) {
-        targetRows.forEach((rowId) => {
-          const rowIndex = updated.findIndex((row) => row?.id === rowId);
-          if (updated[rowIndex]) {
-            updated[rowIndex] = {
-              ...updated[rowIndex],
-              [fieldName]: values[0],
-            };
-            changedIds.push(rowId);
-          }
-        });
-      } else {
-        targetRows.forEach((rowId, i) => {
-          const rowIndex = updated.findIndex((row) => row?.id === rowId);
-          if (updated[rowIndex] && values[i] !== undefined) {
-            updated[rowIndex] = {
-              ...updated[rowIndex],
-              [fieldName]: values[i],
-            };
-            changedIds.push(rowId);
-          }
-        });
-      }
-
-      onBulkUpdate(updated);
-
-      try {
-        await saveUpdatedRows(updated, changedIds);
-        setToast({
-          open: true,
-          title: "Auto-saved",
-          message: `${changedIds.length} row(s) saved successfully.`,
-        });
-      } catch (err) {
-        console.error("Auto-save failed:", err);
-        setToast({
-          open: true,
-          title: "Auto-save failed",
-          message: "Na update ang table pero wala na-save sa database.",
-        });
-      }
-    },
-    [getIndexById, onBulkUpdate, pushUndoSnapshot, records, saveUpdatedRows]
-  );
-
-  useEffect(() => {
-    if (activeRowRef.current) {
-      activeRowRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [activeId, fsicFilterMode, natureFilter, dateFrom, dateTo]);
-
   const sortedSelectedFsicRows = useMemo(() => {
     return [...selectedFsicRows].sort((a, b) => getIndexById(a) - getIndexById(b));
   }, [selectedFsicRows, getIndexById]);
@@ -834,6 +760,82 @@ export default function RecordsTable({
     () => visibleRows.map((item) => item?.row?.id).filter(Boolean),
     [visibleRows]
   );
+
+  const applyPasteValuesToField = useCallback(
+    async (text, rowIds, fieldName) => {
+      if (!rowIds.length) return;
+      if (typeof onBulkUpdate !== "function") return;
+      if (!text) return;
+
+      const values = text
+        .replace(/\r/g, "")
+        .split(/\n|\t/)
+        .map((v) => v.trim())
+        .filter((v) => v !== "");
+
+      if (!values.length) return;
+
+      const updated = [...records];
+      pushUndoSnapshot();
+
+      // IMPORTANT: current visible order sa table ang sundon
+      const targetRows = visibleRowIds.filter((id) => rowIds.includes(id));
+
+      const changedIds = [];
+
+      if (values.length === 1) {
+        targetRows.forEach((rowId) => {
+          const rowIndex = updated.findIndex((row) => row?.id === rowId);
+          if (updated[rowIndex]) {
+            updated[rowIndex] = {
+              ...updated[rowIndex],
+              [fieldName]: values[0],
+            };
+            changedIds.push(rowId);
+          }
+        });
+      } else {
+        targetRows.forEach((rowId, i) => {
+          const rowIndex = updated.findIndex((row) => row?.id === rowId);
+          if (updated[rowIndex] && values[i] !== undefined) {
+            updated[rowIndex] = {
+              ...updated[rowIndex],
+              [fieldName]: values[i],
+            };
+            changedIds.push(rowId);
+          }
+        });
+      }
+
+      onBulkUpdate(updated);
+
+      try {
+        await saveUpdatedRows(updated, changedIds);
+        setToast({
+          open: true,
+          title: "Auto-saved",
+          message: `${changedIds.length} row(s) saved successfully.`,
+        });
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+        setToast({
+          open: true,
+          title: "Auto-save failed",
+          message: "Na update ang table pero wala na-save sa database.",
+        });
+      }
+    },
+    [onBulkUpdate, pushUndoSnapshot, records, saveUpdatedRows, visibleRowIds]
+  );
+
+  useEffect(() => {
+    if (activeRowRef.current) {
+      activeRowRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeId, fsicFilterMode, natureFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     onVisibleCountChange?.(visibleRows.length);
