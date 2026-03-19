@@ -263,7 +263,6 @@ const FIELDS = [
 
   { key: "chiefName", label: "Chief, Fire Safety Enforcement Section", placeholder: "Chief name", required: false, type: "text", span: 1 },
   { key: "chiefPosition", label: "Chief Position", placeholder: "Chief, Fire Prevention Branch", required: false, type: "text", span: 1 },
-  { key: "marshalPosition", label: "Chief Position", placeholder: "District Fire Marshal", required: false, type: "text", span: 1 },
   { key: "marshalName", label: "District Fire Marshal", placeholder: "Marshal name", required: false, type: "text", span: 1 },
 ];
 
