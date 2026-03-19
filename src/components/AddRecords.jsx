@@ -195,7 +195,6 @@ const FSMR_CHOICES = ["YES", "NO"];
 const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
 
 const DUPLICATE_CHECK_FIELDS = {
-  fsicAppNo: "FSIC App No",
   fsicNo: "FSIC No",
   ioNumber: "IO Number",
   ntcNumber: "NTC Number",
