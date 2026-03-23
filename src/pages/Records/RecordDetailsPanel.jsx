@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 
 const HIGH_RISE_CHOICES = ["YES", "NO"];
 const FSMR_CHOICES = ["YES", "NO"];
-const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
+const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED", "NTC"];
 const NATURE_SUGGESTIONS = [
   "ANNUAL",
   "RENEW",
@@ -138,6 +138,7 @@ const CAPS_KEYS = new Set([
   "orNumber",
   "orAmount",
   "chiefName",
+  "chiefPosition",
   "marshalName",
 ]);
 

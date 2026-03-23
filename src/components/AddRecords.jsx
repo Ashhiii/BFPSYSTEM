@@ -136,6 +136,7 @@ const UPPER_KEYS = new Set([
   "fsicAppNo",
   "fsicNo",
   "chiefName",
+  "chiefPosition",
   "marshalName",
   "natureOfInspection",
   "ownerName",
@@ -192,7 +193,7 @@ const OCCUPANCY_OPTIONS = [
 
 const HIGH_RISE_CHOICES = ["YES", "NO"];
 const FSMR_CHOICES = ["YES", "NO"];
-const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED"];
+const REMARKS_CHOICES = ["FSIC", "TRANSFERRED", "CLOSED", "CAN'T BE LOCATED", "REFUSED", "NTC"];
 
 const DUPLICATE_CHECK_FIELDS = {
   fsicNo: "FSIC No",

@@ -38,7 +38,6 @@ const formatMonthLabel = (yyyy_mm) => {
   return `${months[monthIndex]} ${y}`;
 };
 
-/** ✅ Build last N months list (YYYY-MM) */
 const buildMonthOptions = (count = 24) => {
   const base = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
@@ -56,7 +55,6 @@ const buildMonthOptions = (count = 24) => {
   return out;
 };
 
-/** ✅ safe millis for fallback sort */
 const toMillis = (v) => {
   if (!v) return 0;
   if (typeof v === "number") return v;
@@ -64,12 +62,11 @@ const toMillis = (v) => {
     const t = Date.parse(v);
     return Number.isFinite(t) ? t : 0;
   }
-  if (v?.toMillis) return v.toMillis(); // Firestore Timestamp
+  if (v?.toMillis) return v.toMillis();
   if (v instanceof Date) return v.getTime();
   return 0;
 };
 
-/** ✅ DISPLAY FIELDS (edit these to match your Firestore columns) */
 const getBusiness = (r) =>
   r?.establishment ||
   r?.businessName ||
@@ -93,12 +90,22 @@ const getFsic = (r) =>
   r?.fsic ||
   "—";
 
-/** ✅ Search text */
+const getRemarks = (r) =>
+  r?.remarks ||
+  r?.remark ||
+  r?.Remarks ||
+  r?.Remark ||
+  "";
+
+const hasRemarks = (r) => String(getRemarks(r) || "").trim() !== "";
+
 const searchableText = (r) => {
   const parts = [
     getBusiness(r),
     getOwner(r),
     getFsic(r),
+    getRemarks(r),
+    r?.ioNumber || r?.ioNo || "",
     r?.address || r?.location || "",
   ];
   return parts.join(" ").toLowerCase();
@@ -118,32 +125,27 @@ export default function CloseMonthControl({
   const monthOptions = useMemo(() => buildMonthOptions(24), []);
   const [selectedMonth, setSelectedMonth] = useState(monthKeyNow());
 
-  // ✅ current records list
   const [rows, setRows] = useState([]);
   const [loadingRows, setLoadingRows] = useState(false);
 
-  // ✅ search + selection
   const [qText, setQText] = useState("");
+  const [remarksFilter, setRemarksFilter] = useState("all"); // all | with-remarks
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const loadRows = async () => {
     try {
       setLoadingRows(true);
 
-      // ✅ newest -> oldest (preferred)
       let snap;
       try {
-        // change "createdAt" if your timestamp field name is different
         const qq = query(collection(db, "records"), orderBy("createdAt", "desc"));
         snap = await getDocs(qq);
       } catch (err) {
-        // fallback if field missing / no index
         snap = await getDocs(collection(db, "records"));
       }
 
       let arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      // ✅ fallback newest->oldest (common fields)
       arr.sort((a, b) => {
         const aT =
           toMillis(a.createdAt) ||
@@ -160,7 +162,6 @@ export default function CloseMonthControl({
 
       setRows(arr);
 
-      // keep only valid selections
       setSelectedIds((prev) => {
         const next = new Set();
         arr.forEach((r) => prev.has(r.id) && next.add(r.id));
@@ -181,9 +182,15 @@ export default function CloseMonthControl({
 
   const filtered = useMemo(() => {
     const s = qText.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r) => searchableText(r).includes(s));
-  }, [rows, qText]);
+
+    return rows.filter((r) => {
+      const searchMatch = !s || searchableText(r).includes(s);
+      const remarksMatch =
+        remarksFilter === "with-remarks" ? hasRemarks(r) : true;
+
+      return searchMatch && remarksMatch;
+    });
+  }, [rows, qText, remarksFilter]);
 
   const selectedCount = selectedIds.size;
 
@@ -241,7 +248,6 @@ export default function CloseMonthControl({
         return;
       }
 
-      // ensure month doc exists + closedAt (set once)
       if (!alreadyClosed) {
         await setDoc(
           monthDocRef,
@@ -252,7 +258,6 @@ export default function CloseMonthControl({
         await setDoc(monthDocRef, { month }, { merge: true });
       }
 
-      // selected rows only
       const selectedRows = rows.filter((r) => selectedIds.has(r.id));
 
       let i = 0;
@@ -278,6 +283,7 @@ export default function CloseMonthControl({
       onAfterCloseUIReset?.();
       setSelectedIds(new Set());
       setQText("");
+      setRemarksFilter("all");
 
       showToast?.(
         "Archived Successfully",
@@ -295,22 +301,28 @@ export default function CloseMonthControl({
     }
   };
 
-  /* ===================== CLEAN UI STYLES ===================== */
+  const modalWrap = {
+    width: "min(980px, 96vw)",
+    maxWidth: "100%",
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    overflowX: "hidden",
+  };
 
-const modalWrap = {
-  width: "min(980px, 96vw)",
-  maxWidth: "100%",
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-  overflowX: "hidden",     // ✅ prevent horizontal overflow
-};
-const gridTop = {
-  display: "grid",
-  gridTemplateColumns: "1fr", // ✅ stack by default
-  gap: 10,
-  alignItems: "end",
-};
+  const gridTop = {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 10,
+    alignItems: "end",
+  };
+
+  const searchRow = {
+    display: "grid",
+    gridTemplateColumns: "1fr 180px",
+    gap: 10,
+    alignItems: "end",
+  };
 
   const miniLabel = {
     fontSize: 12,
@@ -332,7 +344,7 @@ const gridTop = {
   };
 
   const searchStyle = {
-    width: "100%",
+    width: "95%",
     padding: "12px 14px",
     borderRadius: 14,
     border: `1px solid ${C.border}`,
@@ -356,13 +368,6 @@ const gridTop = {
     fontWeight: 900,
     cursor: "pointer",
     whiteSpace: "nowrap",
-  };
-
-  const dangerGhostBtn = {
-    ...ghostBtn,
-    background: "#fff5f5",
-    border: "1px solid #fecaca",
-    color: "#b91c1c",
   };
 
   const listContainer = {
@@ -429,10 +434,10 @@ const gridTop = {
     marginTop: 2,
   };
 
-  /* responsive: stack top grid on small screens */
   const topResponsive = `
     @media (max-width: 820px) {
       .cm-gridTop { grid-template-columns: 1fr !important; }
+      .cm-searchRow { grid-template-columns: 1fr !important; }
     }
   `;
 
@@ -454,7 +459,6 @@ const gridTop = {
           <div style={modalWrap}>
             <style>{topResponsive}</style>
 
-            {/* TOP: month + search */}
             <div className="cm-gridTop" style={gridTop}>
               <div>
                 <div style={miniLabel}>Month to close</div>
@@ -477,25 +481,38 @@ const gridTop = {
 
               <div>
                 <div style={miniLabel}>Search</div>
-                <input
-                  value={qText}
-                  onChange={(e) => setQText(e.target.value)}
-                  placeholder="Search establishment, owner, FSIC/IO..."
-                  style={searchStyle}
-                  disabled={closing || loadingRows}
-                />
+
+                <div className="cm-searchRow" style={searchRow}>
+                  <div>
+                    <input
+                      value={qText}
+                      onChange={(e) => setQText(e.target.value)}
+                      placeholder="Search establishment, owner, FSIC/IO, remarks..."
+                      style={searchStyle}
+                      disabled={closing || loadingRows}
+                    />
+                  </div>
+
+                  <div>
+                    <select
+                      value={remarksFilter}
+                      onChange={(e) => setRemarksFilter(e.target.value)}
+                      style={selectStyle}
+                      disabled={closing || loadingRows}
+                    >
+                      <option value="all">All records</option>
+                      <option value="with-remarks">With remarks only</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div style={helperText}>
-                  Showing <b>{filtered.length}</b> record(s) • Selected{" "}
-                  <b>{selectedCount}</b>
+                  Showing <b>{filtered.length}</b> record(s) • Selected <b>{selectedCount}</b>
                 </div>
               </div>
             </div>
 
-            {/* ACTIONS */}
             <div style={actionsRow}>
-                  
-
-              
               <button
                 type="button"
                 style={ghostBtn}
@@ -506,7 +523,6 @@ const gridTop = {
               </button>
             </div>
 
-            {/* LIST */}
             <div style={listContainer}>
               <div style={listHeader}>
                 <span>{filtered.length} record(s)</span>
@@ -545,6 +561,7 @@ const gridTop = {
                 ) : (
                   filtered.map((r) => {
                     const active = selectedIds.has(r.id);
+                    const remarks = getRemarks(r);
 
                     return (
                       <div
@@ -562,6 +579,9 @@ const gridTop = {
                           <div style={titleStyle}>{getBusiness(r)}</div>
                           <div style={subStyle}>
                             Owner: {getOwner(r)} • FSIC APP: {getFsic(r)}
+                          </div>
+                          <div style={subStyle}>
+                            Remarks: {remarks || "—"}
                           </div>
                         </div>
 

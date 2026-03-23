@@ -40,45 +40,6 @@ const getEndOfDay = (date) => {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 };
 
-const NATURE_OPTIONS = [
-  { value: "ALL", label: "All" },
-  { value: "NEW", label: "NEW" },
-  { value: "RENEW", label: "RENEW" },
-  { value: "RE-INSPECTION", label: "RE-INSPECTION" },
-  { value: "ANNUAL", label: "ANNUAL" },
-
-  { type: "section", label: "Remarks" },
-
-  { value: "CLOSED", label: "CLOSED" },
-  { value: "REFUSED", label: "REFUSED" },
-  { value: "TRANSFER", label: "TRANSFER" },
-  { value: "NTC", label: "NTC" },
-];
-
-const matchesNatureFilter = (value, filter) => {
-  if (filter === "ALL") return true;
-
-  const text = normalizeText(value);
-
-  if (filter === "RE-INSPECTION") {
-    return (
-      text.includes("RE-INSPECTION") ||
-      text.includes("RE INSPECTION") ||
-      text.includes("REINSPECTION")
-    );
-  }
-
-  if (filter === "TRANSFER") return text.includes("TRANSFER");
-  if (filter === "REFUSED") return text.includes("REFUSED");
-  if (filter === "CLOSED") return text.includes("CLOSED");
-  if (filter === "ANNUAL") return text.includes("ANNUAL");
-  if (filter === "RENEW") return text.includes("RENEW");
-  if (filter === "NEW") return text === "NEW" || text.startsWith("NEW ");
-  if (filter === "NTC") return text.includes("NTC");
-
-  return text.includes(filter);
-};
-
 const isNatureNTC = (value) => normalizeText(value).includes("NTC");
 const isNatureClosed = (value) => normalizeText(value).includes("CLOSED");
 
@@ -96,6 +57,10 @@ const getFirstExistingValue = (row, keys = []) => {
   return undefined;
 };
 
+const getRemarksValue = (row) => {
+  return getFirstExistingValue(row, ["remarks", "remark", "Remarks", "Remark"]);
+};
+
 const getMissingTemplateFields = (row) => {
   const requiredFields = [
     { label: "Height", keys: ["height", "buildingHeight"] },
@@ -107,6 +72,25 @@ const getMissingTemplateFields = (row) => {
   return requiredFields
     .filter((field) => isEmptyValue(getFirstExistingValue(row, field.keys)))
     .map((field) => field.label);
+};
+
+const REMARK_OPTIONS = [
+  { value: "", label: "All" },
+  { value: "FSIC", label: "FSIC" },
+  { value: "TRANSFERRED", label: "TRANSFERRED" },
+  { value: "CLOSED", label: "CLOSED" },
+  { value: "CAN'T BE LOCATED", label: "CAN'T BE LOCATED" },
+  { value: "REFUSED", label: "REFUSED" },
+  { value: "NTC", label: "NTC" },
+];
+
+const matchesRemarksFilter = (remarksValue, filter) => {
+  if (!filter || filter === "ALL") return true;
+
+  const text = normalizeText(remarksValue);
+  const normalizedFilter = normalizeText(filter);
+
+  return text.includes(normalizedFilter);
 };
 
 export default function RecordsTable({
@@ -142,7 +126,6 @@ export default function RecordsTable({
     ntcText: "#ffffff",
     ntcBorder: "#dc2626",
     ntcRowBg: "#d13737",
-    ntcRowHoverBg: "#d13737",
 
     closedText: "#ff1616",
     closedBorder: "#ff1616",
@@ -153,10 +136,6 @@ export default function RecordsTable({
     duplicateBadgeText: "#c2410c",
 
     warningText: "#d97706",
-
-    natureSelectedBg: "#fee2e2",
-    natureSelectedBorder: "#dc2626",
-    natureSelectedText: "#7f1d1d",
   };
 
   const S = {
@@ -379,21 +358,6 @@ export default function RecordsTable({
       color: C.selectedText,
     },
 
-    natureCell: {
-      cursor: "cell",
-      position: "relative",
-      borderLeft: "1px solid transparent",
-      borderRight: "1px solid transparent",
-      transition: "all .12s ease",
-      background: "transparent",
-    },
-
-    natureCellSelected: {
-      background: C.natureSelectedBg,
-      boxShadow: `inset 0 0 0 2px ${C.natureSelectedBorder}`,
-      color: C.natureSelectedText,
-    },
-
     headerFilterWrap: {
       position: "relative",
       display: "inline-flex",
@@ -429,7 +393,7 @@ export default function RecordsTable({
       position: "absolute",
       top: "calc(100% + 8px)",
       right: 0,
-      width: 260,
+      width: 230,
       background: "#fff",
       border: `1px solid ${C.border}`,
       borderRadius: 10,
@@ -438,16 +402,6 @@ export default function RecordsTable({
       display: "flex",
       flexDirection: "column",
       overflow: "hidden",
-    },
-
-    headerDropdownSection: {
-      padding: "10px 12px 6px",
-      fontSize: 11,
-      fontWeight: 900,
-      textTransform: "uppercase",
-      letterSpacing: ".04em",
-      color: "#f97316",
-      background: "#fff",
     },
 
     headerDropdownBtn: {
@@ -582,23 +536,20 @@ export default function RecordsTable({
   const containerRef = useRef(null);
   const fsicMenuRef = useRef(null);
   const dateMenuRef = useRef(null);
-  const natureMenuRef = useRef(null);
+  const remarksMenuRef = useRef(null);
 
   const [selectedFsicRows, setSelectedFsicRows] = useState([]);
   const [lastSelectedFsicId, setLastSelectedFsicId] = useState(null);
 
-  const [selectedNatureRows, setSelectedNatureRows] = useState([]);
-  const [lastSelectedNatureId, setLastSelectedNatureId] = useState(null);
-
   const [fsicFilterMode, setFsicFilterMode] = useState("all");
   const [fsicMenuOpen, setFsicMenuOpen] = useState(false);
+
+  const [remarksFilter, setRemarksFilter] = useState("ALL");
+  const [remarksMenuOpen, setRemarksMenuOpen] = useState(false);
 
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-
-  const [natureMenuOpen, setNatureMenuOpen] = useState(false);
-  const [natureFilter, setNatureFilter] = useState("ALL");
 
   const [toast, setToast] = useState({
     open: false,
@@ -720,13 +671,15 @@ export default function RecordsTable({
             originalIndex,
           }));
 
+    baseRows = baseRows.filter(({ row }) => {
+      const remarksValue = getRemarksValue(row);
+      return matchesRemarksFilter(remarksValue, remarksFilter);
+    });
+
     const fromDate = dateFrom ? getStartOfDay(parseToDate(dateFrom)) : null;
     const toDate = dateTo ? getEndOfDay(parseToDate(dateTo)) : null;
 
     baseRows = baseRows.filter(({ row }) => {
-      const natureText = row?.natureOfInspection;
-      if (!matchesNatureFilter(natureText, natureFilter)) return false;
-
       const inspectedDate = parseToDate(row?.dateInspected);
 
       if (fromDate && (!inspectedDate || inspectedDate < fromDate)) return false;
@@ -754,7 +707,7 @@ export default function RecordsTable({
     }
 
     return baseRows;
-  }, [records, fsicFilterMode, sortedSelectedFsicRows, natureFilter, dateFrom, dateTo]);
+  }, [records, fsicFilterMode, sortedSelectedFsicRows, remarksFilter, dateFrom, dateTo]);
 
   const visibleRowIds = useMemo(
     () => visibleRows.map((item) => item?.row?.id).filter(Boolean),
@@ -778,9 +731,7 @@ export default function RecordsTable({
       const updated = [...records];
       pushUndoSnapshot();
 
-      // IMPORTANT: current visible order sa table ang sundon
       const targetRows = visibleRowIds.filter((id) => rowIds.includes(id));
-
       const changedIds = [];
 
       if (values.length === 1) {
@@ -835,7 +786,7 @@ export default function RecordsTable({
         block: "center",
       });
     }
-  }, [activeId, fsicFilterMode, natureFilter, dateFrom, dateTo]);
+  }, [activeId, fsicFilterMode, remarksFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     onVisibleCountChange?.(visibleRows.length);
@@ -844,8 +795,6 @@ export default function RecordsTable({
   const clearSelection = () => {
     setSelectedFsicRows([]);
     setLastSelectedFsicId(null);
-    setSelectedNatureRows([]);
-    setLastSelectedNatureId(null);
   };
 
   const handleRangeSelection = useCallback((rowId, prev, lastSelectedId, isCtrl, orderedIds) => {
@@ -880,13 +829,7 @@ export default function RecordsTable({
       let next = [...prev];
 
       if (isShift) {
-        next = handleRangeSelection(
-          rowId,
-          prev,
-          lastSelectedFsicId,
-          isCtrl,
-          visibleRowIds
-        );
+        next = handleRangeSelection(rowId, prev, lastSelectedFsicId, isCtrl, visibleRowIds);
       } else if (isCtrl) {
         if (next.includes(rowId)) {
           next = next.filter((id) => id !== rowId);
@@ -903,45 +846,9 @@ export default function RecordsTable({
     setLastSelectedFsicId(rowId);
   };
 
-  const handleNatureCellClick = (rowId, e) => {
-    e.stopPropagation();
-
-    const isCtrl = e.ctrlKey || e.metaKey;
-    const isShift = e.shiftKey;
-
-    setSelectedNatureRows((prev) => {
-      let next = [...prev];
-
-      if (isShift) {
-        next = handleRangeSelection(
-          rowId,
-          prev,
-          lastSelectedNatureId,
-          isCtrl,
-          visibleRowIds
-        );
-      } else if (isCtrl) {
-        if (next.includes(rowId)) {
-          next = next.filter((id) => id !== rowId);
-        } else {
-          next.push(rowId);
-        }
-      } else {
-        next = [rowId];
-      }
-
-      return next;
-    });
-
-    setLastSelectedNatureId(rowId);
-  };
-
   useEffect(() => {
     const handleGlobalPaste = async (e) => {
-      if (!selectedFsicRows.length && !selectedNatureRows.length) {
-        return;
-      }
-
+      if (!selectedFsicRows.length) return;
       if (typeof onBulkUpdate !== "function") return;
 
       const activeEl = document.activeElement;
@@ -961,20 +868,12 @@ export default function RecordsTable({
       if (!text) return;
 
       e.preventDefault();
-
-      if (selectedNatureRows.length) {
-        await applyPasteValuesToField(text, selectedNatureRows, "natureOfInspection");
-        return;
-      }
-
-      if (selectedFsicRows.length) {
-        await applyPasteValuesToField(text, selectedFsicRows, "fsicNo");
-      }
+      await applyPasteValuesToField(text, selectedFsicRows, "fsicNo");
     };
 
     window.addEventListener("paste", handleGlobalPaste);
     return () => window.removeEventListener("paste", handleGlobalPaste);
-  }, [selectedFsicRows, selectedNatureRows, onBulkUpdate, applyPasteValuesToField]);
+  }, [selectedFsicRows, onBulkUpdate, applyPasteValuesToField]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -988,10 +887,7 @@ export default function RecordsTable({
         }
       }
 
-      if (
-        (selectedFsicRows.length || selectedNatureRows.length) &&
-        (e.key === "Delete" || e.key === "Backspace")
-      ) {
+      if (selectedFsicRows.length && (e.key === "Delete" || e.key === "Backspace")) {
         const activeEl = document.activeElement;
         const tag = activeEl?.tagName?.toLowerCase();
         const isContentEditable = activeEl?.isContentEditable;
@@ -1010,41 +906,25 @@ export default function RecordsTable({
         const updated = [...records];
         pushUndoSnapshot();
 
-        if (selectedNatureRows.length) {
-          selectedNatureRows.forEach((rowId) => {
-            const rowIndex = updated.findIndex((row) => row?.id === rowId);
-            if (updated[rowIndex]) {
-              updated[rowIndex] = {
-                ...updated[rowIndex],
-                natureOfInspection: "",
-              };
-            }
-          });
-        } else {
-          selectedFsicRows.forEach((rowId) => {
-            const rowIndex = updated.findIndex((row) => row?.id === rowId);
-            if (updated[rowIndex]) {
-              updated[rowIndex] = {
-                ...updated[rowIndex],
-                fsicNo: "",
-              };
-            }
-          });
-        }
+        selectedFsicRows.forEach((rowId) => {
+          const rowIndex = updated.findIndex((row) => row?.id === rowId);
+          if (updated[rowIndex]) {
+            updated[rowIndex] = {
+              ...updated[rowIndex],
+              fsicNo: "",
+            };
+          }
+        });
 
         if (typeof onBulkUpdate === "function") {
           onBulkUpdate(updated);
 
-          const changedIds = selectedNatureRows.length
-            ? [...selectedNatureRows]
-            : [...selectedFsicRows];
-
-          saveUpdatedRows(updated, changedIds)
+          saveUpdatedRows(updated, [...selectedFsicRows])
             .then(() => {
               setToast({
                 open: true,
                 title: "Auto-saved",
-                message: `${changedIds.length} row(s) saved successfully.`,
+                message: `${selectedFsicRows.length} row(s) saved successfully.`,
               });
             })
             .catch((err) => {
@@ -1062,7 +942,7 @@ export default function RecordsTable({
         clearSelection();
         setFsicMenuOpen(false);
         setDateMenuOpen(false);
-        setNatureMenuOpen(false);
+        setRemarksMenuOpen(false);
       }
     };
 
@@ -1070,7 +950,6 @@ export default function RecordsTable({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     selectedFsicRows,
-    selectedNatureRows,
     records,
     onBulkUpdate,
     undoStack,
@@ -1086,8 +965,8 @@ export default function RecordsTable({
       if (dateMenuRef.current && !dateMenuRef.current.contains(e.target)) {
         setDateMenuOpen(false);
       }
-      if (natureMenuRef.current && !natureMenuRef.current.contains(e.target)) {
-        setNatureMenuOpen(false);
+      if (remarksMenuRef.current && !remarksMenuRef.current.contains(e.target)) {
+        setRemarksMenuOpen(false);
       }
     };
 
@@ -1101,17 +980,15 @@ export default function RecordsTable({
       style={S.tableWrap}
       onClick={(e) => {
         const clickedInsideFsicCell = e.target.closest?.("[data-fsic-cell='true']");
-        const clickedInsideNatureCell = e.target.closest?.("[data-nature-cell='true']");
-        const clickedInsideHeaderFilter = e.target.closest?.("[data-fsic-header-filter='true']");
-        const clickedInsideDateFilter = e.target.closest?.("[data-date-header-filter='true']");
-        const clickedInsideNatureFilter = e.target.closest?.("[data-nature-header-filter='true']");
+        const clickedInsideFsicHeader = e.target.closest?.("[data-fsic-header-filter='true']");
+        const clickedInsideDateHeader = e.target.closest?.("[data-date-header-filter='true']");
+        const clickedInsideRemarksHeader = e.target.closest?.("[data-remarks-header-filter='true']");
 
         if (
           !clickedInsideFsicCell &&
-          !clickedInsideNatureCell &&
-          !clickedInsideHeaderFilter &&
-          !clickedInsideDateFilter &&
-          !clickedInsideNatureFilter
+          !clickedInsideFsicHeader &&
+          !clickedInsideDateHeader &&
+          !clickedInsideRemarksHeader
         ) {
           clearSelection();
         }
@@ -1129,59 +1006,57 @@ export default function RecordsTable({
         <thead>
           <tr>
             <th style={{ ...S.th, width: "12%" }}>FSIC App No</th>
+            <th style={{ ...S.th, width: "15%" }}>Nature</th>
+            <th style={{ ...S.th, width: "12%" }}>IO No</th>
+            <th style={{ ...S.th, width: "18%" }}>Owner</th>
 
-            <th style={{ ...S.th, width: "15%" }}>
+            <th style={{ ...S.th, width: "16%" }}>
               <div style={S.headerFilterWrap}>
-                <span style={{ ...wrap, fontWeight: 900 }}>Nature</span>
+                <span style={{ ...wrap, fontWeight: 900 }}>Remarks</span>
 
                 <div
-                  ref={natureMenuRef}
+                  ref={remarksMenuRef}
                   style={S.headerFilterRight}
-                  data-nature-header-filter="true"
+                  data-remarks-header-filter="true"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     type="button"
                     style={S.headerArrowBtn}
                     onClick={() => {
-                      setNatureMenuOpen((prev) => !prev);
+                      setRemarksMenuOpen((prev) => !prev);
                       setFsicMenuOpen(false);
                       setDateMenuOpen(false);
                     }}
-                    title="Filter nature"
+                    title="Filter Remarks"
                   >
                     ▼
                   </button>
 
-                  {natureMenuOpen && (
-                    <div style={{ ...S.headerDropdown, width: 190 }}>
-                      {NATURE_OPTIONS.map((item, index) => {
-                        if (item.type === "section") {
-                          return (
-                            <div key={`section-${index}`} style={S.headerDropdownSection}>
-                              {item.label}
-                            </div>
-                          );
-                        }
-
-                        const nextItem = NATURE_OPTIONS[index + 1];
-                        const isLastOption = index === NATURE_OPTIONS.length - 1 || !nextItem;
+                  {remarksMenuOpen && (
+                    <div style={S.headerDropdown}>
+                      {REMARK_OPTIONS.map((opt, index) => {
+                        const value = opt.value || "ALL";
+                        const isActive = remarksFilter === value;
 
                         return (
                           <button
-                            key={item.value}
+                            key={value || index}
                             type="button"
                             style={{
                               ...S.headerDropdownBtn,
-                              ...(natureFilter === item.value ? S.headerDropdownBtnActive : {}),
-                              borderBottom: isLastOption ? "none" : `1px solid ${C.border}`,
+                              ...(isActive ? S.headerDropdownBtnActive : {}),
+                              borderBottom:
+                                index === REMARK_OPTIONS.length - 1
+                                  ? "none"
+                                  : `1px solid ${C.border}`,
                             }}
                             onClick={() => {
-                              setNatureFilter(item.value);
-                              setNatureMenuOpen(false);
+                              setRemarksFilter(value);
+                              setRemarksMenuOpen(false);
                             }}
                           >
-                            {item.label}
+                            {opt.label}
                           </button>
                         );
                       })}
@@ -1190,10 +1065,6 @@ export default function RecordsTable({
                 </div>
               </div>
             </th>
-
-            <th style={{ ...S.th, width: "12%" }}>IO No</th>
-            <th style={{ ...S.th, width: "15%" }}>Owner</th>
-            <th style={{ ...S.th, width: "18%" }}>Establishment</th>
 
             <th style={{ ...S.th, width: "13%" }}>
               <div style={S.headerFilterWrap}>
@@ -1211,7 +1082,7 @@ export default function RecordsTable({
                     onClick={() => {
                       setFsicMenuOpen((prev) => !prev);
                       setDateMenuOpen(false);
-                      setNatureMenuOpen(false);
+                      setRemarksMenuOpen(false);
                     }}
                     title="Filter FSIC rows"
                   >
@@ -1242,12 +1113,7 @@ export default function RecordsTable({
                           borderBottom: "none",
                         }}
                         onClick={() => {
-                          const combinedSelected = [
-                            ...selectedFsicRows,
-                            ...selectedNatureRows.filter((id) => !selectedFsicRows.includes(id)),
-                          ];
-
-                          if (combinedSelected.length === 0) {
+                          if (selectedFsicRows.length === 0) {
                             setToast({
                               open: true,
                               title: "No Rows Selected",
@@ -1256,7 +1122,6 @@ export default function RecordsTable({
                             return;
                           }
 
-                          setSelectedFsicRows(combinedSelected);
                           setFsicFilterMode("selected");
                           setFsicMenuOpen(false);
                         }}
@@ -1285,7 +1150,7 @@ export default function RecordsTable({
                     onClick={() => {
                       setDateMenuOpen((prev) => !prev);
                       setFsicMenuOpen(false);
-                      setNatureMenuOpen(false);
+                      setRemarksMenuOpen(false);
                     }}
                     title="Date menu"
                   >
@@ -1348,7 +1213,7 @@ export default function RecordsTable({
               </div>
             </th>
 
-            <th style={{ ...S.th, width: "25%" }}>Generate</th>
+            <th style={{ ...S.th, width: "24%" }}>Generate</th>
           </tr>
         </thead>
 
@@ -1363,14 +1228,16 @@ export default function RecordsTable({
             visibleRows.map(({ row: r, originalIndex }, visibleIndex) => {
               const isActive = activeId && r.id === activeId;
               const isFsicSelected = selectedFsicRows.includes(r.id);
-              const isNatureSelected = selectedNatureRows.includes(r.id);
               const isNTC = isNatureNTC(r.natureOfInspection);
               const isClosed = isNatureClosed(r.natureOfInspection);
               const duplicateWarnings = duplicateMap[r.id] || [];
               const hasDuplicate = duplicateWarnings.length > 0;
 
+              const remarksValue = getRemarksValue(r);
+              const hasRemarks = !isEmptyValue(remarksValue);
+
               const missingFields = getMissingTemplateFields(r);
-              const hasMissingTemplateFields = missingFields.length > 0;
+              const shouldShowMissingWarning = !hasRemarks && missingFields.length > 0;
 
               const duplicateSummary = duplicateWarnings
                 .map((item) => `${item.label}: ${item.value}`)
@@ -1432,24 +1299,11 @@ export default function RecordsTable({
                   </td>
 
                   <td
-                    data-nature-cell="true"
                     style={{
                       ...S.td,
-                      ...S.natureCell,
                       ...(isNTC ? S.ntcTd : {}),
                       ...(isClosed ? S.closedTd : {}),
-                      ...(isNatureSelected ? S.natureCellSelected : {}),
-                      ...(hasDuplicate && !isNTC && !isClosed
-                        ? {
-                            boxShadow: isNatureSelected
-                              ? `inset 0 0 0 2px ${C.natureSelectedBorder}`
-                              : "none",
-                            color: isNatureSelected ? C.natureSelectedText : C.duplicateText,
-                          }
-                        : {}),
                     }}
-                    onClick={(e) => handleNatureCellClick(r.id, e)}
-                    title="Click / Ctrl+Click / Shift+Click then paste Nature of Inspection"
                   >
                     <div style={wrap}>{r.natureOfInspection || "-"}</div>
                     {hasDuplicate && <div style={S.duplicateHint}>{duplicateSummary}</div>}
@@ -1482,7 +1336,7 @@ export default function RecordsTable({
                       ...(isClosed ? S.closedTd : {}),
                     }}
                   >
-                    <div style={wrap}>{r.establishmentName || "-"}</div>
+                    <div style={wrap}>{remarksValue || "-"}</div>
                   </td>
 
                   <td
@@ -1562,7 +1416,7 @@ export default function RecordsTable({
                         </span>
                       </div>
 
-                      {hasMissingTemplateFields && (
+                      {shouldShowMissingWarning && (
                         <span
                           style={
                             isNTC

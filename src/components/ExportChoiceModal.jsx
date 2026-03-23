@@ -1,5 +1,5 @@
 // src/components/ExportChoiceModal.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { HiOutlineX, HiOutlineSearch, HiOutlineCheck, HiOutlineDownload } from "react-icons/hi";
 
 export default function ExportChoiceModal({
@@ -7,7 +7,7 @@ export default function ExportChoiceModal({
   onClose,
   onExportAll,
   onExportSelected,
-  rows = [],         // list of records to choose from (usually filteredRecords)
+  rows = [], // list of records to choose from (usually filteredRecords)
   busy = false,
   C,
 }) {
@@ -29,32 +29,110 @@ export default function ExportChoiceModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, busy, onClose]);
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r) => {
-      const hay = [
-        r.establishmentName,
-        r.ownerName,
-        r.fsicAppNo,
-        r.fsicNo,
-        r.ioNumber,
-        r.primaryId,
-        r.businessAddress,
-      ]
+  const normalizeText = useCallback((value) => {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[\n\r\t]+/g, " ")
+      .replace(/[_/\\|,-]+/g, " ")
+      .replace(/[^a-z0-9\s]/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }, []);
+
+  const getSearchLines = useCallback(
+    (value) => {
+      return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => normalizeText(line))
+        .filter(Boolean);
+    },
+    [normalizeText]
+  );
+
+  const tokenizeSearch = useCallback(
+    (value) => {
+      return normalizeText(value)
+        .split(" ")
+        .map((item) => item.trim())
         .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(s);
-    });
-  }, [rows, q]);
+        .filter((item) => item.length >= 2);
+    },
+    [normalizeText]
+  );
+
+  const getRowSearchBlob = useCallback(
+    (r) => {
+      return normalizeText(
+        [
+          r.establishmentName,
+          r.ownerName,
+          r.fsicAppNo,
+          r.fsicNo,
+          r.ioNumber,
+          r.primaryId,
+          r.businessAddress,
+          r.address,
+          r.barangay,
+          r.businessName,
+          r.natureOfInspection,
+          r.contactNumber,
+        ].join(" ")
+      );
+    },
+    [normalizeText]
+  );
+
+  const matchesSinglePhrase = useCallback(
+    (row, phrase) => {
+      const q = normalizeText(phrase);
+      if (!q) return true;
+
+      const blob = getRowSearchBlob(row);
+      if (!blob) return false;
+
+      // exact/direct contains first
+      if (blob.includes(q)) return true;
+
+      // strict fallback: all tokens must exist
+      const tokens = tokenizeSearch(q);
+      if (!tokens.length) return false;
+
+      return tokens.every((token) => blob.includes(token));
+    },
+    [normalizeText, getRowSearchBlob, tokenizeSearch]
+  );
+
+  const matchesRow = useCallback(
+    (row, rawSearch) => {
+      const raw = String(rawSearch || "").trim();
+      if (!raw) return true;
+
+      const lines = getSearchLines(raw);
+
+      // multiple pasted lines => any matching line is enough
+      if (lines.length > 1) {
+        return lines.some((line) => matchesSinglePhrase(row, line));
+      }
+
+      // single line search
+      return matchesSinglePhrase(row, raw);
+    },
+    [getSearchLines, matchesSinglePhrase]
+  );
+
+  const filtered = useMemo(() => {
+    return rows.filter((r) => matchesRow(r, q));
+  }, [rows, q, matchesRow]);
 
   const selectedIds = useMemo(
     () => Object.keys(selected).filter((k) => selected[k]),
     [selected]
   );
 
-  const allFilteredSelected = filtered.length > 0 && filtered.every((r) => selected[String(r.id)]);
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((r) => selected[String(r.id)]);
 
   const overlay = {
     position: "fixed",
@@ -144,7 +222,7 @@ export default function ExportChoiceModal({
     minWidth: 240,
     display: "flex",
     gap: 8,
-    alignItems: "center",
+    alignItems: "flex-start",
     border: `1px solid ${C.border}`,
     background: "#fff",
     borderRadius: 14,
@@ -159,6 +237,9 @@ export default function ExportChoiceModal({
     color: C.text,
     fontSize: 12,
     background: "transparent",
+    resize: "vertical",
+    fontFamily: "inherit",
+    minHeight: 44,
   };
 
   const smallBtn = (danger) => ({
@@ -190,8 +271,22 @@ export default function ExportChoiceModal({
   };
 
   const left = { minWidth: 0, display: "flex", flexDirection: "column", gap: 3 };
-  const t = { fontWeight: 980, fontSize: 12, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
-  const s = { fontWeight: 850, fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+  const t = {
+    fontWeight: 980,
+    fontSize: 12,
+    color: C.text,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const s = {
+    fontWeight: 850,
+    fontSize: 11,
+    color: C.muted,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
 
   const check = {
     width: 22,
@@ -218,7 +313,10 @@ export default function ExportChoiceModal({
   if (!open) return null;
 
   return (
-    <div style={overlay} onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose?.()}>
+    <div
+      style={overlay}
+      onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose?.()}
+    >
       <div style={modal}>
         <div style={top}>
           <div style={title}>Export Records</div>
@@ -254,49 +352,40 @@ export default function ExportChoiceModal({
             <>
               <div style={selectTop}>
                 <div style={search}>
-                  <HiOutlineSearch size={18} color={C.muted} />
-                  <input
+                  <HiOutlineSearch size={18} color={C.muted} style={{ marginTop: 3 }} />
+                  <textarea
                     style={input}
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search establishment, owner, FSIC APP NO..."
+                    placeholder="Search establishment, owner, FSIC APP NO... or paste multiple lines"
+                    rows={3}
                   />
                 </div>
-
-                <button
-                  style={smallBtn(false)}
-                  onClick={() => {
-                    const next = { ...selected };
-                    for (const r of filtered) next[String(r.id)] = true;
-                    setSelected(next);
-                  }}
-                >
-                  Select Visible
-                </button>
-
-                <button
-                  style={smallBtn(true)}
-                  onClick={() => {
-                    const next = { ...selected };
-                    for (const r of filtered) next[String(r.id)] = false;
-                    setSelected(next);
-                  }}
-                >
-                  Clear Visible
-                </button>
-
-                <button style={smallBtn(false)} onClick={() => setMode("choice")}>
-                  Back
-                </button>
               </div>
 
               <div style={listWrap}>
-                <div style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <div style={{ fontWeight: 980, color: C.text, fontSize: 12 }}>
                     {filtered.length} record(s) • {selectedIds.length} selected
                   </div>
 
-                  <label style={{ display: "inline-flex", gap: 8, alignItems: "center", fontWeight: 900, color: C.muted, fontSize: 12 }}>
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      gap: 8,
+                      alignItems: "center",
+                      fontWeight: 900,
+                      color: C.muted,
+                      fontSize: 12,
+                    }}
+                  >
                     <input
                       type="checkbox"
                       checked={allFilteredSelected}
@@ -315,10 +404,20 @@ export default function ExportChoiceModal({
                   {filtered.map((r, idx) => {
                     const id = String(r.id);
                     const checked = !!selected[id];
+
                     return (
-                      <div key={id} style={{ ...row, borderTop: idx === 0 ? `1px solid ${C.border}` : row.borderTop }}>
+                      <div
+                        key={id}
+                        style={{
+                          ...row,
+                          borderTop: idx === 0 ? `1px solid ${C.border}` : row.borderTop,
+                        }}
+                      >
                         <div style={left}>
-                          <div style={t}>{r.establishmentName || r.fsicAppNo || r.ioNumber || "Record"}</div>
+                          <div style={t}>
+                            {r.establishmentName || r.fsicAppNo || r.ioNumber || "Record"}
+                          </div>
+
                           <div style={s}>
                             {r.ownerName ? `Owner: ${r.ownerName} • ` : ""}
                             {r.fsicAppNo ? `FSIC APP NO: ${r.fsicAppNo} • ` : ""}
@@ -341,7 +440,14 @@ export default function ExportChoiceModal({
                   })}
 
                   {!filtered.length && (
-                    <div style={{ padding: 12, color: C.muted, fontWeight: 900, fontSize: 12 }}>
+                    <div
+                      style={{
+                        padding: 12,
+                        color: C.muted,
+                        fontWeight: 900,
+                        fontSize: 12,
+                      }}
+                    >
                       No matching records.
                     </div>
                   )}
