@@ -165,10 +165,6 @@ const NATURE_SUGGESTIONS = [
   "RENEW",
   "NEW",
   "RE-INSPECTION",
-  "CLOSED",
-  "REFUSED",
-  "TRANSFER",
-  "NTC",
 ];
 
 const OCCUPANCY_OPTIONS = [
