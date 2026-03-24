@@ -67,6 +67,7 @@ const getMissingTemplateFields = (row) => {
     { label: "High Rise", keys: ["highRise", "highrise"] },
     { label: "No. of Storey", keys: ["noOfStorey", "noOfStoreys", "numberOfStorey"] },
     { label: "FSMR", keys: ["fsmr"] },
+    { label: "Type of Occupancy", keys: ["typeOfOccupancy", "occupancyType"] },
   ];
 
   return requiredFields
