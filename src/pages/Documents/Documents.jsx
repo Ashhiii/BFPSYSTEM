@@ -51,11 +51,9 @@ export default function Documents({ refresh, setRefresh }) {
     return (docs || []).filter((d) => {
       return (
         (d.ownerName || "").toLowerCase().includes(key) ||
-        (d.establishmentName || "").toLowerCase().includes(key) ||
         (d.fsicAppNo || "").toLowerCase().includes(key) ||
-        (d.businessAddress || "").toLowerCase().includes(key) ||
-        (d.chiefName || "").toLowerCase().includes(key) ||
-        (d.marshalName || "").toLowerCase().includes(key)
+        (d.ioNumber || "").toLowerCase().includes(key) ||
+        (d.nfsiNumber || "").toLowerCase().includes(key)
       );
     });
   }, [docs, search]);
