@@ -1,5 +1,4 @@
-// DocumentsTable.jsx (FULL) — shows records as documents + PDF buttons
-// ✅ FIXED: wrapper is scrollable (vertical + horizontal) like RecordsTable
+// DocumentsTable.jsx (FULL)
 
 import React from "react";
 
@@ -24,6 +23,36 @@ const C = {
   nfsiText: "#166534",
 };
 
+const formatDate = (value) => {
+  if (!value) return "-";
+
+  try {
+    if (typeof value === "object" && typeof value?.toDate === "function") {
+      const d = value.toDate();
+      if (Number.isNaN(d.getTime())) return "-";
+
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  } catch {
+    return String(value || "-");
+  }
+};
+
 export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
   const API = (apiBase || "http://localhost:5000").replace(/\/+$/, "");
 
@@ -41,11 +70,10 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
   };
 
   const S = {
-    // ✅ SAME BEHAVIOR AS RecordsTable: the wrapper is the scroller
     wrap: {
       width: "100%",
-      height: "100%",   // ✅ fill the card body
-      overflow: "auto", // ✅ vertical + horizontal scroll
+      height: "100%",
+      overflow: "auto",
     },
 
     table: {
@@ -81,7 +109,10 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
       color: C.text,
     },
 
-    row: { cursor: "pointer", transition: "background .15s ease" },
+    row: {
+      cursor: "pointer",
+      transition: "background .15s ease",
+    },
 
     actionsTd: {
       padding: "10px 12px",
@@ -101,9 +132,23 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
       color: C.text,
     },
 
-    btnIO: { border: `1px solid ${C.ioBorder}`, background: C.ioBg, color: C.ioText },
-    btnReinspect: { border: `1px solid ${C.reBorder}`, background: C.reBg, color: C.reText },
-    btnNFSI: { border: `1px solid ${C.nfsiBorder}`, background: C.nfsiBg, color: C.nfsiText },
+    btnIO: {
+      border: `1px solid ${C.ioBorder}`,
+      background: C.ioBg,
+      color: C.ioText,
+    },
+
+    btnReinspect: {
+      border: `1px solid ${C.reBorder}`,
+      background: C.reBg,
+      color: C.reText,
+    },
+
+    btnNFSI: {
+      border: `1px solid ${C.nfsiBorder}`,
+      background: C.nfsiBg,
+      color: C.nfsiText,
+    },
 
     empty: {
       textAlign: "center",
@@ -119,12 +164,12 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
       <table style={S.table}>
         <thead>
           <tr>
-            <th style={{ ...S.th, width: 140 }}>FSIC App No</th>
-            <th style={{ ...S.th, width: 160 }}>Owner</th>
-            <th style={{ ...S.th, width: 180 }}>Establishment</th>
-            <th style={{ ...S.th, width: 220 }}>Address</th>
-            <th style={{ ...S.th, width: 220 }}>Chief</th>
-            <th style={{ ...S.th, width: 220 }}>Marshal</th>
+            <th style={{ ...S.th, width: 150 }}>FSIC App No</th>
+            <th style={{ ...S.th, width: 200 }}>Owner</th>
+            <th style={{ ...S.th, width: 140 }}>IO Number</th>
+            <th style={{ ...S.th, width: 140 }}>IO Date</th>
+            <th style={{ ...S.th, width: 150 }}>NFSI Number</th>
+            <th style={{ ...S.th, width: 140 }}>NFSI Date</th>
             <th style={{ ...S.th, width: 280 }}>Generate</th>
           </tr>
         </thead>
@@ -142,40 +187,54 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
                 key={d.id || i}
                 style={{ ...S.row, background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fff1f2")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa")
+                }
                 onClick={() => onRowClick?.(d)}
               >
                 <td style={S.td}>
                   <div style={clamp2}>{d.fsicAppNo || "-"}</div>
                 </td>
+
                 <td style={S.td}>
                   <div style={clamp2}>{d.ownerName || "-"}</div>
                 </td>
+
                 <td style={S.td}>
-                  <div style={clamp2}>{d.establishmentName || "-"}</div>
+                  <div style={clamp2}>{d.ioNumber || "-"}</div>
                 </td>
+
                 <td style={S.td}>
-                  <div style={clamp2}>{d.businessAddress || "-"}</div>
+                  <div style={clamp2}>{formatDate(d.ioDate)}</div>
                 </td>
+
                 <td style={S.td}>
-                  <div style={clamp2}>{d.chiefName || "-"}</div>
+                  <div style={clamp2}>{d.nfsiNumber || "-"}</div>
                 </td>
+
                 <td style={S.td}>
-                  <div style={clamp2}>{d.marshalName || "-"}</div>
+                  <div style={clamp2}>{formatDate(d.nfsiDate)}</div>
                 </td>
 
                 <td style={S.actionsTd}>
-                  {/* ✅ Since source is records, use /records/:id/... */}
-                  <button style={{ ...S.btn, ...S.btnIO }} onClick={(e) => open(`${API}/records/${d.id}/io/pdf`, e)}>
+                  <button
+                    style={{ ...S.btn, ...S.btnIO }}
+                    onClick={(e) => open(`${API}/records/${d.id}/io/pdf`, e)}
+                  >
                     IO
                   </button>
+
                   <button
                     style={{ ...S.btn, ...S.btnReinspect }}
                     onClick={(e) => open(`${API}/records/${d.id}/reinspection/pdf`, e)}
                   >
                     Reinspection
                   </button>
-                  <button style={{ ...S.btn, ...S.btnNFSI }} onClick={(e) => open(`${API}/records/${d.id}/nfsi/pdf`, e)}>
+
+                  <button
+                    style={{ ...S.btn, ...S.btnNFSI }}
+                    onClick={(e) => open(`${API}/records/${d.id}/nfsi/pdf`, e)}
+                  >
                     NFSI
                   </button>
                 </td>
