@@ -134,6 +134,7 @@ export default function Dashboard() {
             fsicAppNo: r.fsicAppNo || "",
             establishmentName: r.establishmentName || "",
             ownerName: r.ownerName || "",
+            remarks: r.remarks || "",
             natureOfInspection: r.natureOfInspection || "",
             _dt: r._dt || 0,
             dateText: r.dateText || "-",

@@ -1,25 +1,33 @@
 // src/components/ExportChoiceModal.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { HiOutlineX, HiOutlineSearch, HiOutlineCheck, HiOutlineDownload } from "react-icons/hi";
+import {
+  HiOutlineX,
+  HiOutlineSearch,
+  HiOutlineCheck,
+  HiOutlineDownload,
+  HiOutlineFilter,
+} from "react-icons/hi";
 
 export default function ExportChoiceModal({
   open,
   onClose,
   onExportAll,
   onExportSelected,
-  rows = [], // list of records to choose from (usually filteredRecords)
+  rows = [],
   busy = false,
   C,
 }) {
   const [mode, setMode] = useState("choice"); // choice | select
   const [q, setQ] = useState("");
-  const [selected, setSelected] = useState({}); // id -> true
+  const [selected, setSelected] = useState({});
+  const [remarksFilter, setRemarksFilter] = useState("ALL"); // ALL | WITH_REMARKS | WITHOUT_REMARKS
 
   useEffect(() => {
     if (!open) return;
     setMode("choice");
     setQ("");
     setSelected({});
+    setRemarksFilter("ALL");
   }, [open]);
 
   useEffect(() => {
@@ -39,6 +47,26 @@ export default function ExportChoiceModal({
       .replace(/[^a-z0-9\s]/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
+  }, []);
+
+  const getRemarksValue = useCallback((row) => {
+    if (!row || typeof row !== "object") return "";
+
+    const candidates = [
+      row.remarks,
+      row.remark,
+      row.Remarks,
+      row.Remark,
+      row.REMARKS,
+      row.REMARK,
+    ];
+
+    for (const value of candidates) {
+      const text = String(value ?? "").trim();
+      if (text) return text;
+    }
+
+    return "";
   }, []);
 
   const getSearchLines = useCallback(
@@ -71,32 +99,44 @@ export default function ExportChoiceModal({
           r.fsicAppNo,
           r.fsicNo,
           r.ioNumber,
-          r.primaryId,
           r.businessAddress,
           r.address,
-          r.barangay,
           r.businessName,
           r.natureOfInspection,
           r.contactNumber,
+          getRemarksValue(r),
         ].join(" ")
       );
     },
-    [normalizeText]
+    [normalizeText, getRemarksValue]
+  );
+
+  const hasRemarks = useCallback(
+    (row) => {
+      return getRemarksValue(row) !== "";
+    },
+    [getRemarksValue]
+  );
+
+  const matchesRemarksFilter = useCallback(
+    (row) => {
+      if (remarksFilter === "remarks") return hasRemarks(row);
+      return true;
+    },
+    [remarksFilter, hasRemarks]
   );
 
   const matchesSinglePhrase = useCallback(
     (row, phrase) => {
-      const q = normalizeText(phrase);
-      if (!q) return true;
+      const normalizedPhrase = normalizeText(phrase);
+      if (!normalizedPhrase) return true;
 
       const blob = getRowSearchBlob(row);
       if (!blob) return false;
 
-      // exact/direct contains first
-      if (blob.includes(q)) return true;
+      if (blob.includes(normalizedPhrase)) return true;
 
-      // strict fallback: all tokens must exist
-      const tokens = tokenizeSearch(q);
+      const tokens = tokenizeSearch(normalizedPhrase);
       if (!tokens.length) return false;
 
       return tokens.every((token) => blob.includes(token));
@@ -111,28 +151,41 @@ export default function ExportChoiceModal({
 
       const lines = getSearchLines(raw);
 
-      // multiple pasted lines => any matching line is enough
       if (lines.length > 1) {
         return lines.some((line) => matchesSinglePhrase(row, line));
       }
 
-      // single line search
       return matchesSinglePhrase(row, raw);
     },
     [getSearchLines, matchesSinglePhrase]
   );
 
   const filtered = useMemo(() => {
-    return rows.filter((r) => matchesRow(r, q));
-  }, [rows, q, matchesRow]);
+    return rows.filter((r) => matchesRow(r, q) && matchesRemarksFilter(r));
+  }, [rows, q, matchesRow, matchesRemarksFilter]);
 
   const selectedIds = useMemo(
     () => Object.keys(selected).filter((k) => selected[k]),
     [selected]
   );
 
+  const getRowId = useCallback((row, index = 0) => {
+    return String(
+      row?.id ??
+        row?.docId ??
+        row?.fsicAppNo ??
+        row?.fsicNo ??
+        row?.ioNumber ??
+        `row-${index}`
+    );
+  }, []);
+
   const allFilteredSelected =
-    filtered.length > 0 && filtered.every((r) => selected[String(r.id)]);
+    filtered.length > 0 &&
+    filtered.every((r, index) => {
+      const id = getRowId(r, index);
+      return !!selected[id];
+    });
 
   const overlay = {
     position: "fixed",
@@ -166,6 +219,7 @@ export default function ExportChoiceModal({
   };
 
   const title = { fontWeight: 980, color: C.text, fontSize: 14 };
+
   const closeBtn = {
     width: 36,
     height: 36,
@@ -180,7 +234,12 @@ export default function ExportChoiceModal({
 
   const body = { padding: 14, background: "transparent" };
 
-  const two = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+  const two = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 12,
+  };
+
   const card = {
     border: `1px solid ${C.border}`,
     borderRadius: 16,
@@ -188,8 +247,16 @@ export default function ExportChoiceModal({
     padding: 14,
     boxShadow: "0 10px 22px rgba(2,6,23,0.06)",
   };
+
   const h = { fontWeight: 980, color: C.text, fontSize: 13 };
-  const p = { marginTop: 6, color: C.muted, fontWeight: 800, fontSize: 12, lineHeight: 1.4 };
+
+  const p = {
+    marginTop: 6,
+    color: C.muted,
+    fontWeight: 800,
+    fontSize: 12,
+    lineHeight: 1.4,
+  };
 
   const action = (primary) => ({
     marginTop: 12,
@@ -197,7 +264,9 @@ export default function ExportChoiceModal({
     padding: "10px 12px",
     borderRadius: 14,
     border: primary ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
-    background: primary ? `linear-gradient(180deg, ${C.primary}, ${C.primaryDark})` : "#fff",
+    background: primary
+      ? `linear-gradient(180deg, ${C.primary}, ${C.primaryDark})`
+      : "#fff",
     color: primary ? "#fff" : C.text,
     fontWeight: 980,
     cursor: busy ? "not-allowed" : "pointer",
@@ -212,7 +281,7 @@ export default function ExportChoiceModal({
     display: "flex",
     gap: 10,
     flexWrap: "wrap",
-    alignItems: "center",
+    alignItems: "stretch",
     justifyContent: "space-between",
     marginBottom: 10,
   };
@@ -242,17 +311,28 @@ export default function ExportChoiceModal({
     minHeight: 44,
   };
 
-  const smallBtn = (danger) => ({
-    padding: "9px 12px",
+  const remarksFilterWrap = {
+    minWidth: 210,
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+    border: `1px solid ${C.border}`,
+    background: "#fff",
     borderRadius: 14,
-    border: `1px solid ${danger ? "#fecaca" : C.border}`,
-    background: danger ? "#fff1f2" : "#fff",
-    color: danger ? "#9f1239" : C.text,
-    fontWeight: 980,
-    cursor: busy ? "not-allowed" : "pointer",
-    opacity: busy ? 0.65 : 1,
-    whiteSpace: "nowrap",
-  });
+    padding: "10px 12px",
+  };
+
+  const selectStyle = {
+    border: "none",
+    outline: "none",
+    width: "100%",
+    background: "transparent",
+    fontWeight: 900,
+    color: C.text,
+    fontSize: 12,
+    fontFamily: "inherit",
+    cursor: "pointer",
+  };
 
   const listWrap = {
     border: `1px solid ${C.border}`,
@@ -261,7 +341,7 @@ export default function ExportChoiceModal({
     overflow: "hidden",
   };
 
-  const row = {
+  const rowStyle = {
     padding: "10px 12px",
     display: "flex",
     alignItems: "center",
@@ -270,7 +350,13 @@ export default function ExportChoiceModal({
     borderTop: `1px solid ${C.border}`,
   };
 
-  const left = { minWidth: 0, display: "flex", flexDirection: "column", gap: 3 };
+  const left = {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+  };
+
   const t = {
     fontWeight: 980,
     fontSize: 12,
@@ -279,10 +365,20 @@ export default function ExportChoiceModal({
     overflow: "hidden",
     textOverflow: "ellipsis",
   };
+
   const s = {
     fontWeight: 850,
     fontSize: 11,
     color: C.muted,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+
+  const remarksText = {
+    fontWeight: 900,
+    fontSize: 11,
+    color: C.primaryDark,
     whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -320,7 +416,12 @@ export default function ExportChoiceModal({
       <div style={modal}>
         <div style={top}>
           <div style={title}>Export Records</div>
-          <button style={closeBtn} onClick={() => !busy && onClose?.()} title="Close">
+          <button
+            type="button"
+            style={closeBtn}
+            onClick={() => !busy && onClose?.()}
+            title="Close"
+          >
             <HiOutlineX size={18} />
           </button>
         </div>
@@ -333,7 +434,11 @@ export default function ExportChoiceModal({
                 <div style={p}>
                   Exports all records currently shown (your current search/filter results).
                 </div>
-                <button style={action(true)} onClick={() => !busy && onExportAll?.()}>
+                <button
+                  type="button"
+                  style={action(true)}
+                  onClick={() => !busy && onExportAll?.()}
+                >
                   <HiOutlineDownload size={18} /> Export All
                 </button>
               </div>
@@ -343,7 +448,11 @@ export default function ExportChoiceModal({
                 <div style={p}>
                   Choose specific records to export using checkboxes.
                 </div>
-                <button style={action(false)} onClick={() => setMode("select")}>
+                <button
+                  type="button"
+                  style={action(false)}
+                  onClick={() => setMode("select")}
+                >
                   <HiOutlineCheck size={18} /> Select & Export
                 </button>
               </div>
@@ -360,6 +469,18 @@ export default function ExportChoiceModal({
                     placeholder="Search establishment, owner, FSIC APP NO... or paste multiple lines"
                     rows={3}
                   />
+                </div>
+
+                <div style={remarksFilterWrap}>
+                  <HiOutlineFilter size={18} color={C.muted} />
+                  <select
+                    style={selectStyle}
+                    value={remarksFilter}
+                    onChange={(e) => setRemarksFilter(e.target.value)}
+                  >
+                    <option value="ALL">All Records</option>
+                    <option value="remarks">With Remarks</option>
+                  </select>
                 </div>
               </div>
 
@@ -392,7 +513,12 @@ export default function ExportChoiceModal({
                       onChange={(e) => {
                         const on = e.target.checked;
                         const next = { ...selected };
-                        for (const r of filtered) next[String(r.id)] = on;
+
+                        filtered.forEach((r, index) => {
+                          const id = getRowId(r, index);
+                          next[id] = on;
+                        });
+
                         setSelected(next);
                       }}
                     />
@@ -402,20 +528,26 @@ export default function ExportChoiceModal({
 
                 <div style={{ maxHeight: 360, overflow: "auto" }}>
                   {filtered.map((r, idx) => {
-                    const id = String(r.id);
+                    const id = getRowId(r, idx);
                     const checked = !!selected[id];
+                    const rowRemarks = getRemarksValue(r);
 
                     return (
                       <div
                         key={id}
                         style={{
-                          ...row,
-                          borderTop: idx === 0 ? `1px solid ${C.border}` : row.borderTop,
+                          ...rowStyle,
+                          borderTop:
+                            idx === 0 ? `1px solid ${C.border}` : rowStyle.borderTop,
                         }}
                       >
                         <div style={left}>
                           <div style={t}>
-                            {r.establishmentName || r.fsicAppNo || r.ioNumber || "Record"}
+                            {r.establishmentName ||
+                              r.ownerName ||
+                              r.fsicAppNo ||
+                              r.ioNumber ||
+                              "Record"}
                           </div>
 
                           <div style={s}>
@@ -423,18 +555,25 @@ export default function ExportChoiceModal({
                             {r.fsicAppNo ? `FSIC APP NO: ${r.fsicAppNo} • ` : ""}
                             {r.ioNumber ? `IO: ${r.ioNumber}` : ""}
                           </div>
+
+                          {rowRemarks ? (
+                            <div style={remarksText}>Remarks: {rowRemarks}</div>
+                          ) : null}
                         </div>
 
-                        <div
+                        <button
+                          type="button"
                           style={check}
                           onClick={() => {
                             if (busy) return;
-                            setSelected((p) => ({ ...p, [id]: !p[id] }));
+                            setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
                           }}
                           title="Toggle select"
                         >
-                          {checked ? <HiOutlineCheck size={16} color={C.primaryDark} /> : null}
-                        </div>
+                          {checked ? (
+                            <HiOutlineCheck size={16} color={C.primaryDark} />
+                          ) : null}
+                        </button>
                       </div>
                     );
                   })}
@@ -463,6 +602,7 @@ export default function ExportChoiceModal({
           </div>
 
           <button
+            type="button"
             style={{
               padding: "10px 14px",
               borderRadius: 14,
@@ -482,10 +622,16 @@ export default function ExportChoiceModal({
               if (mode === "select") onExportSelected?.(selectedIds);
               else onExportAll?.();
             }}
-            title={mode === "select" && selectedIds.length === 0 ? "Select at least 1 record" : "Export"}
+            title={
+              mode === "select" && selectedIds.length === 0
+                ? "Select at least 1 record"
+                : "Export"
+            }
           >
             <HiOutlineDownload size={18} />
-            {mode === "select" ? `Export Selected (${selectedIds.length})` : "Export All"}
+            {mode === "select"
+              ? `Export Selected (${selectedIds.length})`
+              : "Export All"}
           </button>
         </div>
       </div>
