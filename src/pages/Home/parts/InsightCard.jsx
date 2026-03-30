@@ -96,12 +96,6 @@ export default function InsightCard({
               onClick={onDownloadAll}
               icon={<HiOutlineDownload size={15} />}
             />
-
-            <IconActionBtn
-              title="Print"
-              onClick={onPrint}
-              icon={<HiOutlinePrinter size={15} />}
-            />
           </div>
         </div>
 

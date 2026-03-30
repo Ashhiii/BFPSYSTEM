@@ -10,15 +10,16 @@ import {
   doc,
 } from "firebase/firestore";
 
+import { HiOutlinePrinter } from "react-icons/hi";
 import { useLocation } from "react-router-dom";
 
 import RecordsTable from "./RecordsTable.jsx";
 import RecordDetailsPanel from "./RecordDetailsPanel.jsx";
 import injectTableStyles from "./injectTableStyles.jsx";
 import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
-
 import TopRightToast from "../../components/TopRightToast.jsx";
 import CloseMonthControl from "./CloseMonthControl.jsx";
+import PrintSelectionModal from "../../components/PrintSelectionModal";
 
 const MONTHS = [
   { value: "ALL", label: "All Months" },
@@ -119,6 +120,7 @@ export default function Records({ refresh, setRefresh }) {
   const [activeId, setActiveId] = useState(null);
 
   const [showDetails, setShowDetails] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastTitle, setToastTitle] = useState("Success");
@@ -130,7 +132,7 @@ export default function Records({ refresh, setRefresh }) {
   const [visibleCount, setVisibleCount] = useState(0);
 
   const location = useLocation();
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   useEffect(() => injectTableStyles(), []);
 
@@ -159,7 +161,6 @@ export default function Records({ refresh, setRefresh }) {
 
   useEffect(() => {
     fetchCurrent().catch(() => setRecords([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
   const saveChangedRows = useCallback(
@@ -175,7 +176,6 @@ export default function Records({ refresh, setRefresh }) {
 
       changedRows.forEach((row) => {
         if (!row?.id) return;
-
         const { id, ...payload } = row;
         const ref = doc(db, "records", id);
         batch.set(ref, payload, { merge: true });
@@ -270,7 +270,6 @@ export default function Records({ refresh, setRefresh }) {
       setActiveId(navActiveId);
       window.history.replaceState({}, document.title);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, records]);
 
   const handleRenewSaved = ({ oldId, newRecord }) => {
@@ -283,6 +282,79 @@ export default function Records({ refresh, setRefresh }) {
       return copy;
     });
     setRefresh?.((p) => !p);
+  };
+
+  const getCertificateUrl = (recordId, value) => {
+    if (value === "owner") return `${API}/records/${recordId}/certificate/owner/pdf`;
+    if (value === "bfp") return `${API}/records/${recordId}/certificate/bfp/pdf`;
+    if (value === "owner-new") return `${API}/records/${recordId}/certificate/owner-new/pdf`;
+    if (value === "bfp-new") return `${API}/records/${recordId}/certificate/bfp-new/pdf`;
+    if (value === "io") return `${API}/records/${recordId}/io/pdf`;
+    if (value === "reinspection") return `${API}/records/${recordId}/reinspection/pdf`;
+    if (value === "nfsi") return `${API}/records/${recordId}/nfsi/pdf`;
+    return "";
+  };
+
+  const printPdfBlob = async (blob) => {
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.src = blobUrl;
+
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Print iframe error:", err);
+        window.open(blobUrl, "_blank");
+      }
+
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch {}
+        window.URL.revokeObjectURL(blobUrl);
+      }, 5000);
+    };
+  };
+
+  const handlePrintSelected = async ({ selectedIds, template }) => {
+    if (!selectedIds?.length) {
+      alert("Select record(s) to print.");
+      return;
+    }
+
+    if (!template) {
+      alert("Please select a template.");
+      return;
+    }
+
+    try {
+      for (const recordId of selectedIds) {
+        const url = getCertificateUrl(recordId, template);
+        if (!url) continue;
+
+        const res = await fetch(url, { method: "GET" });
+        if (!res.ok) {
+          throw new Error(`Failed to load printable PDF for record ${recordId}`);
+        }
+
+        const blob = await res.blob();
+        await printPdfBlob(blob);
+      }
+    } catch (err) {
+      console.error("Print failed:", err);
+      alert("There's a problem with the print function. Check backend endpoint or popup/print permissions.");
+    }
   };
 
   const page = {
@@ -433,22 +505,30 @@ export default function Records({ refresh, setRefresh }) {
           <div style={hSub}>View current records + details + close month</div>
         </div>
 
-        <CloseMonthControl
-          C={C}
-          buttonStyle={btnRed}
-          showToast={showToast}
-          fetchCurrent={fetchCurrent}
-          setRefresh={setRefresh}
-          onAfterCloseUIReset={() => {
-            setSelectedRecord(null);
-            setShowDetails(false);
-            setSearch("");
-            setActiveId(null);
-            setMonthFilter("ALL");
-            setYearFilter("ALL");
-            setVisibleCount(0);
-          }}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <CloseMonthControl
+            C={C}
+            buttonStyle={btnRed}
+            showToast={showToast}
+            fetchCurrent={fetchCurrent}
+            setRefresh={setRefresh}
+            onAfterCloseUIReset={() => {
+              setSelectedRecord(null);
+              setShowDetails(false);
+              setSearch("");
+              setActiveId(null);
+              setMonthFilter("ALL");
+              setYearFilter("ALL");
+              setVisibleCount(0);
+            }}
+          />
+
+          <IconActionBtn
+            title="Print"
+            onClick={() => setShowPrintModal(true)}
+            icon={<HiOutlinePrinter size={15} />}
+          />
+        </div>
       </div>
 
       <div style={topbar}>
@@ -541,6 +621,56 @@ export default function Records({ refresh, setRefresh }) {
           }}
         />
       </DetailsFullScreen>
+
+      <PrintSelectionModal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        records={filtered}
+        apiBase={API}
+        C={C}
+        onAutoSave={saveChangedRows}
+        onBulkUpdate={setRecords}
+        onPrint={async (payload) => {
+          await handlePrintSelected(payload);
+          setShowPrintModal(false);
+        }}
+      />
     </div>
+  );
+}
+
+function IconActionBtn({ title, icon, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        border: "1px solid rgba(255,255,255,0.20)",
+        background: "rgba(255,255,255,0.12)",
+        color: "#fff",
+        width: 32,
+        height: 32,
+        borderRadius: 14,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        boxShadow: "0 10px 26px rgba(0,0,0,0.18)",
+        transition: "all .18s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.20)";
+        e.currentTarget.style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+        e.currentTarget.style.transform = "translateY(0)";
+      }}
+    >
+      {icon}
+    </button>
   );
 }
