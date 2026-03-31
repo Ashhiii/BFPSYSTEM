@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 export default function ClearanceTable({
   clearances = [],
@@ -8,7 +8,7 @@ export default function ClearanceTable({
   apiBase,
   activeId,
 }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = import.meta.env.VITE_API_URL || apiBase || "http://localhost:5000";
 
   const wrap = {
     whiteSpace: "nowrap",
@@ -32,14 +32,12 @@ export default function ClearanceTable({
       height: "100%",
       overflow: "auto",
     },
-
     table: {
       width: "100%",
       borderCollapse: "collapse",
       tableLayout: "fixed",
       background: "#fff",
     },
-
     th: {
       position: "sticky",
       top: 0,
@@ -52,7 +50,6 @@ export default function ClearanceTable({
       padding: "12px",
       borderBottom: `2px solid ${C.primary}`,
     },
-
     td: {
       padding: "12px",
       fontSize: 13,
@@ -61,27 +58,24 @@ export default function ClearanceTable({
       color: C.text,
       verticalAlign: "middle",
     },
-
     row: {
       cursor: "pointer",
       transition: "background .15s ease, box-shadow .15s ease",
     },
-
     actionsTd: {
       padding: "10px",
       borderBottom: `1px solid ${C.border}`,
       textAlign: "left",
     },
-
     selectWrap: {
-      position: "relative",
-      width: "100%",
-      maxWidth: 180,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
     },
-
     select: {
-      width: "100%",
-      padding: "8px 34px 8px 12px",
+      flex: 1,
+      minWidth: 160,
+      padding: "8px 12px",
       borderRadius: 10,
       fontSize: 12,
       fontWeight: 800,
@@ -90,24 +84,20 @@ export default function ClearanceTable({
       color: C.text,
       outline: "none",
       cursor: "pointer",
-      appearance: "none",
-      WebkitAppearance: "none",
-      MozAppearance: "none",
       boxSizing: "border-box",
       lineHeight: 1.2,
     },
-
-    selectArrow: {
-      position: "absolute",
-      right: 12,
-      top: "50%",
-      transform: "translateY(-50%)",
-      pointerEvents: "none",
-      fontSize: 10,
-      color: C.muted,
+    btn: {
+      padding: "8px 12px",
+      borderRadius: 10,
+      border: `1px solid ${C.primary}`,
+      background: C.primary,
+      color: "#fff",
       fontWeight: 900,
+      fontSize: 12,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
     },
-
     empty: {
       textAlign: "center",
       padding: 22,
@@ -117,6 +107,7 @@ export default function ClearanceTable({
   };
 
   const activeRowRef = useRef(null);
+  const [selectedTemplates, setSelectedTemplates] = useState({});
 
   useEffect(() => {
     if (activeRowRef.current) {
@@ -126,6 +117,35 @@ export default function ClearanceTable({
       });
     }
   }, [activeId]);
+
+  const normalizeType = (item) => {
+    const raw = String(
+      item?.type || item?.clearanceType || item?.templateType || ""
+    ).trim().toUpperCase();
+
+    if (raw === "CONVEYANCE") return "conveyance";
+    if (raw === "STORAGE") return "storage";
+    if (raw === "HOT_WORKS" || raw === "HOTWORKS") return "hotworks";
+    if (raw === "FIRE_DRILL" || raw === "FIREDRILL") return "firedrill";
+    if (raw === "FUMIGATION") return "fumigation";
+
+    const lower = raw.toLowerCase();
+    if (["conveyance", "storage", "hotworks", "firedrill", "fumigation"].includes(lower)) {
+      return lower;
+    }
+
+    return "";
+  };
+
+  useEffect(() => {
+    const next = {};
+    (clearances || []).forEach((item) => {
+      const id = String(item?.id || item?.docId || item?._id || "").trim();
+      if (!id) return;
+      next[id] = normalizeType(item) || "";
+    });
+    setSelectedTemplates(next);
+  }, [clearances]);
 
   const formatType = (type) => {
     const map = {
@@ -142,46 +162,30 @@ export default function ClearanceTable({
     return String(item?.id || item?.docId || item?._id || "").trim();
   };
 
-  const getTypeValue = (item) =>
-    String(item?.type || item?.clearanceType || "").toLowerCase().trim();
+  const getPdfUrl = (templateValue, id) => {
+    if (!templateValue || !id) return "";
 
-  const handleGenerateChange = (value, item, e) => {
+    if (templateValue === "conveyance") return `${API}/clearances/${id}/certificate/conveyance/pdf`;
+    if (templateValue === "storage") return `${API}/clearances/${id}/certificate/storage/pdf`;
+    if (templateValue === "hotworks") return `${API}/clearances/${id}/certificate/hotworks/pdf`;
+    if (templateValue === "firedrill") return `${API}/clearances/${id}/certificate/firedrill/pdf`;
+    if (templateValue === "fumigation") return `${API}/clearances/${id}/certificate/fumigation/pdf`;
+
+    return "";
+  };
+
+  const handleGenerate = (item, e) => {
     e.stopPropagation();
-
     const id = getId(item);
+    const selected = selectedTemplates[id] || normalizeType(item);
+    const url = getPdfUrl(selected, id);
 
-    console.log("CLEARANCE ITEM:", item);
-    console.log("CLEARANCE ID:", id);
-    console.log("SELECTED TEMPLATE:", value);
-
-    if (!value || !id) {
-      alert("Missing clearance ID.");
-      e.target.value = "";
-      return;
-    }
-
-    let url = "";
-
-    if (value === "conveyance") {
-      url = `${API}/clearances/${id}/certificate/conveyance/pdf`;
-    } else if (value === "storage") {
-      url = `${API}/clearances/${id}/certificate/storage/pdf`;
-    } else if (value === "hotworks") {
-      url = `${API}/clearances/${id}/certificate/hotworks/pdf`;
-    } else if (value === "firedrill") {
-      url = `${API}/clearances/${id}/certificate/firedrill/pdf`;
-    } else if (value === "fumigation") {
-      url = `${API}/clearances/${id}/certificate/fumigation/pdf`;
-    }
-
-    if (!url) {
-      alert("Invalid template.");
-      e.target.value = "";
+    if (!id || !selected || !url) {
+      alert("Missing clearance type or ID.");
       return;
     }
 
     window.open(url, "_blank");
-    e.target.value = "";
   };
 
   return (
@@ -190,10 +194,8 @@ export default function ClearanceTable({
         <thead>
           <tr>
             <th style={{ ...S.th, width: "12%" }}>Type</th>
-            <th style={{ ...S.th, width: "14%" }}>FSIC App No</th>
             <th style={{ ...S.th, width: "18%" }}>Establishment</th>
             <th style={{ ...S.th, width: "16%" }}>Owner</th>
-            <th style={{ ...S.th, width: "18%" }}>Address</th>
             <th style={{ ...S.th, width: "10%" }}>OR No</th>
             <th style={{ ...S.th, width: "10%" }}>OR Date</th>
             <th style={{ ...S.th, width: "20%" }}>Generate</th>
@@ -211,7 +213,7 @@ export default function ClearanceTable({
             clearances.map((item, i) => {
               const rowId = getId(item);
               const isActive = activeId && rowId === activeId;
-              const itemType = getTypeValue(item);
+              const itemType = normalizeType(item);
 
               return (
                 <tr
@@ -231,20 +233,13 @@ export default function ClearanceTable({
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.background =
-                        i % 2 === 0 ? "#fff" : "#fafafa";
+                      e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa";
                     }
                   }}
                   onClick={() => onRowClick?.(item)}
                 >
                   <td style={S.td}>
                     <div style={wrap}>{formatType(itemType)}</div>
-                  </td>
-
-                  <td style={S.td}>
-                    <div style={wrap}>
-                      {item.FSIC_APP_NO || item.fsicAppNo || "-"}
-                    </div>
                   </td>
 
                   <td style={S.td}>
@@ -256,10 +251,6 @@ export default function ClearanceTable({
                   </td>
 
                   <td style={S.td}>
-                    <div style={wrap}>{item.businessAddress || "-"}</div>
-                  </td>
-
-                  <td style={S.td}>
                     <div style={wrap}>{item.orNumber || "-"}</div>
                   </td>
 
@@ -268,20 +259,17 @@ export default function ClearanceTable({
                   </td>
 
                   <td style={S.actionsTd}>
-                    <div
-                      style={S.selectWrap}
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div style={S.selectWrap} onClick={(e) => e.stopPropagation()}>
                       <select
-                        defaultValue=""
+                        value={selectedTemplates[rowId] || itemType || ""}
                         style={S.select}
                         onChange={(e) =>
-                          handleGenerateChange(e.target.value, item, e)
+                          setSelectedTemplates((prev) => ({
+                            ...prev,
+                            [rowId]: e.target.value,
+                          }))
                         }
                       >
-                        <option value="" disabled>
-                          Select template
-                        </option>
                         <option value="conveyance">Conveyance PDF</option>
                         <option value="storage">Storage PDF</option>
                         <option value="hotworks">Hot Works PDF</option>
@@ -289,7 +277,9 @@ export default function ClearanceTable({
                         <option value="fumigation">Fumigation PDF</option>
                       </select>
 
-                      <span style={S.selectArrow}>▼</span>
+                      <button style={S.btn} onClick={(e) => handleGenerate(item, e)}>
+                        Generate
+                      </button>
                     </div>
                   </td>
                 </tr>

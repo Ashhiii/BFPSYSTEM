@@ -66,11 +66,7 @@ export default function ClearancePage() {
         (item.establishmentName || "").toLowerCase().includes(key) ||
         (item.businessAddress || "").toLowerCase().includes(key) ||
         (item.orNumber || "").toLowerCase().includes(key) ||
-        (item.orDate || "").toLowerCase().includes(key) ||
-        (item.FSIC_NUMBER || "").toLowerCase().includes(key) ||
-        (item.FSIC_APP_NO || "").toLowerCase().includes(key) ||
-        (item.fsicNo || "").toLowerCase().includes(key) ||
-        (item.fsicAppNo || "").toLowerCase().includes(key)
+        (item.orDate || "").toLowerCase().includes(key) 
       );
     });
   }, [clearances, search]);
@@ -261,14 +257,20 @@ export default function ClearancePage() {
         title={fullTitle}
         onClose={() => setShowDetails(false)}
       >
-        <ClearanceDetailsPanel
-          clearance={selectedClearance}
-          onEdit={(item) => {
-            setShowDetails(false);
-            handleEdit(item);
-          }}
-          onDelete={handleDelete}
-        />
+<ClearanceDetailsPanel
+  clearance={selectedClearance}
+  onEdit={(item) => {
+    setShowDetails(false);
+    handleEdit(item);
+  }}
+  onDelete={handleDelete}
+  onUpdated={(updatedItem) => {
+    setSelectedClearance(updatedItem);
+    setClearances((prev) =>
+      prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+    );
+  }}
+/>
       </DetailsFullScreen>
     </div>
   );

@@ -1,32 +1,111 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../../firebase";
+
+const normalizeType = (clearance) => {
+  const raw = String(
+    clearance?.type ||
+      clearance?.clearanceType ||
+      clearance?.templateType ||
+      ""
+  )
+    .trim()
+    .toUpperCase();
+
+  if (raw === "CONVEYANCE") return "conveyance";
+  if (raw === "STORAGE") return "storage";
+  if (raw === "HOT_WORKS" || raw === "HOTWORKS") return "hotworks";
+  if (raw === "FIRE_DRILL" || raw === "FIREDRILL") return "firedrill";
+  if (raw === "FUMIGATION") return "fumigation";
+
+  const lower = raw.toLowerCase();
+  if (
+    ["conveyance", "storage", "hotworks", "firedrill", "fumigation"].includes(
+      lower
+    )
+  ) {
+    return lower;
+  }
+
+  return "";
+};
+
+const getValue = (clearance, ...keys) => {
+  for (const key of keys) {
+    const value = clearance?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+  return "";
+};
 
 const FIELDS = [
-  { key: "type", label: "Type" },
+  { key: "type", label: "Type", getValue: (c) => normalizeType(c) },
   { key: "recordId", label: "Record ID" },
-  { key: "FSIC_NUMBER", label: "FSIC Number" },
-  { key: "FSIC_APP_NO", label: "FSIC App No." },
   { key: "ownerName", label: "Owner Name" },
   { key: "establishmentName", label: "Establishment Name" },
   { key: "businessAddress", label: "Business Address" },
   { key: "contactNumber", label: "Contact Number" },
+  { key: "controlNumber", label: "Control Number" },
   { key: "orNumber", label: "OR Number" },
   { key: "orAmount", label: "OR Amount" },
   { key: "orDate", label: "OR Date" },
+  { key: "clearanceDate", label: "Clearance Date" },
   { key: "chiefName", label: "Chief Name" },
   { key: "chiefPosition", label: "Chief Position" },
   { key: "marshalName", label: "Marshal Name" },
   { key: "amountPaid", label: "Amount Paid" },
-  { key: "validUntil", label: "Valid Until" },
+  {
+    key: "clearanceValidity",
+    label: "Clearance Validity",
+    getValue: (c) => getValue(c, "clearanceValidity", "validUntil"),
+  },
 
-  { key: "plateNumber", label: "Plate Number", types: ["conveyance"] },
-  { key: "typeOfVehicle", label: "Type of Vehicle", types: ["conveyance"] },
-  { key: "chassisNumber", label: "Chassis Number", types: ["conveyance"] },
-  { key: "motorNumber", label: "Motor Number", types: ["conveyance"] },
-  { key: "licenseNumber", label: "License Number", types: ["conveyance"] },
-  { key: "nameOfDriver", label: "Driver Name", types: ["conveyance"] },
-  { key: "trailerNumber", label: "Trailer Number", types: ["conveyance"] },
+  {
+    key: "plateNumber",
+    label: "Plate Number",
+    types: ["conveyance"],
+  },
+  {
+    key: "typeOfVehicle",
+    label: "Type of Vehicle",
+    types: ["conveyance"],
+    getValue: (c) => getValue(c, "typeOfVehicle", "vehicleType"),
+  },
+  {
+    key: "chassisNumber",
+    label: "Chassis Number",
+    types: ["conveyance"],
+  },
+  {
+    key: "motorNumber",
+    label: "Motor Number",
+    types: ["conveyance"],
+  },
+  {
+    key: "licenseNumber",
+    label: "License Number",
+    types: ["conveyance"],
+  },
+  {
+    key: "nameOfDriver",
+    label: "Name of Driver",
+    types: ["conveyance"],
+    getValue: (c) => getValue(c, "nameOfDriver", "driverName"),
+  },
+  {
+    key: "trailerNumber",
+    label: "Trailer Number",
+    types: ["conveyance"],
+  },
   { key: "capacity", label: "Capacity", types: ["conveyance"] },
 
+  {
+    key: "storageAddress",
+    label: "Storage Address",
+    types: ["storage"],
+  },
   { key: "flammable1", label: "Flammable 1", types: ["storage"] },
   { key: "capacity1", label: "Capacity 1", types: ["storage"] },
   { key: "flammable2", label: "Flammable 2", types: ["storage"] },
@@ -37,37 +116,61 @@ const FIELDS = [
   { key: "capacity4", label: "Capacity 4", types: ["storage"] },
 
   { key: "companyName", label: "Company Name", types: ["hotworks"] },
-  { key: "jobOrderNumber", label: "Job Order Number", types: ["hotworks"] },
+  {
+    key: "jobOrderNumber",
+    label: "Job Order Number",
+    types: ["hotworks"],
+  },
   { key: "natureOfJob", label: "Nature of Job", types: ["hotworks"] },
   {
     key: "permitAuthorizingIndividual",
     label: "Permit Authorizing Individual",
     types: ["hotworks"],
   },
-  { key: "hotworkOperator", label: "Hotwork Operator", types: ["hotworks"] },
-  { key: "fireWatch", label: "Fire Watch", types: ["hotworks"] },
+  {
+    key: "hotWorkOperator",
+    label: "Hotwork Operator",
+    types: ["hotworks"],
+  },
+  {
+    key: "fireWatch",
+    label: "Fire Watch",
+    types: ["hotworks"],
+    getValue: (c) => getValue(c, "fireWatch", "fireWatchName"),
+  },
 
-  { key: "dateConducted", label: "Date Conducted", types: ["firedrill"] },
+  {
+    key: "dateConducted",
+    label: "Date Conducted",
+    types: ["firedrill"],
+    getValue: (c) => getValue(c, "dateConducted", "fireDrillDate"),
+  },
+  { key: "issuedDay", label: "Issued Day", types: ["firedrill"] },
+  { key: "issuedMonth", label: "Issued Month", types: ["firedrill"] },
 
   { key: "operatorName", label: "Operator Name", types: ["fumigation"] },
   { key: "operationTime", label: "Operation Time", types: ["fumigation"] },
   { key: "operationDate", label: "Operation Date", types: ["fumigation"] },
+  {
+    key: "operationDuration",
+    label: "Operation Duration",
+    types: ["fumigation"],
+  },
 ];
 
 const CAPS_KEYS = new Set([
-  "FSIC_NUMBER",
-  "FSIC_APP_NO",
   "ownerName",
   "establishmentName",
   "businessAddress",
   "contactNumber",
+  "controlNumber",
   "orNumber",
   "orAmount",
   "chiefName",
   "chiefPosition",
   "marshalName",
   "amountPaid",
-  "validUntil",
+  "clearanceValidity",
   "plateNumber",
   "typeOfVehicle",
   "chassisNumber",
@@ -76,6 +179,7 @@ const CAPS_KEYS = new Set([
   "nameOfDriver",
   "trailerNumber",
   "capacity",
+  "storageAddress",
   "flammable1",
   "capacity1",
   "flammable2",
@@ -88,14 +192,16 @@ const CAPS_KEYS = new Set([
   "jobOrderNumber",
   "natureOfJob",
   "permitAuthorizingIndividual",
-  "hotworkOperator",
+  "hotWorkOperator",
   "fireWatch",
   "operatorName",
+  "issuedMonth",
 ]);
 
 const DATE_KEYS = new Set([
   "orDate",
-  "validUntil",
+  "clearanceDate",
+  "clearanceValidity",
   "dateConducted",
   "operationDate",
 ]);
@@ -117,7 +223,7 @@ const toInputDate = (v) => {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   }
-  return "";
+  return String(v);
 };
 
 export default function ClearanceDetailsPanel({
@@ -129,6 +235,7 @@ export default function ClearanceDetailsPanel({
   onUpdated,
 }) {
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
 
   const C = {
@@ -154,10 +261,7 @@ export default function ClearanceDetailsPanel({
     return map[String(type || "").toLowerCase()] || type || "-";
   };
 
-  const activeType = useMemo(
-    () => String(clearance?.type || clearance?.clearanceType || "").toLowerCase(),
-    [clearance]
-  );
+  const activeType = useMemo(() => normalizeType(clearance), [clearance]);
 
   const visibleFields = useMemo(() => {
     return FIELDS.filter((f) => !f.types || f.types.includes(activeType));
@@ -173,13 +277,13 @@ export default function ClearanceDetailsPanel({
 
     const init = {};
     visibleFields.forEach((f) => {
-      let raw = clearance?.[f.key] ?? "";
-      if (f.key === "type") raw = clearance?.type || clearance?.clearanceType || "";
+      let raw = f.getValue ? f.getValue(clearance) : clearance?.[f.key] ?? "";
+      if (f.key === "type") raw = activeType;
       init[f.key] = DATE_KEYS.has(f.key) ? toInputDate(raw) : raw;
     });
 
     setForm(init);
-  }, [clearance, visibleFields]);
+  }, [clearance, visibleFields, activeType]);
 
   const inputStyle = (k) => ({
     width: "100%",
@@ -209,6 +313,7 @@ export default function ClearanceDetailsPanel({
       fontWeight: 950,
       cursor: "pointer",
       whiteSpace: "nowrap",
+      opacity: saving ? 0.7 : 1,
     };
 
     if (variant === "primary") {
@@ -293,6 +398,81 @@ export default function ClearanceDetailsPanel({
     background: "#fff",
   };
 
+  const buildUpdatePayload = () => {
+    const updated = {
+      ...clearance,
+      ...form,
+      type: activeType,
+      clearanceType: activeType,
+      updatedAt: serverTimestamp(),
+    };
+
+    if ("typeOfVehicle" in updated && !updated.vehicleType) {
+      updated.vehicleType = updated.typeOfVehicle;
+    }
+    if ("vehicleType" in updated && !updated.typeOfVehicle) {
+      updated.typeOfVehicle = updated.vehicleType;
+    }
+
+    if ("nameOfDriver" in updated && !updated.driverName) {
+      updated.driverName = updated.nameOfDriver;
+    }
+    if ("driverName" in updated && !updated.nameOfDriver) {
+      updated.nameOfDriver = updated.driverName;
+    }
+
+    if ("dateConducted" in updated && !updated.fireDrillDate) {
+      updated.fireDrillDate = updated.dateConducted;
+    }
+    if ("fireDrillDate" in updated && !updated.dateConducted) {
+      updated.dateConducted = updated.fireDrillDate;
+    }
+
+    if ("fireWatch" in updated && !updated.fireWatchName) {
+      updated.fireWatchName = updated.fireWatch;
+    }
+    if ("fireWatchName" in updated && !updated.fireWatch) {
+      updated.fireWatch = updated.fireWatchName;
+    }
+
+    if ("clearanceValidity" in updated && !updated.validUntil) {
+      updated.validUntil = updated.clearanceValidity;
+    }
+    if ("validUntil" in updated && !updated.clearanceValidity) {
+      updated.clearanceValidity = updated.validUntil;
+    }
+
+    return updated;
+  };
+
+  const handleDirectSave = async () => {
+    if (!clearance?.id) {
+      alert("Missing clearance ID.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = buildUpdatePayload();
+
+      await updateDoc(doc(db, "clearances", clearance.id), payload);
+
+      const nextClearance = {
+        ...clearance,
+        ...payload,
+        updatedAt: new Date(),
+      };
+
+      setEditing(false);
+      onUpdated?.(nextClearance);
+    } catch (error) {
+      console.error("Update clearance error:", error);
+      alert("Failed to save changes.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!clearance) {
     return (
       <div style={panel}>
@@ -312,7 +492,6 @@ export default function ClearanceDetailsPanel({
   const title =
     clearance.establishmentName ||
     clearance.ownerName ||
-    clearance.FSIC_APP_NO ||
     "Clearance";
 
   return (
@@ -335,12 +514,17 @@ export default function ClearanceDetailsPanel({
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {!editing ? (
             <>
-              <button style={btn("primary")} onClick={() => setEditing(true)}>
+              <button
+                style={btn("primary")}
+                onClick={() => setEditing(true)}
+                disabled={saving}
+              >
                 Edit
               </button>
               <button
                 style={btn("danger")}
                 onClick={() => onDelete?.(clearance.id)}
+                disabled={saving}
               >
                 Delete
               </button>
@@ -349,30 +533,25 @@ export default function ClearanceDetailsPanel({
             <>
               <button
                 style={btn("gold")}
-                onClick={() => {
-                  const updated = {
-                    ...clearance,
-                    ...form,
-                    type: activeType,
-                  };
-                  setEditing(false);
-                  onUpdated?.(updated);
-                  onEdit?.(updated);
-                }}
+                onClick={handleDirectSave}
+                disabled={saving}
               >
-                Save
+                {saving ? "Saving..." : "Save"}
               </button>
               <button
                 style={btn("danger")}
+                disabled={saving}
                 onClick={() => {
                   setEditing(false);
                   const reset = {};
                   visibleFields.forEach((f) => {
-                    let raw = clearance?.[f.key] ?? "";
-                    if (f.key === "type") {
-                      raw = clearance?.type || clearance?.clearanceType || "";
-                    }
-                    reset[f.key] = DATE_KEYS.has(f.key) ? toInputDate(raw) : raw;
+                    let raw = f.getValue
+                      ? f.getValue(clearance)
+                      : clearance?.[f.key] ?? "";
+                    if (f.key === "type") raw = activeType;
+                    reset[f.key] = DATE_KEYS.has(f.key)
+                      ? toInputDate(raw)
+                      : raw;
                   });
                   setForm(reset);
                 }}
@@ -415,7 +594,9 @@ export default function ClearanceDetailsPanel({
                             <input
                               name={f.key}
                               value={form[f.key] ?? ""}
-                              onChange={(e) => setField(f.key, e.target.value)}
+                              onChange={(e) =>
+                                setField(f.key, e.target.value)
+                              }
                               style={inputStyle(f.key)}
                               autoComplete="off"
                               placeholder={f.label}
@@ -425,7 +606,9 @@ export default function ClearanceDetailsPanel({
                         ) : f.key === "type" ? (
                           formatType(activeType)
                         ) : (
-                          clearance?.[f.key] || "-"
+                          (f.getValue
+                            ? f.getValue(clearance)
+                            : clearance?.[f.key]) || "-"
                         )}
                       </td>
                     </React.Fragment>

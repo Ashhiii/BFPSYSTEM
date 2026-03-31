@@ -12,18 +12,8 @@ const formatDateLong = (yyyy_mm_dd) => {
   if (!y || !m || !d) return String(yyyy_mm_dd);
 
   const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December",
   ];
 
   return `${months[m - 1]} ${d}, ${y}`;
@@ -59,6 +49,14 @@ const TEMPLATE_OPTIONS = [
 
 const HOTWORKS_MODE_OPTIONS = ["ANNUAL", "PROJECT BASED"];
 
+const TEMPLATE_TYPE_TO_SLUG = {
+  CONVEYANCE: "conveyance",
+  STORAGE: "storage",
+  HOT_WORKS: "hotworks",
+  FIRE_DRILL: "firedrill",
+  FUMIGATION: "fumigation",
+};
+
 const INITIAL_FORM = {
   templateType: "CONVEYANCE",
 
@@ -71,6 +69,7 @@ const INITIAL_FORM = {
   marshalName: "",
   marshalPosition: "",
 
+  controlNumber: "",
   orNumber: "",
   orAmount: "",
   orDate: "",
@@ -82,11 +81,11 @@ const INITIAL_FORM = {
   vehicleType: "",
   motorNumber: "",
   driverName: "",
+  trailerNumber: "",
+  capacity: "",
   plateNumber: "",
   chassisNumber: "",
   licenseNumber: "",
-  trailerNumber: "",
-  capacity: "",
 
   // STORAGE
   storageAddress: "",
@@ -130,16 +129,17 @@ const UPPER_KEYS = new Set([
   "chiefPosition",
   "marshalName",
   "marshalPosition",
+  "controlNumber",
   "orNumber",
 
   "vehicleType",
   "motorNumber",
   "driverName",
+  "trailerNumber",
+  "capacity",
   "plateNumber",
   "chassisNumber",
   "licenseNumber",
-  "trailerNumber",
-  "capacity",
 
   "storageAddress",
   "flammable1",
@@ -175,6 +175,30 @@ const COMMON_FIELDS = [
     required: true,
     span: 2,
   },
+  {
+    key: "controlNumber",
+    label: "Control Number",
+    type: "text",
+    required: false,
+    span: 1,
+    placeholder: "Control number",
+  },
+  {
+    key: "clearanceDate",
+    label: "Clearance Date",
+    type: "date",
+    required: false,
+    span: 1,
+  },
+  {
+    key: "clearanceValidity",
+    label: "Clearance Validity",
+    type: "text",
+    required: false,
+    span: 2,
+    readOnly: true,
+    placeholder: "Auto from clearance date",
+  },
 
   {
     key: "establishmentName",
@@ -199,23 +223,6 @@ const COMMON_FIELDS = [
     required: true,
     span: 2,
     placeholder: "Full address",
-  },
-
-  {
-    key: "clearanceDate",
-    label: "Clearance Date",
-    type: "date",
-    required: false,
-    span: 1,
-  },
-  {
-    key: "clearanceValidity",
-    label: "Validity Until",
-    type: "text",
-    required: false,
-    span: 1,
-    readOnly: true,
-    placeholder: "Auto from clearance date",
   },
 
   {
@@ -258,7 +265,6 @@ const COMMON_FIELDS = [
     span: 1,
     placeholder: "Fire marshal name",
   },
-
   {
     key: "chiefPosition",
     label: "Chief Position",
@@ -279,272 +285,50 @@ const COMMON_FIELDS = [
 
 const TEMPLATE_FIELDS = {
   CONVEYANCE: [
-    {
-      key: "vehicleType",
-      label: "Type of Vehicle",
-      type: "text",
-      required: true,
-      span: 1,
-      placeholder: "Example: TANKER TRUCK",
-    },
-    {
-      key: "plateNumber",
-      label: "Plate Number",
-      type: "text",
-      required: true,
-      span: 1,
-      placeholder: "Example: ABC 1234",
-    },
-    {
-      key: "motorNumber",
-      label: "Motor Number",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Motor number",
-    },
-    {
-      key: "chassisNumber",
-      label: "Chassis Number",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Chassis number",
-    },
-    {
-      key: "driverName",
-      label: "Name of Driver",
-      type: "text",
-      required: true,
-      span: 1,
-      placeholder: "Driver name",
-    },
-    {
-      key: "licenseNumber",
-      label: "License Number",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "License number",
-    },
-    {
-      key: "trailerNumber",
-      label: "Trailer Number",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Trailer number",
-    },
-    {
-      key: "capacity",
-      label: "Capacity",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: 5000 L",
-    },
+    { key: "vehicleType", label: "Type of Vehicle", type: "text", required: true, span: 1, placeholder: "Example: TANKER TRUCK" },
+    { key: "motorNumber", label: "Motor Number", type: "text", required: false, span: 1, placeholder: "Motor number" },
+    { key: "driverName", label: "Name of Driver", type: "text", required: true, span: 1, placeholder: "Driver name" },
+    { key: "trailerNumber", label: "Trailer Number", type: "text", required: false, span: 1, placeholder: "Trailer number" },
+    { key: "capacity", label: "Capacity", type: "text", required: false, span: 1, placeholder: "Example: 5000 L" },
+    { key: "plateNumber", label: "Plate Number", type: "text", required: true, span: 1, placeholder: "Example: ABC 1234" },
+    { key: "chassisNumber", label: "Chassis Number", type: "text", required: false, span: 1, placeholder: "Chassis number" },
+    { key: "licenseNumber", label: "License Number", type: "text", required: false, span: 1, placeholder: "License number" },
   ],
 
   STORAGE: [
-    {
-      key: "storageAddress",
-      label: "Storage Address",
-      type: "text",
-      required: true,
-      span: 2,
-      placeholder: "Location where liquids will be stored",
-    },
-    {
-      key: "flammable1",
-      label: "Flammable / Combustible Liquid 1",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: DIESEL",
-    },
-    {
-      key: "capacity1",
-      label: "Capacity 1",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: 2000 L",
-    },
-    {
-      key: "flammable2",
-      label: "Flammable / Combustible Liquid 2",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: GASOLINE",
-    },
-    {
-      key: "capacity2",
-      label: "Capacity 2",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: 1500 L",
-    },
-    {
-      key: "flammable3",
-      label: "Flammable / Combustible Liquid 3",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: KEROSENE",
-    },
-    {
-      key: "capacity3",
-      label: "Capacity 3",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: 500 L",
-    },
-    {
-      key: "flammable4",
-      label: "Flammable / Combustible Liquid 4",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: PAINT THINNER",
-    },
-    {
-      key: "capacity4",
-      label: "Capacity 4",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: 100 L",
-    },
+    { key: "storageAddress", label: "Storage Address", type: "text", required: true, span: 2, placeholder: "Location where liquids will be stored" },
+    { key: "flammable1", label: "Flammable / Combustible Liquid 1", type: "text", required: false, span: 1, placeholder: "Example: DIESEL" },
+    { key: "capacity1", label: "Capacity 1", type: "text", required: false, span: 1, placeholder: "Example: 2000 L" },
+    { key: "flammable2", label: "Flammable / Combustible Liquid 2", type: "text", required: false, span: 1, placeholder: "Example: GASOLINE" },
+    { key: "capacity2", label: "Capacity 2", type: "text", required: false, span: 1, placeholder: "Example: 1500 L" },
+    { key: "flammable3", label: "Flammable / Combustible Liquid 3", type: "text", required: false, span: 1, placeholder: "Example: KEROSENE" },
+    { key: "capacity3", label: "Capacity 3", type: "text", required: false, span: 1, placeholder: "Example: 500 L" },
+    { key: "flammable4", label: "Flammable / Combustible Liquid 4", type: "text", required: false, span: 1, placeholder: "Example: PAINT THINNER" },
+    { key: "capacity4", label: "Capacity 4", type: "text", required: false, span: 1, placeholder: "Example: 100 L" },
   ],
 
   HOT_WORKS: [
-    {
-      key: "companyName",
-      label: "Installer / Company",
-      type: "text",
-      required: true,
-      span: 1,
-      placeholder: "Company name",
-    },
-    {
-      key: "hotWorksMode",
-      label: "Mode",
-      type: "select",
-      required: true,
-      span: 1,
-      options: HOTWORKS_MODE_OPTIONS,
-    },
-    {
-      key: "jobOrderNumber",
-      label: "Job Order No. / Letter Request",
-      type: "text",
-      required: false,
-      span: 2,
-      placeholder: "For project based only",
-    },
-    {
-      key: "natureOfJob",
-      label: "Nature of Job / Object",
-      type: "text",
-      required: false,
-      span: 2,
-      placeholder: "Nature of work",
-    },
-    {
-      key: "facilityAddress",
-      label: "Building / Structure / Facility Address",
-      type: "text",
-      required: false,
-      span: 2,
-      placeholder: "Work site address",
-    },
-    {
-      key: "permitAuthorizingIndividual",
-      label: "Permit Authorizing Individual (PAI)",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "PAI name",
-    },
-    {
-      key: "hotWorkOperator",
-      label: "Hot Work Operator / Contractor",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Operator / contractor",
-    },
-    {
-      key: "fireWatchName",
-      label: "Fire Watch / Watchmen",
-      type: "text",
-      required: false,
-      span: 2,
-      placeholder: "Fire watch / watchmen",
-    },
+    { key: "companyName", label: "Installer / Company", type: "text", required: true, span: 1, placeholder: "Company name" },
+    { key: "hotWorksMode", label: "Mode", type: "select", required: true, span: 1, options: HOTWORKS_MODE_OPTIONS },
+    { key: "jobOrderNumber", label: "Job Order No. / Letter Request", type: "text", required: false, span: 2, placeholder: "For project based only" },
+    { key: "natureOfJob", label: "Nature of Job / Object", type: "text", required: false, span: 2, placeholder: "Nature of work" },
+    { key: "facilityAddress", label: "Building / Structure / Facility Address", type: "text", required: false, span: 2, placeholder: "Work site address" },
+    { key: "permitAuthorizingIndividual", label: "Permit Authorizing Individual (PAI)", type: "text", required: false, span: 1, placeholder: "PAI name" },
+    { key: "hotWorkOperator", label: "Hot Work Operator / Contractor", type: "text", required: false, span: 1, placeholder: "Operator / contractor" },
+    { key: "fireWatchName", label: "Fire Watch / Watchmen", type: "text", required: false, span: 2, placeholder: "Fire watch / watchmen" },
   ],
 
   FIRE_DRILL: [
-    {
-      key: "fireDrillDate",
-      label: "Fire Drill Date",
-      type: "date",
-      required: true,
-      span: 1,
-    },
-    {
-      key: "issuedDay",
-      label: "Issued Day",
-      type: "number",
-      required: false,
-      span: 1,
-      placeholder: "Example: 12",
-    },
-    {
-      key: "issuedMonth",
-      label: "Issued Month",
-      type: "text",
-      required: false,
-      span: 2,
-      placeholder: "Example: MARCH",
-    },
+    { key: "fireDrillDate", label: "Fire Drill Date", type: "date", required: true, span: 1 },
+    { key: "issuedDay", label: "Issued Day", type: "number", required: false, span: 1, placeholder: "Example: 12" },
+    { key: "issuedMonth", label: "Issued Month", type: "text", required: false, span: 2, placeholder: "Example: MARCH" },
   ],
 
   FUMIGATION: [
-    {
-      key: "operatorName",
-      label: "Authorized Operator / Contractor",
-      type: "text",
-      required: true,
-      span: 1,
-      placeholder: "Operator name",
-    },
-    {
-      key: "operationDate",
-      label: "Operation Date",
-      type: "date",
-      required: false,
-      span: 1,
-    },
-    {
-      key: "operationTime",
-      label: "Operation Time",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: 8:00 AM - 12:00 PM",
-    },
-    {
-      key: "operationDuration",
-      label: "Duration of Operation",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Example: 4 HOURS",
-    },
+    { key: "operatorName", label: "Authorized Operator / Contractor", type: "text", required: true, span: 1, placeholder: "Operator name" },
+    { key: "operationDate", label: "Operation Date", type: "date", required: false, span: 1 },
+    { key: "operationTime", label: "Operation Time", type: "text", required: false, span: 1, placeholder: "Example: 8:00 AM - 12:00 PM" },
+    { key: "operationDuration", label: "Duration of Operation", type: "text", required: false, span: 1, placeholder: "Example: 4 HOURS" },
   ],
 };
 
@@ -732,15 +516,52 @@ export default function AddClearance({ setRefresh }) {
   };
 
   const buildPayload = (state) => {
+    const typeSlug = TEMPLATE_TYPE_TO_SLUG[state.templateType] || "conveyance";
+    const templateLabel =
+      TEMPLATE_OPTIONS.find((item) => item.value === state.templateType)?.label || "";
+
+    const clearanceDateLong = formatDateLong(state.clearanceDate);
+    const orDateLong = formatDateLong(state.orDate);
+    const fireDrillDateLong = formatDateLong(state.fireDrillDate);
+    const operationDateLong = formatDateLong(state.operationDate);
+
     return {
       ...state,
-      templateLabel:
-        TEMPLATE_OPTIONS.find((item) => item.value === state.templateType)?.label || "",
-      clearanceDate: formatDateLong(state.clearanceDate),
-      clearanceValidity: state.clearanceValidity,
-      orDate: formatDateLong(state.orDate),
-      fireDrillDate: formatDateLong(state.fireDrillDate),
-      operationDate: formatDateLong(state.operationDate),
+
+      // normalized keys
+      type: typeSlug,
+      clearanceType: typeSlug,
+      templateLabel,
+
+      // common aliases
+      controlNumber: state.controlNumber || "",
+      clearanceDate: clearanceDateLong,
+      clearanceValidity: state.clearanceValidity || "",
+      validUntil: state.clearanceValidity || "",
+      orDate: orDateLong,
+
+      // conveyance aliases
+      typeOfVehicle: state.vehicleType || "",
+      motorNumber: state.motorNumber || "",
+      nameOfDriver: state.driverName || "",
+      trailerNumber: state.trailerNumber || "",
+      capacity: state.capacity || "",
+      plateNumber: state.plateNumber || "",
+      chassisNumber: state.chassisNumber || "",
+      licenseNumber: state.licenseNumber || "",
+
+      // hotworks aliases
+      fireWatch: state.fireWatchName || "",
+
+      // fire drill aliases
+      fireDrillDate: fireDrillDateLong,
+      dateConducted: fireDrillDateLong,
+      issuedDay: state.issuedDay || "",
+      issuedMonth: state.issuedMonth || "",
+
+      // fumigation aliases
+      operationDate: operationDateLong,
+
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -786,7 +607,7 @@ export default function AddClearance({ setRefresh }) {
           <div>
             <div style={styles.title}>Add Clearance</div>
             <div style={styles.sub}>
-              Conveyance is selected by default. You can still change the template if needed.
+              Type-based fields now save with matching aliases for details and PDF templates.
             </div>
           </div>
         </div>
