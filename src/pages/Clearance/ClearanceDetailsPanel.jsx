@@ -55,7 +55,6 @@ const FIELDS = [
 ];
 
 const CAPS_KEYS = new Set([
-  "recordId",
   "FSIC_NUMBER",
   "FSIC_APP_NO",
   "ownerName",
