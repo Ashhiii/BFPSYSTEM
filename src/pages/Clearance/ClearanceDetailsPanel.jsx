@@ -42,11 +42,9 @@ const getValue = (clearance, ...keys) => {
 
 const FIELDS = [
   { key: "type", label: "Type", getValue: (c) => normalizeType(c) },
-  { key: "recordId", label: "Record ID" },
   { key: "ownerName", label: "Owner Name" },
   { key: "establishmentName", label: "Establishment Name" },
   { key: "businessAddress", label: "Business Address" },
-  { key: "contactNumber", label: "Contact Number" },
   { key: "controlNumber", label: "Control Number" },
   { key: "orNumber", label: "OR Number" },
   { key: "orAmount", label: "OR Amount" },
@@ -55,7 +53,6 @@ const FIELDS = [
   { key: "chiefName", label: "Chief Name" },
   { key: "chiefPosition", label: "Chief Position" },
   { key: "marshalName", label: "Marshal Name" },
-  { key: "amountPaid", label: "Amount Paid" },
   {
     key: "clearanceValidity",
     label: "Clearance Validity",
