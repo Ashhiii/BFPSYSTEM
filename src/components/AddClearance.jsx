@@ -1,43 +1,43 @@
-import React, { useMemo, useRef, useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import React, { useMemo, useRef, useState, useEffect } from "react";
+import { addDoc, collection, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 import TopRightToast from "../components/TopRightToast";
 import AddTabs from "../components/AddTabs";
 
-/** YYYY-MM-DD -> January 2, 2026 */
+/** YYYY-MM-DD -> 2 January 2026 */
 const formatDateLong = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return "";
   const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
   if (!y || !m || !d) return String(yyyy_mm_dd);
 
   const months = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
-  return `${months[m - 1]} ${d}, ${y}`;
+  return `${d} ${months[m - 1]} ${y}`;
 };
 
-/** add 1 year to YYYY-MM-DD */
-const addYearsYMD = (yyyy_mm_dd, years = 1) => {
+/** YYYY-MM-DD -> YYYY-12-31 */
+const getEndOfYearYMD = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return "";
   const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
   if (!y || !m || !d) return "";
-
-  const dt = new Date(y, m - 1, d);
-  const targetYear = y + years;
-  dt.setFullYear(targetYear);
-
-  if (m === 2 && d === 29 && dt.getMonth() === 2) {
-    return `${targetYear}-02-28`;
-  }
-
-  const yy = dt.getFullYear();
-  const mm = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
+  return `${y}-12-31`;
 };
+
+const isYMD = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
 
 const TEMPLATE_OPTIONS = [
   { value: "CONVEYANCE", label: "Conveyance" },
@@ -119,7 +119,7 @@ const INITIAL_FORM = {
   operationTime: "",
   operationDuration: "",
   foggingAddress: "",
-conductedBy: "",
+  conductedBy: "",
 };
 
 const UPPER_KEYS = new Set([
@@ -168,7 +168,7 @@ const UPPER_KEYS = new Set([
   "operationTime",
   "operationDuration",
   "foggingAddress",
-"conductedBy",
+  "conductedBy",
 ]);
 
 const COMMON_FIELDS = [
@@ -189,19 +189,19 @@ const COMMON_FIELDS = [
   },
   {
     key: "clearanceDate",
-    label: "Clearance Date",
+    label: "Activity Date",
     type: "date",
     required: false,
     span: 1,
   },
   {
     key: "clearanceValidity",
-    label: "Clearance Validity",
+    label: "Activity Validity",
     type: "text",
     required: false,
     span: 2,
     readOnly: true,
-    placeholder: "Auto from clearance date",
+    placeholder: "Auto generated validity",
   },
 
   {
@@ -289,56 +289,297 @@ const COMMON_FIELDS = [
 
 const TEMPLATE_FIELDS = {
   CONVEYANCE: [
-    { key: "vehicleType", label: "Type of Vehicle", type: "text", required: true, span: 1, placeholder: "Example: TANKER TRUCK" },
-    { key: "motorNumber", label: "Motor Number", type: "text", required: false, span: 1, placeholder: "Motor number" },
-    { key: "driverName", label: "Name of Driver", type: "text", required: true, span: 1, placeholder: "Driver name" },
-    { key: "trailerNumber", label: "Trailer Number", type: "text", required: false, span: 1, placeholder: "Trailer number" },
-    { key: "capacity", label: "Capacity", type: "text", required: false, span: 1, placeholder: "Example: 5000 L" },
-    { key: "plateNumber", label: "Plate Number", type: "text", required: true, span: 1, placeholder: "Example: ABC 1234" },
-    { key: "chassisNumber", label: "Chassis Number", type: "text", required: false, span: 1, placeholder: "Chassis number" },
-    { key: "licenseNumber", label: "License Number", type: "text", required: false, span: 1, placeholder: "License number" },
+    {
+      key: "vehicleType",
+      label: "Type of Vehicle",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Example: TANKER TRUCK",
+    },
+    {
+      key: "motorNumber",
+      label: "Motor Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Motor number",
+    },
+    {
+      key: "driverName",
+      label: "Name of Driver",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Driver name",
+    },
+    {
+      key: "trailerNumber",
+      label: "Trailer Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Trailer number",
+    },
+    {
+      key: "capacity",
+      label: "Capacity",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 5000 L",
+    },
+    {
+      key: "plateNumber",
+      label: "Plate Number",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Example: ABC 1234",
+    },
+    {
+      key: "chassisNumber",
+      label: "Chassis Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Chassis number",
+    },
+    {
+      key: "licenseNumber",
+      label: "License Number",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "License number",
+    },
   ],
 
   STORAGE: [
-    { key: "storageAddress", label: "Storage Address", type: "text", required: true, span: 2, placeholder: "Location where liquids will be stored" },
-    { key: "flammable1", label: "Flammable / Combustible Liquid 1", type: "text", required: false, span: 1, placeholder: "Example: DIESEL" },
-    { key: "capacity1", label: "Capacity 1", type: "text", required: false, span: 1, placeholder: "Example: 2000 L" },
-    { key: "flammable2", label: "Flammable / Combustible Liquid 2", type: "text", required: false, span: 1, placeholder: "Example: GASOLINE" },
-    { key: "capacity2", label: "Capacity 2", type: "text", required: false, span: 1, placeholder: "Example: 1500 L" },
-    { key: "flammable3", label: "Flammable / Combustible Liquid 3", type: "text", required: false, span: 1, placeholder: "Example: KEROSENE" },
-    { key: "capacity3", label: "Capacity 3", type: "text", required: false, span: 1, placeholder: "Example: 500 L" },
-    { key: "flammable4", label: "Flammable / Combustible Liquid 4", type: "text", required: false, span: 1, placeholder: "Example: PAINT THINNER" },
-    { key: "capacity4", label: "Capacity 4", type: "text", required: false, span: 1, placeholder: "Example: 100 L" },
+    {
+      key: "storageAddress",
+      label: "Storage Address",
+      type: "text",
+      required: true,
+      span: 2,
+      placeholder: "Location where liquids will be stored",
+    },
+    {
+      key: "flammable1",
+      label: "Flammable / Combustible Liquid 1",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: DIESEL",
+    },
+    {
+      key: "capacity1",
+      label: "Capacity 1",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 2000 L",
+    },
+    {
+      key: "flammable2",
+      label: "Flammable / Combustible Liquid 2",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: GASOLINE",
+    },
+    {
+      key: "capacity2",
+      label: "Capacity 2",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 1500 L",
+    },
+    {
+      key: "flammable3",
+      label: "Flammable / Combustible Liquid 3",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: KEROSENE",
+    },
+    {
+      key: "capacity3",
+      label: "Capacity 3",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 500 L",
+    },
+    {
+      key: "flammable4",
+      label: "Flammable / Combustible Liquid 4",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: PAINT THINNER",
+    },
+    {
+      key: "capacity4",
+      label: "Capacity 4",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 100 L",
+    },
   ],
 
   HOT_WORKS: [
-    { key: "companyName", label: "Installer / Company", type: "text", required: true, span: 1, placeholder: "Company name" },
-    { key: "hotWorksMode", label: "Mode", type: "select", required: true, span: 1, options: HOTWORKS_MODE_OPTIONS },
-    { key: "jobOrderNumber", label: "Job Order No. / Letter Request", type: "text", required: false, span: 2, placeholder: "For project based only" },
-    { key: "natureOfJob", label: "Nature of Job / Object", type: "text", required: false, span: 2, placeholder: "Nature of work" },
-    { key: "facilityAddress", label: "Building / Structure / Facility Address", type: "text", required: false, span: 2, placeholder: "Work site address" },
-    { key: "permitAuthorizingIndividual", label: "Permit Authorizing Individual (PAI)", type: "text", required: false, span: 1, placeholder: "PAI name" },
-    { key: "hotWorkOperator", label: "Hot Work Operator / Contractor", type: "text", required: false, span: 1, placeholder: "Operator / contractor" },
-    { key: "fireWatchName", label: "Fire Watch / Watchmen", type: "text", required: false, span: 2, placeholder: "Fire watch / watchmen" },
+    {
+      key: "companyName",
+      label: "Installer / Company",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Company name",
+    },
+    {
+      key: "hotWorksMode",
+      label: "Mode",
+      type: "select",
+      required: true,
+      span: 1,
+      options: HOTWORKS_MODE_OPTIONS,
+    },
+    {
+      key: "jobOrderNumber",
+      label: "Job Order No. / Letter Request",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "For project based only",
+    },
+    {
+      key: "natureOfJob",
+      label: "Nature of Job / Object",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Nature of work",
+    },
+    {
+      key: "facilityAddress",
+      label: "Building / Structure / Facility Address",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Work site address",
+    },
+    {
+      key: "permitAuthorizingIndividual",
+      label: "Permit Authorizing Individual (PAI)",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "PAI name",
+    },
+    {
+      key: "hotWorkOperator",
+      label: "Hot Work Operator / Contractor",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Operator / contractor",
+    },
+    {
+      key: "fireWatchName",
+      label: "Fire Watch / Watchmen",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Fire watch / watchmen",
+    },
   ],
 
   FIRE_DRILL: [
-    { key: "fireDrillDate", label: "Fire Drill Date", type: "date", required: true, span: 1 },
-    { key: "issuedDay", label: "Issued Day", type: "number", required: false, span: 1, placeholder: "Example: 12" },
-    { key: "issuedMonth", label: "Issued Month", type: "text", required: false, span: 2, placeholder: "Example: MARCH" },
+    {
+      key: "fireDrillDate",
+      label: "Fire Drill Date",
+      type: "date",
+      required: true,
+      span: 1,
+    },
+    {
+      key: "issuedDay",
+      label: "Issued Day",
+      type: "number",
+      required: false,
+      span: 1,
+      placeholder: "Example: 12",
+    },
+    {
+      key: "issuedMonth",
+      label: "Issued Month",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Example: MARCH",
+    },
   ],
 
   FUMIGATION: [
-    { key: "operatorName", label: "Authorized Operator / Contractor", type: "text", required: true, span: 1, placeholder: "Operator name" },
-    { key: "operationDate", label: "Operation Date", type: "date", required: false, span: 1 },
-    { key: "operationTime", label: "Operation Time", type: "text", required: false, span: 1, placeholder: "Example: 8:00 AM - 12:00 PM" },
-    { key: "operationDuration", label: "Duration of Operation", type: "text", required: false, span: 1, placeholder: "Example: 4 HOURS" },
-    { key: "foggingAddress", label: "Address of Fogging / Fumigation", type: "text", required: false, span: 1, placeholder: "Location of fumigation" },
-    { key: "conductedBy", label: "Fumigation Conducted By", type: "text", required: false, span: 1, placeholder: "Name of person / company who conducted the operation" },
+    {
+      key: "operatorName",
+      label: "Authorized Operator / Contractor",
+      type: "text",
+      required: true,
+      span: 1,
+      placeholder: "Operator name",
+    },
+    {
+      key: "operationDate",
+      label: "Operation Date",
+      type: "date",
+      required: false,
+      span: 1,
+    },
+    {
+      key: "operationTime",
+      label: "Operation Time",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 8:00 AM - 12:00 PM",
+    },
+    {
+      key: "operationDuration",
+      label: "Duration of Operation",
+      type: "text",
+      required: false,
+      span: 1,
+      placeholder: "Example: 4 HOURS",
+    },
+    {
+      key: "foggingAddress",
+      label: "Fogging Address",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Address of fogging operation",
+    },
+    {
+      key: "conductedBy",
+      label: "Conducted By",
+      type: "text",
+      required: false,
+      span: 2,
+      placeholder: "Person / company who conducted the operation",
+    },
   ],
 };
 
-export default function AddClearance({ setRefresh }) {
+export default function AddClearance({
+  editingClearance = null,
+  onSaved,
+  onCancel,
+  setRefresh,
+}) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState({});
@@ -353,6 +594,63 @@ export default function AddClearance({ setRefresh }) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
+
+  useEffect(() => {
+    if (!editingClearance) {
+      setForm(INITIAL_FORM);
+      setTouched({});
+      return;
+    }
+
+    const typeMap = {
+      conveyance: "CONVEYANCE",
+      storage: "STORAGE",
+      hotworks: "HOT_WORKS",
+      firedrill: "FIRE_DRILL",
+      fumigation: "FUMIGATION",
+    };
+
+    const nextTemplateType =
+      editingClearance.templateType ||
+      typeMap[String(editingClearance.type || editingClearance.clearanceType || "").toLowerCase()] ||
+      "CONVEYANCE";
+
+    const rawClearanceDate =
+      editingClearance.clearanceDateRaw ||
+      editingClearance.clearanceDateYMD ||
+      (isYMD(editingClearance.clearanceDate) ? editingClearance.clearanceDate : "") ||
+      "";
+
+    let computedValidity =
+      editingClearance.clearanceValidity || editingClearance.validUntil || "";
+
+    if (rawClearanceDate) {
+      if (nextTemplateType === "FUMIGATION") {
+        computedValidity = formatDateLong(rawClearanceDate);
+      } else {
+        const validityYMD = getEndOfYearYMD(rawClearanceDate);
+        computedValidity = validityYMD ? formatDateLong(validityYMD) : "";
+      }
+    }
+
+    setForm({
+      ...INITIAL_FORM,
+      ...editingClearance,
+      templateType: nextTemplateType,
+      clearanceDate: rawClearanceDate,
+      vehicleType: editingClearance.vehicleType || editingClearance.typeOfVehicle || "",
+      driverName: editingClearance.driverName || editingClearance.nameOfDriver || "",
+      hotWorkOperator: editingClearance.hotWorkOperator || editingClearance.hotworkOperator || "",
+      fireWatchName: editingClearance.fireWatchName || editingClearance.fireWatch || "",
+      fireDrillDate: editingClearance.fireDrillDate || editingClearance.dateConducted || "",
+      clearanceValidity: computedValidity,
+      foggingAddress:
+        editingClearance.foggingAddress || editingClearance.fogging_address || "",
+      conductedBy:
+        editingClearance.conductedBy || editingClearance.conducted_by || "",
+    });
+    setTouched({});
+  }, [editingClearance]);
 
   const activeTemplateFields = useMemo(() => {
     return TEMPLATE_FIELDS[form.templateType] || [];
@@ -484,6 +782,15 @@ export default function AddClearance({ setRefresh }) {
       cursor: "pointer",
       fontWeight: 950,
     },
+    cancel: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      background: "#fff",
+      color: "#0f172a",
+      cursor: "pointer",
+      fontWeight: 950,
+    },
   };
 
   const handleBlur = (key) => {
@@ -493,15 +800,43 @@ export default function AddClearance({ setRefresh }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === "clearanceDate") {
-      const untilYMD = addYearsYMD(value, 1);
-      const validityText = untilYMD ? formatDateLong(untilYMD) : "";
+    if (name === "templateType") {
+      setForm((prev) => {
+        let nextValidity = prev.clearanceValidity || "";
 
-      setForm((prev) => ({
-        ...prev,
-        clearanceDate: value,
-        clearanceValidity: validityText,
-      }));
+        if (value === "FUMIGATION") {
+          nextValidity = prev.clearanceDate ? formatDateLong(prev.clearanceDate) : "";
+        } else {
+          const validityYMD = getEndOfYearYMD(prev.clearanceDate);
+          nextValidity = validityYMD ? formatDateLong(validityYMD) : "";
+        }
+
+        return {
+          ...prev,
+          templateType: value,
+          clearanceValidity: nextValidity,
+        };
+      });
+      return;
+    }
+
+    if (name === "clearanceDate") {
+      setForm((prev) => {
+        let validityText = "";
+
+        if (prev.templateType === "FUMIGATION") {
+          validityText = value ? formatDateLong(value) : "";
+        } else {
+          const validityYMD = getEndOfYearYMD(value);
+          validityText = validityYMD ? formatDateLong(validityYMD) : "";
+        }
+
+        return {
+          ...prev,
+          clearanceDate: value,
+          clearanceValidity: validityText,
+        };
+      });
       return;
     }
 
@@ -534,42 +869,54 @@ export default function AddClearance({ setRefresh }) {
     return {
       ...state,
 
-      // normalized keys
       type: typeSlug,
       clearanceType: typeSlug,
       templateLabel,
 
-      // common aliases
       controlNumber: state.controlNumber || "",
+
+      clearanceDateRaw: state.clearanceDate || "",
+      clearanceDateYMD: state.clearanceDate || "",
       clearanceDate: clearanceDateLong,
       clearanceValidity: state.clearanceValidity || "",
       validUntil: state.clearanceValidity || "",
+
       orDate: orDateLong,
 
-      // conveyance aliases
       typeOfVehicle: state.vehicleType || "",
+      vehicleType: state.vehicleType || "",
       motorNumber: state.motorNumber || "",
       nameOfDriver: state.driverName || "",
+      driverName: state.driverName || "",
       trailerNumber: state.trailerNumber || "",
       capacity: state.capacity || "",
       plateNumber: state.plateNumber || "",
       chassisNumber: state.chassisNumber || "",
       licenseNumber: state.licenseNumber || "",
 
-      // hotworks aliases
       fireWatch: state.fireWatchName || "",
+      fireWatchName: state.fireWatchName || "",
+      hotworkOperator: state.hotWorkOperator || "",
+      hotWorkOperator: state.hotWorkOperator || "",
 
-      // fire drill aliases
       fireDrillDate: fireDrillDateLong,
       dateConducted: fireDrillDateLong,
       issuedDay: state.issuedDay || "",
       issuedMonth: state.issuedMonth || "",
 
-      // fumigation aliases
       operationDate: operationDateLong,
+      operationDuration: state.operationDuration || "",
+      foggingAddress: state.foggingAddress || "",
+      fogging_address: state.foggingAddress || "",
+      conductedBy: state.conductedBy || "",
+      conducted_by: state.conductedBy || "",
 
-      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      ...(editingClearance
+        ? {}
+        : {
+            createdAt: serverTimestamp(),
+          }),
     };
   };
 
@@ -587,13 +934,24 @@ export default function AddClearance({ setRefresh }) {
     setSaving(true);
     try {
       const payload = buildPayload(form);
-      await addDoc(collection(db, "clearances"), payload);
+
+      if (editingClearance?.id) {
+        await updateDoc(doc(db, "clearances", editingClearance.id), payload);
+      } else {
+        await addDoc(collection(db, "clearances"), payload);
+      }
 
       setToastOpen(true);
-      setForm(INITIAL_FORM);
-      setTouched({});
       setRefresh?.((prev) => !prev);
-      scrollToTop();
+
+      if (editingClearance) {
+        onSaved?.();
+      } else {
+        setForm(INITIAL_FORM);
+        setTouched({});
+        scrollToTop();
+        onSaved?.();
+      }
     } catch (err) {
       console.error(err);
       alert("Firestore error. Check rules / permissions.");
@@ -611,9 +969,13 @@ export default function AddClearance({ setRefresh }) {
 
         <div style={styles.headerRow}>
           <div>
-            <div style={styles.title}>Add Clearance</div>
+            <div style={styles.title}>
+              {editingClearance ? "Edit Clearance" : "Add Clearance"}
+            </div>
             <div style={styles.sub}>
-              Type-based fields now save with matching aliases for details and PDF templates.
+              {form.templateType === "FUMIGATION"
+                ? "For fumigation, Activity Validity is the same as the Activity Date."
+                : "Validity is automatically set to 31 December of the selected clearance year."}
             </div>
           </div>
         </div>
@@ -705,8 +1067,20 @@ export default function AddClearance({ setRefresh }) {
             Clear
           </button>
 
+          {editingClearance && (
+            <button style={styles.cancel} onClick={onCancel} disabled={saving}>
+              Cancel
+            </button>
+          )}
+
           <button style={styles.primary} onClick={submit} disabled={saving}>
-            {saving ? "Saving..." : "Save Clearance"}
+            {saving
+              ? editingClearance
+                ? "Updating..."
+                : "Saving..."
+              : editingClearance
+              ? "Update Clearance"
+              : "Save Clearance"}
           </button>
         </div>
       </div>
@@ -718,8 +1092,12 @@ export default function AddClearance({ setRefresh }) {
           muted: "#64748b",
         }}
         open={toastOpen}
-        title="Added to Clearances"
-        message="Clearance saved successfully."
+        title={editingClearance ? "Updated Clearance" : "Added to Clearances"}
+        message={
+          editingClearance
+            ? "Clearance updated successfully."
+            : "Clearance saved successfully."
+        }
         autoCloseMs={1600}
         onClose={() => setToastOpen(false)}
       />
