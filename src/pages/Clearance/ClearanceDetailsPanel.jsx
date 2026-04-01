@@ -156,6 +156,8 @@ const FIELDS = [
     label: "Operation Duration",
     types: ["fumigation"],
   },
+  { key: "foggingAddress", label: "Fogging Address", types: ["fumigation"] },
+{ key: "conductedBy", label: "Conducted By", types: ["fumigation"] },
 ];
 
 const CAPS_KEYS = new Set([
@@ -196,6 +198,8 @@ const CAPS_KEYS = new Set([
   "fireWatch",
   "operatorName",
   "issuedMonth",
+  "foggingAddress",
+"conductedBy",
 ]);
 
 const DATE_KEYS = new Set([

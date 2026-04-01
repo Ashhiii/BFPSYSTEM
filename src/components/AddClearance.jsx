@@ -118,6 +118,8 @@ const INITIAL_FORM = {
   operationDate: "",
   operationTime: "",
   operationDuration: "",
+  foggingAddress: "",
+conductedBy: "",
 };
 
 const UPPER_KEYS = new Set([
@@ -165,6 +167,8 @@ const UPPER_KEYS = new Set([
   "operatorName",
   "operationTime",
   "operationDuration",
+  "foggingAddress",
+"conductedBy",
 ]);
 
 const COMMON_FIELDS = [
@@ -329,6 +333,8 @@ const TEMPLATE_FIELDS = {
     { key: "operationDate", label: "Operation Date", type: "date", required: false, span: 1 },
     { key: "operationTime", label: "Operation Time", type: "text", required: false, span: 1, placeholder: "Example: 8:00 AM - 12:00 PM" },
     { key: "operationDuration", label: "Duration of Operation", type: "text", required: false, span: 1, placeholder: "Example: 4 HOURS" },
+    { key: "foggingAddress", label: "Address of Fogging / Fumigation", type: "text", required: false, span: 1, placeholder: "Location of fumigation" },
+    { key: "conductedBy", label: "Fumigation Conducted By", type: "text", required: false, span: 1, placeholder: "Name of person / company who conducted the operation" },
   ],
 };
 
