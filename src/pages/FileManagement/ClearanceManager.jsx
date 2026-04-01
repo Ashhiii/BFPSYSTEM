@@ -94,9 +94,7 @@ export default function ClearanceManager({ C, refresh, setRefresh }) {
 
           const hasSomething =
             data &&
-            (data.fsicAppNo ||
-              data.fsicNumber ||
-              data.ownerName ||
+              (data.ownerName ||
               data.establishmentName ||
               data.businessAddress ||
               data.clearanceType ||
@@ -135,8 +133,6 @@ export default function ClearanceManager({ C, refresh, setRefresh }) {
     return (rows || []).filter((r) => {
       return (
         (r.clearanceType || "").toLowerCase().includes(q) ||
-        (r.fsicAppNo || "").toLowerCase().includes(q) ||
-        (r.fsicNumber || "").toLowerCase().includes(q) ||
         (r.ownerName || "").toLowerCase().includes(q) ||
         (r.establishmentName || "").toLowerCase().includes(q) ||
         (r.businessAddress || "").toLowerCase().includes(q) ||
@@ -516,7 +512,6 @@ export default function ClearanceManager({ C, refresh, setRefresh }) {
             <tr>
               {selectMode && <th style={{ ...th, width: 46, textAlign: "center" }}>✓</th>}
               <th style={th}>Type</th>
-              <th style={th}>FSIC</th>
               <th style={th}>Owner</th>
               <th style={th}>Establishment</th>
               <th style={th}>Address</th>
@@ -578,7 +573,6 @@ export default function ClearanceManager({ C, refresh, setRefresh }) {
                     )}
 
                     <td style={td}>{r.clearanceType || "-"}</td>
-                    <td style={td}>{r.fsicAppNo || r.fsicNumber || "-"}</td>
                     <td style={td}>{r.ownerName || "-"}</td>
                     <td style={td}>{r.establishmentName || "-"}</td>
                     <td style={td}>{r.businessAddress || "-"}</td>
