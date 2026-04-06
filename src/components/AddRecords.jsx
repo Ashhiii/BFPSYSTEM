@@ -165,6 +165,7 @@ const NATURE_SUGGESTIONS = [
   "RENEW",
   "NEW",
   "RE-INSPECTION",
+  "GOVERNMENT",
 ];
 
 const OCCUPANCY_OPTIONS = [
