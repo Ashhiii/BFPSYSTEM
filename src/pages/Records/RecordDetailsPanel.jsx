@@ -396,58 +396,113 @@ export default function RecordDetailsPanel({
   };
 
   const saveEdit = async () => {
-    if (!record?.id) return alert("Missing record.id (cannot save).");
+  if (!record?.id) return alert("Missing record.id (cannot save).");
 
-    try {
-      setSaving(true);
+  try {
+    setSaving(true);
 
-      const ensured = { ...form };
+    const ensured = { ...form };
 
-      if (ensured.dateInspected) {
-        ensured.fsicValidity = addOneYear(ensured.dateInspected);
-      }
-
-      ensured.inspectors = combineInspectors(
-        ensured.inspector1,
-        ensured.inspector2,
-        ensured.inspector3,
-        ensured.inspector4,
-        ensured.inspector5
-      );
-
-      const payload = {};
-      FIELDS.forEach((f) => {
-        payload[f.key] = ensured[f.key] ?? "";
-      });
-
-      payload.updatedAt = serverTimestamp();
-      payload.typeOfOccupancy = payload.occupancyType;
-      payload.buildingDesc = payload.buildingDescription;
-      payload.floorArea = payload.floorAreaSqm;
-      payload.storeyCount = payload.noOfStorey;
-
-      const targetDocRef = isArchive
-        ? doc(db, "archives", String(source || "").replace("Archive: ", ""), "records", record.id)
-        : doc(db, "records", record.id);
-
-      await setDoc(targetDocRef, payload, { merge: true });
-
-      const updatedRecord = {
-        ...record,
-        ...payload,
-        id: record.id,
-        _editedAt: Date.now(),
-      };
-
-      setEditing(false);
-      setForm(buildFormFromRecord(updatedRecord));
-      onUpdated?.(updatedRecord);
-    } catch (e) {
-      alert(`❌ SAVE ERROR: ${e.message}`);
-    } finally {
-      setSaving(false);
+    if (ensured.dateInspected) {
+      ensured.fsicValidity = addOneYear(ensured.dateInspected);
     }
-  };
+
+    ensured.inspectors = combineInspectors(
+      ensured.inspector1,
+      ensured.inspector2,
+      ensured.inspector3,
+      ensured.inspector4,
+      ensured.inspector5
+    );
+
+    const payload = {};
+    FIELDS.forEach((f) => {
+      payload[f.key] = ensured[f.key] ?? "";
+    });
+
+    payload.updatedAt = serverTimestamp();
+    payload.typeOfOccupancy = payload.occupancyType;
+    payload.buildingDesc = payload.buildingDescription;
+    payload.floorArea = payload.floorAreaSqm;
+    payload.storeyCount = payload.noOfStorey;
+
+    const targetDocRef = isArchive
+      ? doc(db, "archives", String(source || "").replace("Archive: ", ""), "records", record.id)
+      : doc(db, "records", record.id);
+
+    // 1) save to firestore
+    await setDoc(targetDocRef, payload, { merge: true });
+
+    // 2) sync to backend/api so template download uses new data
+    try {
+      const apiBase =
+        (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+
+      await fetch(`${apiBase}/records/${record.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...record,
+          ...payload,
+          id: record.id,
+          fsicNo: payload.fsicNo ?? "",
+          fsicAppNo: payload.fsicAppNo ?? "",
+          natureOfInspection: payload.natureOfInspection ?? "",
+          ownerName: payload.ownerName ?? "",
+          establishmentName: payload.establishmentName ?? "",
+          businessAddress: payload.businessAddress ?? "",
+          contactNumber: payload.contactNumber ?? "",
+          dateInspected: payload.dateInspected ?? "",
+          ioNumber: payload.ioNumber ?? "",
+          ioDate: payload.ioDate ?? "",
+          nfsiNumber: payload.nfsiNumber ?? "",
+          nfsiDate: payload.nfsiDate ?? "",
+          ntcNumber: payload.ntcNumber ?? "",
+          ntcDate: payload.ntcDate ?? "",
+          fsicValidity: payload.fsicValidity ?? "",
+          defects: payload.defects ?? "",
+          occupancyType: payload.occupancyType ?? "",
+          typeOfOccupancy: payload.occupancyType ?? "",
+          buildingDescription: payload.buildingDescription ?? "",
+          buildingDesc: payload.buildingDescription ?? "",
+          floorAreaSqm: payload.floorAreaSqm ?? "",
+          floorArea: payload.floorAreaSqm ?? "",
+          noOfStorey: payload.noOfStorey ?? "",
+          storeyCount: payload.noOfStorey ?? "",
+          highRise: payload.highRise ?? "",
+          fsmr: payload.fsmr ?? "",
+          remarks: payload.remarks ?? "",
+          orNumber: payload.orNumber ?? "",
+          orAmount: payload.orAmount ?? "",
+          orDate: payload.orDate ?? "",
+          chiefName: payload.chiefName ?? "",
+          chiefPosition: payload.chiefPosition ?? "",
+          marshalName: payload.marshalName ?? "",
+          inspectors: payload.inspectors ?? "",
+        }),
+      });
+    } catch (apiErr) {
+      console.error("Backend sync failed:", apiErr);
+    }
+
+    const updatedRecord = {
+      ...record,
+      ...payload,
+      id: record.id,
+      _editedAt: Date.now(),
+    };
+
+    setEditing(false);
+    setForm(buildFormFromRecord(updatedRecord));
+    onUpdated?.(updatedRecord);
+  } catch (e) {
+    alert(`❌ SAVE ERROR: ${e.message}`);
+  } finally {
+    setSaving(false);
+  }
+};
 
   const saveRenew = async () => {
     if (!record) return;
