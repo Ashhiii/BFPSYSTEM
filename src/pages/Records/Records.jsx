@@ -295,63 +295,37 @@ export default function Records({ refresh, setRefresh }) {
     return "";
   };
 
-const printPdfBlob = (blob) => {
-  return new Promise((resolve, reject) => {
+  const printPdfBlob = async (blob) => {
     const blobUrl = window.URL.createObjectURL(blob);
 
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
     iframe.style.bottom = "0";
-    iframe.style.width = "1px";
-    iframe.style.height = "1px";
-    iframe.style.opacity = "0";
-    iframe.style.pointerEvents = "none";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
     iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
     iframe.src = blobUrl;
 
-    const cleanup = () => {
-      setTimeout(() => {
-        try {
-          iframe.remove();
-        } catch {}
-        try {
-          window.URL.revokeObjectURL(blobUrl);
-        } catch {}
-      }, 3000);
-    };
+    document.body.appendChild(iframe);
 
     iframe.onload = () => {
-      // important: hulat sa gamay para fully render ang PDF page
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Print iframe error:", err);
+        window.open(blobUrl, "_blank");
+      }
+
       setTimeout(() => {
         try {
-          const win = iframe.contentWindow;
-          if (!win) throw new Error("Print window not available.");
-
-          win.focus();
-          win.print();
-
-          // slight delay after print trigger
-          setTimeout(() => {
-            cleanup();
-            resolve();
-          }, 1500);
-        } catch (err) {
-          cleanup();
-          reject(err);
-        }
-      }, 1200); // pwede nimo ni himuong 1500 if needed
+          document.body.removeChild(iframe);
+        } catch {}
+        window.URL.revokeObjectURL(blobUrl);
+      }, 5000);
     };
-
-    iframe.onerror = () => {
-      cleanup();
-      reject(new Error("Failed to load PDF into print iframe."));
-    };
-
-    document.body.appendChild(iframe);
-  });
-};
+  };
 
   const handlePrintSelected = async ({ selectedIds, template }) => {
     if (!selectedIds?.length) {
