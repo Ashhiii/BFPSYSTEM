@@ -1,10 +1,4 @@
 // src/pages/Archive/Archive.jsx
-// ✅ Updates:
-// 1) Unclose uses ConfirmModal (glass) instead of window.confirm
-// 2) Success/Error uses your TopRightToast (same design)
-// 3) Month dropdown + Closed date display are NOT numeric (e.g., "February 2026")
-// 4) Archive list ORDERED newest -> oldest (orderBy createdAt desc + fallback sort)
-
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
@@ -16,15 +10,16 @@ import {
   deleteDoc,
   writeBatch,
 } from "firebase/firestore";
+import { HiOutlinePrinter } from "react-icons/hi";
 import { db } from "../../firebase";
 
 import RecordsTable from "../Records/RecordsTable.jsx";
 import injectTableStyles from "../Records/injectTableStyles.jsx";
 import RecordDetailsPanel from "../Records/RecordDetailsPanel.jsx";
 import DetailsFullScreen from "../../components/DetailsFullScreen.jsx";
-
-import ConfirmModal from "../../components/ConfirmModal.jsx"; // adjust if needed
-import TopRightToast from "../../components/TopRightToast.jsx"; // ✅ your toast
+import PrintSelectionModal from "../../components/PrintSelectionModal";
+import ConfirmModal from "../../components/ConfirmModal.jsx";
+import TopRightToast from "../../components/TopRightToast.jsx";
 
 /** ✅ Convert "YYYY-MM" -> "February 2026" */
 const formatMonthLabel = (yyyy_mm) => {
@@ -33,8 +28,8 @@ const formatMonthLabel = (yyyy_mm) => {
   const monthIndex = Number(m) - 1;
 
   const months = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
   ];
 
   if (!y || monthIndex < 0 || monthIndex > 11) return String(yyyy_mm);
@@ -65,7 +60,7 @@ const formatDateTimePretty = (dt) => {
 /** ✅ Safe timestamp to millis (Firestore Timestamp | Date | string | number) */
 const toMillisSafe = (v) => {
   if (!v) return 0;
-  if (v?.toMillis) return v.toMillis(); // Firestore Timestamp
+  if (v?.toMillis) return v.toMillis();
   if (v instanceof Date) return v.getTime();
   if (typeof v === "string") {
     const t = Date.parse(v);
@@ -73,6 +68,29 @@ const toMillisSafe = (v) => {
   }
   if (typeof v === "number") return v;
   return 0;
+};
+
+/** ✅ Same combined search as Records page */
+const normalizeText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tokensOf = (value) => normalizeText(value).split(" ").filter(Boolean);
+
+const fieldMatchesCombinedSearch = (fieldValue, combinedSearch) => {
+  const field = normalizeText(fieldValue);
+  if (!field) return false;
+
+  if (field.includes(combinedSearch)) return true;
+  if (combinedSearch.includes(field)) return true;
+
+  const fieldTokens = tokensOf(field);
+  if (!fieldTokens.length) return false;
+
+  return fieldTokens.every((token) => combinedSearch.includes(token));
 };
 
 export default function Archive() {
@@ -85,6 +103,9 @@ export default function Archive() {
 
   // ✅ FULLSCREEN DETAILS
   const [showDetails, setShowDetails] = useState(false);
+
+  // ✅ PRINT MODAL
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // ✅ close info saved in Firestore (archives/{YYYY-MM})
   const [closeInfo, setCloseInfo] = useState(null);
@@ -100,7 +121,7 @@ export default function Archive() {
   const [toastTitle, setToastTitle] = useState("Success");
   const [toastMsg, setToastMsg] = useState("");
 
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const C = {
     primary: "#b91c1c",
@@ -125,7 +146,7 @@ export default function Archive() {
   const fetchMonths = async () => {
     const qy = query(collection(db, "archives"), orderBy("month", "desc"));
     const snap = await getDocs(qy);
-    setMonths(snap.docs.map((d) => d.id)); // doc id = YYYY-MM
+    setMonths(snap.docs.map((d) => d.id));
   };
 
   const makeEntityKey = (r) => {
@@ -141,12 +162,6 @@ export default function Archive() {
       .slice(0, 140);
   };
 
-  /**
-   * ✅ Behavior:
-   * - If month has 0 records => DELETE archives/{month} doc
-   *   so closeDate disappears and you can Close Month again.
-   * ✅ ORDER: newest -> oldest (createdAt desc + fallback sort)
-   */
   const fetchArchiveMonth = async (m) => {
     if (!m) {
       setSelectedMonth("");
@@ -165,16 +180,13 @@ export default function Archive() {
     setCloseInfo(null);
     setShowDetails(false);
 
-    // ✅ 1) fetch records first (NEWEST -> OLDEST)
     const arcRef = collection(db, "archives", m, "records");
 
     let snap;
     try {
-      // prefer ordered query
       const qArc = query(arcRef, orderBy("createdAt", "desc"));
       snap = await getDocs(qArc);
     } catch (e) {
-      // fallback (if no createdAt / missing index)
       snap = await getDocs(arcRef);
     }
 
@@ -187,8 +199,6 @@ export default function Archive() {
       };
     });
 
-    // ✅ extra safety sort (NEWEST -> OLDEST)
-    // If createdAt is missing, it falls back to archivedAt or restoredAt if present.
     list = list.sort((a, b) => {
       const bt =
         toMillisSafe(b.createdAt) ||
@@ -201,7 +211,6 @@ export default function Archive() {
       return bt - at;
     });
 
-    // ❗ IF EMPTY → delete month doc (removes close date)
     if (list.length === 0) {
       try {
         await deleteDoc(doc(db, "archives", m));
@@ -210,7 +219,6 @@ export default function Archive() {
         console.error("❌ Failed deleting empty month:", err);
       }
 
-      // reset UI
       setSelectedMonth("");
       setRecords([]);
       setSelectedRecord(null);
@@ -218,12 +226,10 @@ export default function Archive() {
       setCloseInfo(null);
       setShowDetails(false);
 
-      // refresh month list
       fetchMonths().catch(() => {});
       return;
     }
 
-    // ✅ 2) if has data, fetch month doc for close info (closeDate/closedAt)
     try {
       const monthSnap = await getDoc(doc(db, "archives", m));
       setCloseInfo(monthSnap.exists() ? monthSnap.data() : null);
@@ -238,29 +244,44 @@ export default function Archive() {
     fetchMonths().catch(() => setMonths([]));
   }, []);
 
+  /** ✅ Same multiple search feel as Records page */
   const filtered = useMemo(() => {
-    const key = search.toLowerCase().trim();
+    const combinedSearch = normalizeText(search);
+
     return (records || []).filter((r) => {
-      return (
-        (r.ownerName || "").toLowerCase().includes(key) ||
-        (r.establishmentName || "").toLowerCase().includes(key) ||
-        (r.businessAddress || "").toLowerCase().includes(key) ||
-        (r.fsicAppNo || "").toLowerCase().includes(key) ||
-        (r.natureOfInspection || "").toLowerCase().includes(key) ||
-        (r.inspectors || "").toLowerCase().includes(key)
+      if (!combinedSearch) return true;
+
+      const searchableFields = [
+        r.fsicAppNo,
+        r.fsicNo,
+        r.establishmentName,
+        r.ownerName,
+        r.ioNumber,
+        r.natureOfInspection,
+        r.inspectors,
+        r.businessAddress,
+        r.nfsiNumber,
+        r.ntcNumber,
+        r.remarks,
+      ];
+
+      const rowCombined = normalizeText(searchableFields.join(" "));
+
+      if (rowCombined.includes(combinedSearch)) return true;
+
+      return searchableFields.some((field) =>
+        fieldMatchesCombinedSearch(field, combinedSearch)
       );
     });
   }, [records, search]);
 
   const hasData = (records || []).length > 0;
 
-  // ✅ on row click -> open fullscreen
   const onSelectRow = (rec) => {
     setSelectedRecord(rec);
     setShowDetails(true);
   };
 
-  // ✅ close date string (pretty)
   const closeDateText = (() => {
     const raw =
       closeInfo?.closedAt?.toDate?.()
@@ -269,12 +290,8 @@ export default function Archive() {
     return formatDateTimePretty(raw);
   })();
 
-  // ✅ treat month as "closed" if closedAt exists
   const isClosed = !!closeDateText;
 
-  /**
-   * ✅ UN-CLOSE core logic (no confirm here)
-   */
   const doUncloseMonth = async () => {
     try {
       if (unclosing) return;
@@ -293,7 +310,6 @@ export default function Archive() {
 
       setUnclosing(true);
 
-      // 1) read all archived docs for this month
       const arcSnap = await getDocs(
         collection(db, "archives", selectedMonth, "records")
       );
@@ -303,18 +319,16 @@ export default function Archive() {
         return;
       }
 
-      // 2) build a set of existing current record IDs (to avoid overwriting)
       const currentSnap = await getDocs(collection(db, "records"));
       const existingIds = new Set(currentSnap.docs.map((d) => String(d.id)));
 
       let restored = 0;
       let skipped = 0;
 
-      // 3) batch restore + delete archive docs (chunked)
       let i = 0;
       while (i < arcDocs.length) {
         const batch = writeBatch(db);
-        const slice = arcDocs.slice(i, i + 200); // 200 => safe (set+delete = 400 writes)
+        const slice = arcDocs.slice(i, i + 200);
 
         slice.forEach((d) => {
           const data = d.data() || {};
@@ -334,7 +348,6 @@ export default function Archive() {
           restored++;
         });
 
-        // delete archive docs for ALL in slice (even if skipped restore)
         slice.forEach((d) => {
           batch.delete(
             doc(db, "archives", selectedMonth, "records", String(d.id))
@@ -345,16 +358,13 @@ export default function Archive() {
         i += 200;
       }
 
-      // 4) delete month doc itself (removes closedAt)
       await deleteDoc(doc(db, "archives", selectedMonth));
 
-      // ✅ Success toast (month label not numeric)
       showToast(
         "Unclosed Successfully",
         `✅ Month: ${formatMonthLabel(selectedMonth)}\nRestored: ${restored}\nSkipped: ${skipped}\nTotal: ${arcDocs.length}`
       );
 
-      // 5) reset UI + refresh months
       setSelectedMonth("");
       setRecords([]);
       setSelectedRecord(null);
@@ -372,7 +382,80 @@ export default function Archive() {
     }
   };
 
-  // ---------- styles ----------
+  /** ✅ Same bulk print flow as Records page */
+  const getCertificateUrl = (recordId, value) => {
+    if (value === "owner") return `${API}/records/${recordId}/certificate/owner/pdf`;
+    if (value === "bfp") return `${API}/records/${recordId}/certificate/bfp/pdf`;
+    if (value === "owner-new") return `${API}/records/${recordId}/certificate/owner-new/pdf`;
+    if (value === "bfp-new") return `${API}/records/${recordId}/certificate/bfp-new/pdf`;
+    if (value === "io") return `${API}/records/${recordId}/io/pdf`;
+    if (value === "reinspection") return `${API}/records/${recordId}/reinspection/pdf`;
+    if (value === "nfsi") return `${API}/records/${recordId}/nfsi/pdf`;
+    return "";
+  };
+
+  const printPdfBlob = async (blob) => {
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.src = blobUrl;
+
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Print iframe error:", err);
+        window.open(blobUrl, "_blank");
+      }
+
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch {}
+        window.URL.revokeObjectURL(blobUrl);
+      }, 5000);
+    };
+  };
+
+  const handlePrintSelected = async ({ selectedIds, template }) => {
+    if (!selectedIds?.length) {
+      alert("Select record(s) to print.");
+      return;
+    }
+
+    if (!template) {
+      alert("Please select a template.");
+      return;
+    }
+
+    try {
+      for (const recordId of selectedIds) {
+        const url = getCertificateUrl(recordId, template);
+        if (!url) continue;
+
+        const res = await fetch(url, { method: "GET" });
+        if (!res.ok) {
+          throw new Error(`Failed to load printable PDF for record ${recordId}`);
+        }
+
+        const blob = await res.blob();
+        await printPdfBlob(blob);
+      }
+    } catch (err) {
+      console.error("Print failed:", err);
+      alert("There's a problem with the print function. Check backend endpoint or popup/print permissions.");
+    }
+  };
+
   const page = {
     height: "calc(100vh - 70px)",
     display: "flex",
@@ -396,6 +479,15 @@ export default function Archive() {
     `,
     boxShadow: "0 20px 40px rgba(0,0,0,.25)",
   };
+
+  const headerRight = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  marginLeft: "auto",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+};
 
   const hTitle = { fontSize: 18, fontWeight: 950, color: C.bg };
   const hSub = { fontSize: 12, fontWeight: 800, color: C.bg, marginTop: 6 };
@@ -455,6 +547,24 @@ export default function Archive() {
     opacity: unclosing ? 0.7 : 1,
   };
 
+  const btnRed = {
+    ...btn,
+     border: "1px solid rgba(255,255,255,0.20)",
+        background: "rgba(255,255,255,0.12)",
+        color: "#fff",
+         width: 32,
+        height: 32,
+        borderRadius: 14,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        boxShadow: "0 10px 26px rgba(0,0,0,0.18)",
+        transition: "all .18s ease",
+  };
+
   const card = {
     overflow: "hidden",
     borderRadius: 16,
@@ -503,7 +613,6 @@ export default function Archive() {
 
   return (
     <div style={page}>
-      {/* ✅ TOAST (your design) */}
       <TopRightToast
         C={C}
         open={toastOpen}
@@ -513,14 +622,28 @@ export default function Archive() {
         onClose={() => setToastOpen(false)}
       />
 
-      <div style={header}>
-        <div>
-          <div style={hTitle}>Archive Records</div>
-          <div style={hSub}>
-            Select month → search → click row to view details / renew • (Unclose available if closed)
-          </div>
-        </div>
-      </div>
+<div style={header}>
+  <div>
+    <div style={hTitle}>Archive Records</div>
+    <div style={hSub}>
+      Select month → search → click row to view details / renew / bulk print
+    </div>
+  </div>
+
+  <div style={headerRight}>
+    {selectedMonth && hasData ? (
+      <button
+        style={btnRed}
+        onClick={() => setShowPrintModal(true)}
+        title="Bulk Print"
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <HiOutlinePrinter size={16} />
+        </span>
+      </button>
+    ) : null}
+  </div>
+</div>
 
       <div style={bar}>
         <select
@@ -541,13 +664,12 @@ export default function Archive() {
 
         <input
           style={input}
-          placeholder="🔍 Search archived records..."
+          placeholder="🔍 Search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           disabled={!selectedMonth || !hasData}
         />
 
-        {/* ✅ Unclose button shows ONLY if month closed */}
         {selectedMonth && isClosed ? (
           <button
             style={btnDanger}
@@ -597,35 +719,39 @@ export default function Archive() {
         </div>
       </div>
 
-      {/* ✅ FULL SCREEN DETAILS */}
       <DetailsFullScreen
         open={showDetails}
         title={modalTitle}
         onClose={() => setShowDetails(false)}
       >
-<RecordDetailsPanel
-  styles={panelTableStyles}
-  record={selectedRecord}
-  source={selectedMonth ? `Archive: ${formatMonthLabel(selectedMonth)}` : "Archive"}
-  archiveMonthId={selectedMonth}
-  isArchive={true}
-  onRenewSaved={({ oldId, newRecord }) => {
-    console.log("Renew saved:", oldId, newRecord);
-    showToast("Renew Saved", "✅ Renewed record saved successfully.");
-  }}
-  onUpdated={(updated) => {
-    setRecords((prev) =>
-      (prev || []).map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
-    );
-    setSelectedRecord((prev) =>
-      prev?.id === updated.id ? { ...prev, ...updated } : prev
-    );
-    showToast("Updated", "✅ Record updated successfully.");
-  }}
-/>
+        <RecordDetailsPanel
+          styles={panelTableStyles}
+          record={selectedRecord}
+          source={selectedMonth ? `Archive: ${formatMonthLabel(selectedMonth)}` : "Archive"}
+          isArchive={true}
+          onRenewSaved={({ oldId, newRecord }) => {
+            console.log("Renew saved:", oldId, newRecord);
+            showToast("Renew Saved", "✅ Renewed record saved successfully.");
+          }}
+          onUpdated={(updated) => {
+            setRecords((prev) =>
+              (prev || []).map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+            );
+            setSelectedRecord((prev) =>
+              prev?.id === updated.id ? { ...prev, ...updated } : prev
+            );
+            showToast("Updated", "✅ Record updated successfully.");
+          }}
+        />
       </DetailsFullScreen>
 
-      {/* ✅ UN-CLOSE CONFIRM MODAL (glass) */}
+      <PrintSelectionModal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        records={filtered}
+        onPrintSelected={handlePrintSelected}
+      />
+
       <ConfirmModal
         C={C}
         open={showUncloseConfirm}
