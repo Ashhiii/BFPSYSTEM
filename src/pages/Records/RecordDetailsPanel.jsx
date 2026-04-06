@@ -207,10 +207,12 @@ export default function RecordDetailsPanel({
   styles,
   record,
   source,
+  archiveMonthId,
   isArchive,
   onRenewSaved,
   onUpdated,
 }) {
+
   const navigate = useNavigate();
 
   const [editing, setEditing] = useState(false);
@@ -395,7 +397,7 @@ export default function RecordDetailsPanel({
     navigate("/app/add-record", { state: { prefill } });
   };
 
-  const saveEdit = async () => {
+const saveEdit = async () => {
   if (!record?.id) return alert("Missing record.id (cannot save).");
 
   try {
@@ -427,61 +429,69 @@ export default function RecordDetailsPanel({
     payload.storeyCount = payload.noOfStorey;
 
     const targetDocRef = isArchive
-      ? doc(db, "archives", String(source || "").replace("Archive: ", ""), "records", record.id)
+      ? doc(db, "archives", String(archiveMonthId || ""), "records", record.id)
       : doc(db, "records", record.id);
 
-    // 1) save to firestore
     await setDoc(targetDocRef, payload, { merge: true });
 
-    // 2) sync to backend/api so template download uses new data
+    // important: sync latest edited data to backend record
+    const apiBase =
+      (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+
     try {
-      const apiBase =
-        (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+      const backendPayload = {
+        ...record,
+        ...payload,
+        id: record.id,
+
+        // keep all possible aliases in sync
+        fsicNo: payload.fsicNo ?? "",
+        FSIC_NUMBER: payload.fsicNo ?? "",
+        fsic_number: payload.fsicNo ?? "",
+
+        fsicAppNo: payload.fsicAppNo ?? "",
+        FSIC_APP_NO: payload.fsicAppNo ?? "",
+
+        natureOfInspection: payload.natureOfInspection ?? "",
+        ownerName: payload.ownerName ?? "",
+        establishmentName: payload.establishmentName ?? "",
+        businessAddress: payload.businessAddress ?? "",
+        contactNumber: payload.contactNumber ?? "",
+        dateInspected: payload.dateInspected ?? "",
+        ioNumber: payload.ioNumber ?? "",
+        ioDate: payload.ioDate ?? "",
+        nfsiNumber: payload.nfsiNumber ?? "",
+        nfsiDate: payload.nfsiDate ?? "",
+        ntcNumber: payload.ntcNumber ?? "",
+        ntcDate: payload.ntcDate ?? "",
+        fsicValidity: payload.fsicValidity ?? "",
+        defects: payload.defects ?? "",
+        occupancyType: payload.occupancyType ?? "",
+        typeOfOccupancy: payload.occupancyType ?? "",
+        buildingDescription: payload.buildingDescription ?? "",
+        buildingDesc: payload.buildingDescription ?? "",
+        floorAreaSqm: payload.floorAreaSqm ?? "",
+        floorArea: payload.floorAreaSqm ?? "",
+        noOfStorey: payload.noOfStorey ?? "",
+        storeyCount: payload.noOfStorey ?? "",
+        highRise: payload.highRise ?? "",
+        fsmr: payload.fsmr ?? "",
+        remarks: payload.remarks ?? "",
+        orNumber: payload.orNumber ?? "",
+        orAmount: payload.orAmount ?? "",
+        orDate: payload.orDate ?? "",
+        chiefName: payload.chiefName ?? "",
+        chiefPosition: payload.chiefPosition ?? "",
+        marshalName: payload.marshalName ?? "",
+        inspectors: payload.inspectors ?? "",
+      };
 
       await fetch(`${apiBase}/records/${record.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...record,
-          ...payload,
-          id: record.id,
-          fsicNo: payload.fsicNo ?? "",
-          fsicAppNo: payload.fsicAppNo ?? "",
-          natureOfInspection: payload.natureOfInspection ?? "",
-          ownerName: payload.ownerName ?? "",
-          establishmentName: payload.establishmentName ?? "",
-          businessAddress: payload.businessAddress ?? "",
-          contactNumber: payload.contactNumber ?? "",
-          dateInspected: payload.dateInspected ?? "",
-          ioNumber: payload.ioNumber ?? "",
-          ioDate: payload.ioDate ?? "",
-          nfsiNumber: payload.nfsiNumber ?? "",
-          nfsiDate: payload.nfsiDate ?? "",
-          ntcNumber: payload.ntcNumber ?? "",
-          ntcDate: payload.ntcDate ?? "",
-          fsicValidity: payload.fsicValidity ?? "",
-          defects: payload.defects ?? "",
-          occupancyType: payload.occupancyType ?? "",
-          typeOfOccupancy: payload.occupancyType ?? "",
-          buildingDescription: payload.buildingDescription ?? "",
-          buildingDesc: payload.buildingDescription ?? "",
-          floorAreaSqm: payload.floorAreaSqm ?? "",
-          floorArea: payload.floorAreaSqm ?? "",
-          noOfStorey: payload.noOfStorey ?? "",
-          storeyCount: payload.noOfStorey ?? "",
-          highRise: payload.highRise ?? "",
-          fsmr: payload.fsmr ?? "",
-          remarks: payload.remarks ?? "",
-          orNumber: payload.orNumber ?? "",
-          orAmount: payload.orAmount ?? "",
-          orDate: payload.orDate ?? "",
-          chiefName: payload.chiefName ?? "",
-          chiefPosition: payload.chiefPosition ?? "",
-          marshalName: payload.marshalName ?? "",
-          inspectors: payload.inspectors ?? "",
-        }),
+        body: JSON.stringify(backendPayload),
       });
     } catch (apiErr) {
       console.error("Backend sync failed:", apiErr);
@@ -490,6 +500,9 @@ export default function RecordDetailsPanel({
     const updatedRecord = {
       ...record,
       ...payload,
+      fsicNo: payload.fsicNo ?? "",
+      FSIC_NUMBER: payload.fsicNo ?? "",
+      fsic_number: payload.fsicNo ?? "",
       id: record.id,
       _editedAt: Date.now(),
     };

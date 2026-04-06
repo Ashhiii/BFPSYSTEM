@@ -603,25 +603,26 @@ export default function Archive() {
         title={modalTitle}
         onClose={() => setShowDetails(false)}
       >
-        <RecordDetailsPanel
-          styles={panelTableStyles}
-          record={selectedRecord}
-          source={selectedMonth ? `Archive: ${formatMonthLabel(selectedMonth)}` : "Archive"}
-          isArchive={true}
-          onRenewSaved={({ oldId, newRecord }) => {
-            console.log("Renew saved:", oldId, newRecord);
-            showToast("Renew Saved", "✅ Renewed record saved successfully.");
-          }}
-          onUpdated={(updated) => {
-            setRecords((prev) =>
-              (prev || []).map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
-            );
-            setSelectedRecord((prev) =>
-              prev?.id === updated.id ? { ...prev, ...updated } : prev
-            );
-            showToast("Updated", "✅ Record updated successfully.");
-          }}
-        />
+<RecordDetailsPanel
+  styles={panelTableStyles}
+  record={selectedRecord}
+  source={selectedMonth ? `Archive: ${formatMonthLabel(selectedMonth)}` : "Archive"}
+  archiveMonthId={selectedMonth}
+  isArchive={true}
+  onRenewSaved={({ oldId, newRecord }) => {
+    console.log("Renew saved:", oldId, newRecord);
+    showToast("Renew Saved", "✅ Renewed record saved successfully.");
+  }}
+  onUpdated={(updated) => {
+    setRecords((prev) =>
+      (prev || []).map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+    );
+    setSelectedRecord((prev) =>
+      prev?.id === updated.id ? { ...prev, ...updated } : prev
+    );
+    showToast("Updated", "✅ Record updated successfully.");
+  }}
+/>
       </DetailsFullScreen>
 
       {/* ✅ UN-CLOSE CONFIRM MODAL (glass) */}
