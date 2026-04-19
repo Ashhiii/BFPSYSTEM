@@ -45,6 +45,8 @@ const TEMPLATE_OPTIONS = [
   { value: "HOT_WORKS", label: "Hot Works" },
   { value: "FIRE_DRILL", label: "Fire Drill Certification" },
   { value: "FUMIGATION", label: "Fumigation" },
+  { value: "SEMINAR", label: "Seminar" },
+  { value: "FIRE_SAFETY", label: "Fire Safety" },
 ];
 
 const HOTWORKS_MODE_OPTIONS = ["ANNUAL", "PROJECT BASED"];
@@ -55,6 +57,8 @@ const TEMPLATE_TYPE_TO_SLUG = {
   HOT_WORKS: "hotworks",
   FIRE_DRILL: "firedrill",
   FUMIGATION: "fumigation",
+  SEMINAR: "seminar",
+  FIRE_SAFETY: "firesafety",
 };
 
 const INITIAL_FORM = {
@@ -69,7 +73,6 @@ const INITIAL_FORM = {
   marshalName: "",
   marshalPosition: "",
 
-  controlNumber: "",
   orNumber: "",
   orAmount: "",
   orDate: "",
@@ -131,7 +134,6 @@ const UPPER_KEYS = new Set([
   "chiefPosition",
   "marshalName",
   "marshalPosition",
-  "controlNumber",
   "orNumber",
 
   "vehicleType",
@@ -178,14 +180,6 @@ const COMMON_FIELDS = [
     type: "select",
     required: true,
     span: 2,
-  },
-  {
-    key: "controlNumber",
-    label: "Control Number",
-    type: "text",
-    required: false,
-    span: 1,
-    placeholder: "Control number",
   },
   {
     key: "clearanceDate",
@@ -872,8 +866,6 @@ export default function AddClearance({
       type: typeSlug,
       clearanceType: typeSlug,
       templateLabel,
-
-      controlNumber: state.controlNumber || "",
 
       clearanceDateRaw: state.clearanceDate || "",
       clearanceDateYMD: state.clearanceDate || "",
