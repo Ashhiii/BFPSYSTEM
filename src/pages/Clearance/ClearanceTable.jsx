@@ -128,9 +128,11 @@ export default function ClearanceTable({
     if (raw === "HOT_WORKS" || raw === "HOTWORKS") return "hotworks";
     if (raw === "FIRE_DRILL" || raw === "FIREDRILL") return "firedrill";
     if (raw === "FUMIGATION") return "fumigation";
+    if (raw === "SEMINAR") return "seminar";
+    if (raw === "FIRE_SAFETY" || raw === "FIRESAFETY") return "firesafety";
 
     const lower = raw.toLowerCase();
-    if (["conveyance", "storage", "hotworks", "firedrill", "fumigation"].includes(lower)) {
+    if (["conveyance", "storage", "hotworks", "firedrill", "fumigation", "seminar", "firesafety"].includes(lower)) {
       return lower;
     }
 
@@ -154,6 +156,8 @@ export default function ClearanceTable({
       hotworks: "Hot Works",
       firedrill: "Fire Drill",
       fumigation: "Fumigation",
+      seminar: "Seminar",
+      firesafety: "Fire Safety",
     };
     return map[String(type || "").toLowerCase()] || type || "-";
   };
@@ -170,6 +174,8 @@ export default function ClearanceTable({
     if (templateValue === "hotworks") return `${API}/clearances/${id}/certificate/hotworks/pdf`;
     if (templateValue === "firedrill") return `${API}/clearances/${id}/certificate/firedrill/pdf`;
     if (templateValue === "fumigation") return `${API}/clearances/${id}/certificate/fumigation/pdf`;
+    if (templateValue === "seminar") return `${API}/clearances/${id}/certificate/seminar/pdf`;
+    if (templateValue === "firesafety") return `${API}/clearances/${id}/certificate/firesafety/pdf`;
 
     return "";
   };
@@ -275,6 +281,8 @@ export default function ClearanceTable({
                         <option value="hotworks">Hot Works PDF</option>
                         <option value="firedrill">Fire Drill PDF</option>
                         <option value="fumigation">Fumigation PDF</option>
+                        <option value="seminar">Seminar PDF</option>
+                        <option value="firesafety">Fire Safety PDF</option>
                       </select>
 
                       <button style={S.btn} onClick={(e) => handleGenerate(item, e)}>

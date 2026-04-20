@@ -123,6 +123,21 @@ const INITIAL_FORM = {
   operationDuration: "",
   foggingAddress: "",
   conductedBy: "",
+
+  // LPG / CONVEYANCE (UPDATED)
+vehicleType: "",
+plateNumber: "",
+brandOfVehicle: "",   // ✅ ADD
+engineNumber: "",     // ✅ ADD
+chassisNumber: "",
+permitNumber: "",     // ✅ ADD
+fsicIssued: "",       // ✅ ADD
+cageSize: "",         // ✅ ADD
+
+// Optional (keep if needed)
+driverName: "",
+licenseNumber: "",
+capacity: "",
 };
 
 const UPPER_KEYS = new Set([
@@ -566,6 +581,97 @@ const TEMPLATE_FIELDS = {
       placeholder: "Person / company who conducted the operation",
     },
   ],
+
+FIRE_SAFETY: [
+  {
+    key: "vehicleType",
+    label: "Type of Vehicle",
+    type: "text",
+    required: true,
+    span: 1,
+    placeholder: "Example: Motorcycle / Tricycle",
+  },
+  {
+    key: "plateNumber",
+    label: "Plate Number",
+    type: "text",
+    required: true,
+    span: 1,
+    placeholder: "ABC 1234",
+  },
+  {
+    key: "brandOfVehicle",
+    label: "Brand of Vehicle",
+    type: "text",
+    required: true,
+    span: 1,
+    placeholder: "Example: Honda",
+  },
+  {
+    key: "engineNumber",
+    label: "Engine Number",
+    type: "text",
+    required: true,
+    span: 1,
+    placeholder: "Engine number",
+  },
+  {
+    key: "chassisNumber",
+    label: "Chassis Number",
+    type: "text",
+    required: true,
+    span: 1,
+    placeholder: "Chassis number",
+  },
+  {
+    key: "permitNumber",
+    label: "Mayor’s Permit Number",
+    type: "text",
+    required: false,
+    span: 1,
+  },
+  {
+    key: "fsicIssued",
+    label: "FSIC No. & Date Issued",
+    type: "text",
+    required: false,
+    span: 1,
+  },
+  {
+    key: "cageSize",
+    label: "Cage Size",
+    type: "text",
+    required: false,
+    span: 1,
+    placeholder: "Size of LPG cage",
+  },
+],
+
+  SEMINAR: [
+  {
+    key: "fireDrillDate",
+    label: "Date Conducted",
+    type: "date",
+    required: true,
+    span: 1,
+  },
+  {
+    key: "issuedDay",
+    label: "Issued Day",
+    type: "number",
+    required: false,
+    span: 1,
+    placeholder: "Example: 12",
+  },
+  {
+    key: "issuedMonth",
+    label: "Issued Month",
+    type: "text",
+    required: false,
+    span: 2,
+    placeholder: "Example: March",
+  },
+]
 };
 
 export default function AddClearance({
@@ -602,6 +708,8 @@ export default function AddClearance({
       hotworks: "HOT_WORKS",
       firedrill: "FIRE_DRILL",
       fumigation: "FUMIGATION",
+      seminar: "SEMINAR",
+      firesafety: "FIRE_SAFETY",
     };
 
     const nextTemplateType =
@@ -902,6 +1010,16 @@ export default function AddClearance({
       fogging_address: state.foggingAddress || "",
       conductedBy: state.conductedBy || "",
       conducted_by: state.conductedBy || "",
+
+      brandOfVehicle: state.brandOfVehicle || "",
+engineNumber: state.engineNumber || "",
+permitNumber: state.permitNumber || "",
+fsicIssued: state.fsicIssued || "",
+cageSize: state.cageSize || "",
+
+orNumber: state.orNumber || "",
+orAmount: state.orAmount || state.amountPaid || "",
+amountPaid: state.amountPaid || state.orAmount || "",
 
       updatedAt: serverTimestamp(),
       ...(editingClearance
