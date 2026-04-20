@@ -394,6 +394,16 @@ export default function RecordDetailsPanel({
       storeyCount: record.noOfStorey ?? record.storeyCount ?? "",
     };
 
+    setForm((prev) => {
+    const cleaned = { ...prev };
+
+    delete cleaned.id;
+    delete cleaned.docId;
+    delete cleaned._id;
+
+    return cleaned;
+  });
+
     navigate("/app/add-record", { state: { prefill } });
   };
 
@@ -712,6 +722,13 @@ const saveEdit = async () => {
   const title = record.establishmentName || record.fsicAppNo || record.primaryId || "Record";
   const mode = editing ? "edit" : renewing ? "renew" : "view";
 
+  const cleanForm = (record) => ({
+  field1: record.field1 || "",
+  field2: record.field2 || "",
+  inspectors: record.inspectors || [],
+  // IMPORTANT: remove Firestore metadata
+});
+
   return (
     <div style={panel}>
       <div style={head}>
@@ -743,8 +760,8 @@ const saveEdit = async () => {
                 <button
                   style={btn("gold")}
                   onClick={() => {
-                    resetFormToRecord();
-                    setRenewing(true);
+setForm(cleanForm(record));                    
+setRenewing(true);
                     setEditing(false);
                   }}
                 >

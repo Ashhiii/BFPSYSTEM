@@ -620,19 +620,38 @@ export default function AddRecord({ setRefresh }) {
     }
   };
 
-  const buildPayload = (state) => {
-    const payload = { ...state };
+  const cleanPayload = (data) => {
+  const { id, docId, _id, ...rest } = data;
 
-    payload.dateInspected = formatDateLong(state.dateInspected);
-    payload.ioDate = formatDateLong(state.ioDate);
-    payload.nfsiDate = formatDateLong(state.nfsiDate);
-    payload.orDate = formatDateLong(state.orDate);
-    payload.ntcDate = formatDateLong(state.ntcDate);
+  // remove undefined values
+  Object.keys(rest).forEach((key) => {
+    if (rest[key] === undefined) {
+      delete rest[key];
+    }
+  });
 
-    payload.createdAt = serverTimestamp();
-    payload.updatedAt = serverTimestamp();
-    return payload;
-  };
+  return rest;
+};
+
+const buildPayload = (state = {}) => {
+  const payload = { ...state };
+
+  payload.dateInspected = formatDateLong(state?.dateInspected);
+  payload.ioDate = formatDateLong(state?.ioDate);
+  payload.nfsiDate = formatDateLong(state?.nfsiDate);
+  payload.orDate = formatDateLong(state?.orDate);
+  payload.ntcDate = formatDateLong(state?.ntcDate);
+
+  payload.createdAt = serverTimestamp();
+  payload.updatedAt = serverTimestamp();
+
+  // IMPORTANT CLEANUP
+  Object.keys(payload).forEach((k) => {
+    if (payload[k] === undefined) delete payload[k];
+  });
+
+  return payload;
+};
 
   const submit = async () => {
     const firstRequiredError = requiredKeys.find(
@@ -678,9 +697,8 @@ export default function AddRecord({ setRefresh }) {
         inspectors: combineInspectors(form),
       };
 
-      const payload = buildPayload(withCombined);
-
-      await addDoc(collection(db, "records"), payload);
+    const payload = buildPayload(cleanPayload(withCombined));
+    await addDoc(collection(db, "records"), payload);
 
       setToastOpen(true);
       setForm(INITIAL_FORM);
