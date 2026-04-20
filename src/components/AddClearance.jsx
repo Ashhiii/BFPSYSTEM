@@ -40,13 +40,13 @@ const getEndOfYearYMD = (yyyy_mm_dd) => {
 const isYMD = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
 
 const TEMPLATE_OPTIONS = [
-  { value: "CONVEYANCE", label: "Conveyance" },
+  { value: "CONVEYANCE", label: "Conveyance Tanker" },
   { value: "STORAGE", label: "Storage" },
   { value: "HOT_WORKS", label: "Hot Works" },
   { value: "FIRE_DRILL", label: "Fire Drill Certification" },
   { value: "FUMIGATION", label: "Fumigation" },
-  { value: "SEMINAR", label: "Seminar" },
-  { value: "FIRE_SAFETY", label: "Fire Safety" },
+  { value: "SEMINAR", label: "Lecture" },
+  { value: "FIRE_SAFETY", label: "Conveyance LPG" },
 ];
 
 const HOTWORKS_MODE_OPTIONS = ["ANNUAL", "PROJECT BASED"];

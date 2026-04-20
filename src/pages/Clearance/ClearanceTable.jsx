@@ -151,13 +151,13 @@ export default function ClearanceTable({
 
   const formatType = (type) => {
     const map = {
-      conveyance: "Conveyance",
+      conveyance: "Conveyance Tanker",
       storage: "Storage",
       hotworks: "Hot Works",
       firedrill: "Fire Drill",
       fumigation: "Fumigation",
       seminar: "Seminar",
-      firesafety: "Fire Safety",
+      firesafety: "Conveyance LPG",
     };
     return map[String(type || "").toLowerCase()] || type || "-";
   };

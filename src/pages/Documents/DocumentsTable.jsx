@@ -165,6 +165,7 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
         <thead>
           <tr>
             <th style={{ ...S.th, width: 150 }}>FSIC App No</th>
+            <th style={{ ...S.th, width: 200 }}>Inspector</th>
             <th style={{ ...S.th, width: 200 }}>Owner</th>
             <th style={{ ...S.th, width: 140 }}>IO Number</th>
             <th style={{ ...S.th, width: 140 }}>IO Date</th>
@@ -194,6 +195,10 @@ export default function DocumentsTable({ docs = [], onRowClick, apiBase }) {
               >
                 <td style={S.td}>
                   <div style={clamp2}>{d.fsicAppNo || "-"}</div>
+                </td>
+
+                <td style={S.td}>
+                  <div style={clamp2}>{d.inspector1 || "-"}</div>
                 </td>
 
                 <td style={S.td}>
