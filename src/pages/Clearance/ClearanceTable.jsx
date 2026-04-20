@@ -162,23 +162,23 @@ export default function ClearanceTable({
     return map[String(type || "").toLowerCase()] || type || "-";
   };
 
-  const getId = (item) => {
-    return String(item?.id || item?.docId || item?._id || "").trim();
-  };
+    const getId = (item) => {
+      return String(item?.id || item?.docId || item?._id || "").trim();
+    };
 
-  const getPdfUrl = (templateValue, id) => {
-    if (!templateValue || !id) return "";
+    const getPdfUrl = (templateValue, id) => {
+      if (!templateValue || !id) return "";
 
-    if (templateValue === "conveyance") return `${API}/clearances/${id}/certificate/conveyance/pdf`;
-    if (templateValue === "storage") return `${API}/clearances/${id}/certificate/storage/pdf`;
-    if (templateValue === "hotworks") return `${API}/clearances/${id}/certificate/hotworks/pdf`;
-    if (templateValue === "firedrill") return `${API}/clearances/${id}/certificate/firedrill/pdf`;
-    if (templateValue === "fumigation") return `${API}/clearances/${id}/certificate/fumigation/pdf`;
-    if (templateValue === "seminar") return `${API}/clearances/${id}/certificate/seminar/pdf`;
-    if (templateValue === "firesafety") return `${API}/clearances/${id}/certificate/firesafety/pdf`;
+      if (templateValue === "conveyance") return `${API}/clearances/${id}/certificate/conveyance/pdf`;
+      if (templateValue === "storage") return `${API}/clearances/${id}/certificate/storage/pdf`;
+      if (templateValue === "hotworks") return `${API}/clearances/${id}/certificate/hotworks/pdf`;
+      if (templateValue === "firedrill") return `${API}/clearances/${id}/certificate/firedrill/pdf`;
+      if (templateValue === "fumigation") return `${API}/clearances/${id}/certificate/fumigation/pdf`;
+      if (templateValue === "seminar") return `${API}/clearances/${id}/certificate/seminar/pdf`;
+      if (templateValue === "firesafety") return `${API}/clearances/${id}/certificate/firesafety/pdf`;
 
-    return "";
-  };
+      return "";
+    };
 
   const handleGenerate = (item, e) => {
     e.stopPropagation();
