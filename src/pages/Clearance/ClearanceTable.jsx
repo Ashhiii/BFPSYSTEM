@@ -128,7 +128,7 @@ export default function ClearanceTable({
     if (raw === "HOT_WORKS" || raw === "HOTWORKS") return "hotworks";
     if (raw === "FIRE_DRILL" || raw === "FIREDRILL") return "firedrill";
     if (raw === "FUMIGATION") return "fumigation";
-    if (raw === "SEMINAR") return "seminar";
+    if (raw === "SEMINAR" || raw === "FSED-SEMINAR") return "seminar";
     if (raw === "FIRE_SAFETY" || raw === "FIRESAFETY") return "firesafety";
 
     const lower = raw.toLowerCase();
