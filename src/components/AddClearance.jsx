@@ -106,9 +106,6 @@ const INITIAL_FORM = {
   hotWorksMode: "",
   jobOrderNumber: "",
   natureOfJob: "",
-  facilityAddress: "",
-  permitAuthorizingIndividual: "",
-  hotWorkOperator: "",
   fireWatchName: "",
 
   // FIRE DRILL
@@ -174,9 +171,6 @@ const UPPER_KEYS = new Set([
   "hotWorksMode",
   "jobOrderNumber",
   "natureOfJob",
-  "facilityAddress",
-  "permitAuthorizingIndividual",
-  "hotWorkOperator",
   "fireWatchName",
 
   "issuedMonth",
@@ -471,30 +465,6 @@ const TEMPLATE_FIELDS = {
       required: false,
       span: 2,
       placeholder: "Nature of work",
-    },
-    {
-      key: "facilityAddress",
-      label: "Building / Structure / Facility Address",
-      type: "text",
-      required: false,
-      span: 2,
-      placeholder: "Work site address",
-    },
-    {
-      key: "permitAuthorizingIndividual",
-      label: "Permit Authorizing Individual (PAI)",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "PAI name",
-    },
-    {
-      key: "hotWorkOperator",
-      label: "Hot Work Operator / Contractor",
-      type: "text",
-      required: false,
-      span: 1,
-      placeholder: "Operator / contractor",
     },
     {
       key: "fireWatchName",

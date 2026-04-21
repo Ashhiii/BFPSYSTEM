@@ -123,16 +123,6 @@ const FIELDS = [
   },
   { key: "natureOfJob", label: "Nature of Job", types: ["hotworks"] },
   {
-    key: "permitAuthorizingIndividual",
-    label: "Permit Authorizing Individual",
-    types: ["hotworks"],
-  },
-  {
-    key: "hotWorkOperator",
-    label: "Hotwork Operator",
-    types: ["hotworks"],
-  },
-  {
     key: "fireWatch",
     label: "Fire Watch",
     types: ["hotworks"],
@@ -194,10 +184,7 @@ const CAPS_KEYS = new Set([
   "companyName",
   "jobOrderNumber",
   "natureOfJob",
-  "permitAuthorizingIndividual",
-  "hotWorkOperator",
   "fireWatch",
-  "operatorName",
   "issuedMonth",
   "foggingAddress",
 "conductedBy",
