@@ -40,6 +40,7 @@ const FIELDS = [
   { key: "chiefName", label: "Chief" },
   { key: "chiefPosition", label: "Chief Position" },
   { key: "marshalName", label: "Marshal" },
+  { key: "marshalPosition", label: "Marshal Position" },
 ];
 
 const CAPS_KEYS = new Set([

@@ -109,6 +109,7 @@ const FIELDS = [
   { key: "chiefName", label: "Chief" },
   { key: "chiefPosition", label: "Chief Position" },
   { key: "marshalName", label: "Marshal" },
+  { key: "marshalPosition", label: "Marshal Position" },
 ];
 
 const CAPS_KEYS = new Set([
@@ -137,6 +138,7 @@ const CAPS_KEYS = new Set([
   "chiefName",
   "chiefPosition",
   "marshalName",
+  "marshalPosition",
 ]);
 
 const NO_CAPS_KEYS = new Set([
@@ -493,6 +495,7 @@ const saveEdit = async () => {
         chiefName: payload.chiefName ?? "",
         chiefPosition: payload.chiefPosition ?? "",
         marshalName: payload.marshalName ?? "",
+        marshalPosition: payload.marshalPosition ?? "",
         inspectors: payload.inspectors ?? "",
       };
 

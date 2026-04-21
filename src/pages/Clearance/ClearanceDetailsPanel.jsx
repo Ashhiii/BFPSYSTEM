@@ -55,6 +55,7 @@ const FIELDS = [
   { key: "chiefName", label: "Chief Name" },
   { key: "chiefPosition", label: "Chief Position" },
   { key: "marshalName", label: "Marshal Name" },
+  { key: "marshalPosition", label: "Marshal Position" },
   {
     key: "clearanceValidity",
     label: "Clearance Validity",
@@ -170,6 +171,7 @@ const CAPS_KEYS = new Set([
   "chiefName",
   "chiefPosition",
   "marshalName",
+  "marshalPosition",
   "amountPaid",
   "clearanceValidity",
   "plateNumber",

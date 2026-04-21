@@ -82,6 +82,7 @@ const INITIAL_FORM = {
   marshalPosition: "",
   marshalName: "",
 
+
   natureOfInspection: "",
 
   ownerName: "",
@@ -138,6 +139,7 @@ const UPPER_KEYS = new Set([
   "chiefName",
   "chiefPosition",
   "marshalName",
+  "marshalPosition",
   "natureOfInspection",
   "ownerName",
   "establishmentName",
@@ -262,6 +264,7 @@ const FIELDS = [
   { key: "chiefName", label: "Chief, Fire Safety Enforcement Section", placeholder: "Chief name", required: false, type: "text", span: 1 },
   { key: "chiefPosition", label: "Chief Position", placeholder: "Chief, Fire Prevention Branch", required: false, type: "text", span: 1 },
   { key: "marshalName", label: "District Fire Marshal", placeholder: "Marshal name", required: false, type: "text", span: 1 },
+  { key: "marshalPosition", label: "Marshal Position", placeholder: "District Fire Marshal", required: false, type: "text", span: 1 },
 ];
 
 export default function AddRecord({ setRefresh }) {
