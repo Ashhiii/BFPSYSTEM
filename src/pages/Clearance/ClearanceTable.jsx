@@ -276,13 +276,13 @@ export default function ClearanceTable({
                           }))
                         }
                       >
-                        <option value="conveyance">Conveyance PDF</option>
+                        <option value="conveyance">Conveyance Tanker PDF</option>
                         <option value="storage">Storage PDF</option>
                         <option value="hotworks">Hot Works PDF</option>
                         <option value="firedrill">Fire Drill PDF</option>
                         <option value="fumigation">Fumigation PDF</option>
                         <option value="seminar">Seminar PDF</option>
-                        <option value="firesafety">Fire Safety PDF</option>
+                        <option value="firesafety">Conveyance LPG PDF</option>
                       </select>
 
                       <button style={S.btn} onClick={(e) => handleGenerate(item, e)}>
