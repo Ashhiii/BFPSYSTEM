@@ -231,7 +231,7 @@ export default function RecordDetailsPanel({
           {mode === "renew" && (
             <button style={btn("danger")} onClick={() => setMode("view")} disabled={saving}>
               Cancel
-            </button>
+            </button>D
           )}
         </div>
       </div>

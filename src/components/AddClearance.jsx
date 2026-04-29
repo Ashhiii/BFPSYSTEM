@@ -202,7 +202,7 @@ const COMMON_FIELDS = [
     label: "Activity Validity",
     type: "text",
     required: false,
-    span: 2,
+    span: 1,
     readOnly: true,
     placeholder: "Auto generated validity",
   },

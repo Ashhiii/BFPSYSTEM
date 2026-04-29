@@ -84,6 +84,10 @@ const REMARK_OPTIONS = [
   { value: "CAN'T BE LOCATED", label: "CAN'T BE LOCATED" },
   { value: "REFUSED", label: "REFUSED" },
   { value: "NTC", label: "NTC" },
+  { value: "NTCV", label: "NTCV" },
+  { value: "ON AFFIDAVIT", label: "ON AFFIDAVIT" },
+  { value: "ABATEMENT", label: "ABATEMENT" },
+  { value: "CLOSURE", label: "CLOSURE" },
 ];
 
 const matchesRemarksFilter = (remarksValue, filter) => {
