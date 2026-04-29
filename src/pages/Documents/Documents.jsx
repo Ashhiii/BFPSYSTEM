@@ -44,19 +44,27 @@ export default function Documents({ refresh, setRefresh }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
-  const filtered = useMemo(() => {
-    const key = search.toLowerCase().trim();
-    if (!key) return docs;
+const filtered = useMemo(() => {
+  const keys = search
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
 
-    return (docs || []).filter((d) => {
-      return (
-        (d.ownerName || "").toLowerCase().includes(key) ||
-        (d.fsicAppNo || "").toLowerCase().includes(key) ||
-        (d.ioNumber || "").toLowerCase().includes(key) ||
-        (d.nfsiNumber || "").toLowerCase().includes(key)
-      );
-    });
-  }, [docs, search]);
+  if (!keys.length) return docs;
+
+  return (docs || []).filter((d) => {
+    const text = `
+      ${d.ownerName || ""}
+      ${d.fsicAppNo || ""}
+      ${d.ioNumber || ""}
+      ${d.nfsiNumber || ""}
+    `.toLowerCase();
+
+    // ✅ ANY keyword match (OR)
+    return keys.some((k) => text.includes(k));
+  });
+}, [docs, search]);
 
   const onSelectRow = (d) => {
     setSelectedDoc(d);
